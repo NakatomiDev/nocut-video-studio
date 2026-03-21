@@ -10,10 +10,16 @@ const MULTIPART_THRESHOLD = 50 * 1024 * 1024; // 50 MB
 
 export const s3Client = new S3Client({
   region: config.aws.region,
-  credentials: {
-    accessKeyId: config.aws.accessKeyId,
-    secretAccessKey: config.aws.secretAccessKey,
-  },
+  // On ECS, credentials come from the task role via the default credential chain.
+  // Only set explicit credentials when provided (local development).
+  ...(config.aws.accessKeyId && config.aws.secretAccessKey
+    ? {
+        credentials: {
+          accessKeyId: config.aws.accessKeyId,
+          secretAccessKey: config.aws.secretAccessKey,
+        },
+      }
+    : {}),
 });
 
 export async function downloadFile(s3Key: string, localPath: string): Promise<void> {
