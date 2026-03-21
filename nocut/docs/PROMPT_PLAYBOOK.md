@@ -825,7 +825,7 @@ POST-COMPLETION (mandatory):
 
 ## 2.3 — Transcoding Worker
 
-### - [ ] Prompt 2.3.1 — Build transcoding Docker service
+### - [x] Prompt 2.3.1 — Build transcoding Docker service *(completed 2026-03-21)*
 
 **Tool: Claude Code**
 

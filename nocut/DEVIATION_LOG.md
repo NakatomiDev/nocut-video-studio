@@ -103,3 +103,19 @@ A running log of architectural decisions that deviate from the original spec or 
 - `src/App.tsx` — Added `/upload` route (protected, no AppLayout wrapper since it's a full-screen overlay)
 **Deviation:** (1) Upload page is a full-screen overlay at `/upload` rather than a modal dialog — simpler routing and avoids z-index issues with the sidebar. (2) The `/upload` route uses `ProtectedRoute` without `AppLayout` since the overlay covers the entire screen. (3) ETag from S3 presigned PUT responses may not always be accessible due to CORS — falls back to a generated placeholder ETag. S3 CORS config must include `ExposeHeaders: ["ETag"]` for proper multipart completion. (4) Realtime subscription for project status is set up after upload-complete succeeds; channel cleanup relies on component unmount.
 **Impact:** S3 bucket CORS configuration must expose the `ETag` header for chunked uploads to work correctly with `CompleteMultipartUpload`. The editor page at `/project/{project_id}` does not exist yet — redirect will 404 until Sprint 3.
+
+### [2026-03-21] — Prompt 2.3.1: Transcoding Docker service
+
+**Area:** Backend / Services
+**Original plan:** Create a Node.js service at `services/transcoder/` that connects to Redis (BullMQ), polls `video.transcode` jobs, downloads source from S3, runs FFmpeg (transcode, proxy, waveform, thumbnails), uploads results, and updates Supabase DB.
+**Files created:**
+- `services/transcoder/package.json` — Dependencies: bullmq, @aws-sdk/client-s3, @aws-sdk/lib-storage, @supabase/supabase-js
+- `services/transcoder/tsconfig.json` — ES2022/NodeNext target
+- `services/transcoder/Dockerfile` — node:20-slim + FFmpeg via apt-get, runs as non-root user
+- `services/transcoder/src/config.ts` — Validated env vars (REDIS_URL, SUPABASE_*, AWS_*, CONCURRENCY)
+- `services/transcoder/src/supabase.ts` — Service-role client with job lifecycle helpers (claim, progress, complete, fail) and DB update functions
+- `services/transcoder/src/s3.ts` — Download/upload utilities with multipart upload for large files (>50MB)
+- `services/transcoder/src/transcoder.ts` — Core FFmpeg pipeline: probe → transcode H.264/AAC → 360p proxy → waveform extraction → thumbnail sprite sheets → upload → DB update
+- `services/transcoder/src/index.ts` — BullMQ worker + Supabase poller bridge
+**Deviation:** (1) Uses a hybrid Supabase-poller-to-BullMQ architecture: since `upload-complete` inserts jobs into the Supabase `job_queue` table (not Redis), a 5-second poller reads queued rows, claims them (optimistic lock via `status='queued'` WHERE clause), and feeds them into a local BullMQ queue. BullMQ handles concurrency and processing. (2) Removed standalone `ioredis` dependency — BullMQ bundles its own ioredis; using a separate version causes TypeScript type conflicts. Connection is passed as a URL config object instead. (3) `incrementAttempts` uses a fallback read-then-write pattern since no `increment_job_attempts` RPC function exists yet. (4) Waveform extraction pipes raw f32le audio from FFmpeg, downsamples to ~1000 normalized (0-1) data points. (5) Thumbnail sprites use FFmpeg `tile=10x1` filter without `-frames:v 1`, producing multiple sprite sheets automatically for videos longer than 10 seconds.
+**Impact:** The transcoder is ready to deploy as a Docker container to ECS Fargate. It transitions projects from `transcoding` → `detecting` and enqueues `video.detect` jobs for the detector service (Prompt 3.1.1). An `increment_job_attempts` Postgres function could be added for atomic increment but the fallback works correctly for the current concurrency model.
