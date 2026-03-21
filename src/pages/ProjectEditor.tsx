@@ -247,6 +247,7 @@ const ProjectEditor = () => {
             <WaveformTimeline
               waveformUrl={waveformUrl}
               videoUrl={videoUrl}
+              thumbnailSpriteUrl={thumbnailSpriteUrl}
               duration={video?.duration || 0}
             />
           </div>
