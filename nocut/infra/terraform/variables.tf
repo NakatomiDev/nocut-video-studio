@@ -44,12 +44,6 @@ variable "supabase_url" {
   type        = string
 }
 
-variable "supabase_service_role_key" {
-  description = "Supabase service-role key (server-side only)"
-  type        = string
-  sensitive   = true
-}
-
 variable "transcoder_cpu" {
   description = "CPU units for the transcoder task (1024 = 1 vCPU)"
   type        = number

@@ -16,7 +16,9 @@ redis_auth_token       = "change-me-to-a-strong-token"
 
 # Supabase
 supabase_url               = "https://your-project.supabase.co"
-supabase_service_role_key  = "eyJ..."
+# NOTE: supabase_service_role_key and redis_auth_token are stored in
+# AWS Secrets Manager (nocut/supabase-service-role-key, nocut/redis-auth-token)
+# and injected into containers at launch — not passed via Terraform variables.
 
 # ECS service sizing (defaults are fine for dev)
 # transcoder_cpu           = 1024
