@@ -911,7 +911,7 @@ POST-COMPLETION (mandatory):
 
 ## 3.1 — Silence Detection
 
-### - [ ] Prompt 3.1.1 — Build silence detection service
+### - [x] Prompt 3.1.1 — Build silence detection service *(completed 2026-03-21)*
 
 **Tool: Claude Code**
 
