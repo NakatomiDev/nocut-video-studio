@@ -90,3 +90,16 @@ A running log of architectural decisions that deviate from the original spec or 
 - `supabase/functions/upload-complete/index.ts` — Validates auth/ownership, verifies all chunks present, calls S3 CompleteMultipartUpload, updates project status, inserts job_queue row
 **Deviation:** (1) The spec listed `upload_session_id` as UUID type in the request body, but it is actually the S3 multipart UploadId which is a string (not a UUID). Validation accepts any non-empty string, consistent with upload-initiate. (2) No additional migration needed — migration 005 from Prompt 2.1.1 already added the required `upload_chunks`, `multipart_upload_id`, and `total_chunks` columns. (3) Chunk completion uses read-modify-write pattern on the JSONB array rather than a Postgres function, which is acceptable for typical upload concurrency. Duplicate chunk_index entries are handled idempotently (replaced, not duplicated). (4) Job queue insertion failure is treated as non-fatal — the project status is already updated and the job can be retried manually.
 **Impact:** The complete upload pipeline (initiate → chunk-complete → upload-complete) is now functional. The next step (Prompt 2.2.1) can build the frontend upload UI against these three endpoints. The transcoding worker (Prompt 2.3.1) will poll the job_queue for `video.transcode` jobs.
+
+### 2026-03-21 — Upload flow UI (Prompt 2.2.1)
+
+**Area:** Frontend
+**Original plan:** Build upload modal/page with drag-and-drop zone, file validation, chunked upload with progress, speed/ETA, error handling with resume, and Realtime subscription for processing status.
+**Files created:**
+- `src/hooks/useUpload.ts` — Upload state machine and chunked upload engine (4 concurrent workers, 5MB chunks, resume support)
+- `src/pages/Upload.tsx` — Full-screen upload overlay with drag-and-drop zone, progress bar, processing status, error states
+**Files modified:**
+- `src/pages/Dashboard.tsx` — Wired "New Project" and "Upload Video" buttons to navigate to `/upload`
+- `src/App.tsx` — Added `/upload` route (protected, no AppLayout wrapper since it's a full-screen overlay)
+**Deviation:** (1) Upload page is a full-screen overlay at `/upload` rather than a modal dialog — simpler routing and avoids z-index issues with the sidebar. (2) The `/upload` route uses `ProtectedRoute` without `AppLayout` since the overlay covers the entire screen. (3) ETag from S3 presigned PUT responses may not always be accessible due to CORS — falls back to a generated placeholder ETag. S3 CORS config must include `ExposeHeaders: ["ETag"]` for proper multipart completion. (4) Realtime subscription for project status is set up after upload-complete succeeds; channel cleanup relies on component unmount.
+**Impact:** S3 bucket CORS configuration must expose the `ETag` header for chunked uploads to work correctly with `CompleteMultipartUpload`. The editor page at `/project/{project_id}` does not exist yet — redirect will 404 until Sprint 3.

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Plus, Scissors, Video } from "lucide-react";
 import ProjectCard from "@/components/ProjectCard";
@@ -8,12 +9,13 @@ const mockProjects: { id: string; title: string; status: string; date: string }[
 
 const Dashboard = () => {
   const [projects] = useState(mockProjects);
+  const navigate = useNavigate();
 
   return (
     <div className="p-6 lg:p-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-foreground">My Projects</h1>
-        <Button className="gap-2">
+        <Button className="gap-2" onClick={() => navigate("/upload")}>
           <Plus className="h-4 w-4" />
           New Project
         </Button>
@@ -29,7 +31,7 @@ const Dashboard = () => {
           <p className="mt-2 max-w-sm text-sm text-muted-foreground">
             Upload your first video to get started
           </p>
-          <Button className="mt-6 gap-2">
+          <Button className="mt-6 gap-2" onClick={() => navigate("/upload")}>
             <Plus className="h-4 w-4" />
             Upload Video
           </Button>

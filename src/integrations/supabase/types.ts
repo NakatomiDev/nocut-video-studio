@@ -529,11 +529,14 @@ export type Database = {
           file_size_bytes: number | null
           format: string | null
           id: string
+          multipart_upload_id: string | null
           project_id: string
           proxy_s3_key: string | null
           resolution: string | null
           s3_key: string
           thumbnail_sprite_s3_key: string | null
+          total_chunks: number | null
+          upload_chunks: Json | null
           waveform_s3_key: string | null
         }
         Insert: {
@@ -542,11 +545,14 @@ export type Database = {
           file_size_bytes?: number | null
           format?: string | null
           id?: string
+          multipart_upload_id?: string | null
           project_id: string
           proxy_s3_key?: string | null
           resolution?: string | null
           s3_key: string
           thumbnail_sprite_s3_key?: string | null
+          total_chunks?: number | null
+          upload_chunks?: Json | null
           waveform_s3_key?: string | null
         }
         Update: {
@@ -555,11 +561,14 @@ export type Database = {
           file_size_bytes?: number | null
           format?: string | null
           id?: string
+          multipart_upload_id?: string | null
           project_id?: string
           proxy_s3_key?: string | null
           resolution?: string | null
           s3_key?: string
           thumbnail_sprite_s3_key?: string | null
+          total_chunks?: number | null
+          upload_chunks?: Json | null
           waveform_s3_key?: string | null
         }
         Relationships: [
