@@ -68,9 +68,20 @@ const ProjectEditor = () => {
 
       if (vid) {
         setVideo(vid);
-        // Use proxy or original s3_key — in production this would be a CloudFront/presigned URL
-        if (vid.proxy_s3_key) setVideoUrl(vid.proxy_s3_key);
-        else setVideoUrl(vid.s3_key);
+
+        // Get signed URLs for video and waveform
+        const videoKey = vid.proxy_s3_key || vid.s3_key;
+        const { data: videoSigned } = await supabase.functions.invoke('get-signed-url', {
+          body: { s3_key: videoKey },
+        });
+        if (videoSigned?.url) setVideoUrl(videoSigned.url);
+
+        if (vid.waveform_s3_key) {
+          const { data: waveformSigned } = await supabase.functions.invoke('get-signed-url', {
+            body: { s3_key: vid.waveform_s3_key },
+          });
+          if (waveformSigned?.url) setWaveformUrl(waveformSigned.url);
+        }
 
         // Fetch cut map
         const { data: cm } = await supabase
