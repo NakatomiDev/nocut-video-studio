@@ -34,3 +34,4 @@ nocut/.env
 *.tfstate
 *.tfstate.backup
 *.tfplan
+tfplan
