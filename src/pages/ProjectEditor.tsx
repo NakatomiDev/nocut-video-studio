@@ -17,6 +17,7 @@ const ProjectEditor = () => {
   const [processingStatus, setProcessingStatus] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [waveformUrl, setWaveformUrl] = useState<string | null>(null);
+  const [thumbnailSpriteUrl, setThumbnailSpriteUrl] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [editingTitle, setEditingTitle] = useState(false);
 
@@ -85,7 +86,7 @@ const ProjectEditor = () => {
       if (vid) {
         setVideo(vid);
 
-        // Get signed URLs for video and waveform
+        // Get signed URLs for video, waveform, and thumbnail sprite
         const videoKey = vid.proxy_s3_key || vid.s3_key;
         const videoResult = await supabase.functions.invoke('get-signed-url', {
           body: { s3_key: videoKey },
@@ -99,6 +100,14 @@ const ProjectEditor = () => {
           });
           const nextWaveformUrl = waveformResult.data?.url || waveformResult.data?.data?.url || null;
           if (nextWaveformUrl) setWaveformUrl(nextWaveformUrl);
+        }
+
+        if (vid.thumbnail_sprite_s3_key) {
+          const thumbnailResult = await supabase.functions.invoke('get-signed-url', {
+            body: { s3_key: vid.thumbnail_sprite_s3_key },
+          });
+          const nextThumbnailSpriteUrl = thumbnailResult.data?.url || thumbnailResult.data?.data?.url || null;
+          if (nextThumbnailSpriteUrl) setThumbnailSpriteUrl(nextThumbnailSpriteUrl);
         }
 
         // Fetch cut map
@@ -238,6 +247,7 @@ const ProjectEditor = () => {
             <WaveformTimeline
               waveformUrl={waveformUrl}
               videoUrl={videoUrl}
+              thumbnailSpriteUrl={thumbnailSpriteUrl}
               duration={video?.duration || 0}
             />
           </div>

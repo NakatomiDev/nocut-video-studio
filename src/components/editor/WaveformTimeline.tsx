@@ -14,10 +14,11 @@ const SNAP_THRESHOLD_S = 0.1;
 interface WaveformTimelineProps {
   waveformUrl: string | null;
   videoUrl: string | null;
+  thumbnailSpriteUrl?: string | null;
   duration: number;
 }
 
-const WaveformTimeline = ({ waveformUrl, videoUrl, duration }: WaveformTimelineProps) => {
+const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration }: WaveformTimelineProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const animFrameRef = useRef<number>(0);
@@ -46,13 +47,31 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, duration }: WaveformTimelineP
   const [hoveredCut, setHoveredCut] = useState<string | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [razorPreview, setRazorPreview] = useState<number | null>(null);
-  const [thumbnails, setThumbnails] = useState<{ time: number; img: HTMLImageElement }[]>([]);
+  const [thumbnailSprite, setThumbnailSprite] = useState<HTMLImageElement | null>(null);
 
-  // Generate video thumbnails
+  // Prefer server-generated thumbnail sprite, fall back to client-side extraction
   useEffect(() => {
-    if (!videoUrl || !duration) return;
     let cancelled = false;
-    const generate = async () => {
+
+    const loadSprite = async () => {
+      if (!thumbnailSpriteUrl || !duration) return false;
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = thumbnailSpriteUrl;
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('sprite failed to load'));
+      });
+
+      if (!cancelled) {
+        setThumbnailSprite(img);
+      }
+
+      return true;
+    };
+
+    const generateFallback = async () => {
+      if (!videoUrl || !duration) return;
       const video = document.createElement('video');
       video.crossOrigin = 'anonymous';
       video.preload = 'auto';
@@ -60,12 +79,12 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, duration }: WaveformTimelineP
       video.src = videoUrl;
       await new Promise<void>((resolve, reject) => {
         video.onloadeddata = () => resolve();
-        video.onerror = () => reject();
+        video.onerror = () => reject(new Error('video failed to load'));
       });
 
       const thumbCanvas = document.createElement('canvas');
-      const thumbH = 60;
-      const thumbW = Math.round((video.videoWidth / video.videoHeight) * thumbH) || 80;
+      const thumbH = 72;
+      const thumbW = Math.round((video.videoWidth / video.videoHeight) * thumbH) || 96;
       thumbCanvas.width = thumbW;
       thumbCanvas.height = thumbH;
       const tCtx = thumbCanvas.getContext('2d');
@@ -73,28 +92,44 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, duration }: WaveformTimelineP
 
       const count = Math.min(Math.max(Math.ceil(duration / 2), 5), 60);
       const interval = duration / count;
-      const results: { time: number; img: HTMLImageElement }[] = [];
+      const stripCanvas = document.createElement('canvas');
+      stripCanvas.width = thumbW * count;
+      stripCanvas.height = thumbH;
+      const stripCtx = stripCanvas.getContext('2d');
+      if (!stripCtx) return;
 
       for (let i = 0; i < count; i++) {
         if (cancelled) return;
-        const t = i * interval;
+        const t = Math.min(duration, i * interval);
         video.currentTime = t;
         await new Promise<void>((resolve) => {
           video.onseeked = () => resolve();
         });
+        tCtx.clearRect(0, 0, thumbW, thumbH);
         tCtx.drawImage(video, 0, 0, thumbW, thumbH);
-        const img = new Image();
-        img.src = thumbCanvas.toDataURL('image/jpeg', 0.6);
-        await new Promise<void>((resolve) => {
-          img.onload = () => resolve();
-        });
-        results.push({ time: t, img });
+        stripCtx.drawImage(thumbCanvas, i * thumbW, 0);
       }
-      if (!cancelled) setThumbnails(results);
+
+      const stripImage = new Image();
+      stripImage.src = stripCanvas.toDataURL('image/jpeg', 0.75);
+      await new Promise<void>((resolve) => {
+        stripImage.onload = () => resolve();
+        stripImage.onerror = () => resolve();
+      });
+
+      if (!cancelled) {
+        setThumbnailSprite(stripImage);
+      }
     };
-    generate().catch(() => {});
-    return () => { cancelled = true; };
-  }, [videoUrl, duration]);
+
+    setThumbnailSprite(null);
+    loadSprite()
+      .catch(() => generateFallback().catch(() => {}));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [thumbnailSpriteUrl, videoUrl, duration]);
 
   // Escape key to cancel razor
   useEffect(() => {
@@ -184,28 +219,8 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, duration }: WaveformTimelineP
     ctx.fillRect(0, 0, w, h);
 
     // Video thumbnail filmstrip
-    if (thumbnails.length > 0 && duration > 0) {
-      const thumbH = thumbnails[0].img.height;
-      const thumbW = thumbnails[0].img.width;
-      const scale = h / thumbH;
-      const drawW = thumbW * scale;
-      const interval = duration / thumbnails.length;
-
-      // Fill the visible area with evenly-spaced thumbnails
-      const totalThumbs = Math.ceil(totalWidth / drawW);
-      for (let i = 0; i < totalThumbs; i++) {
-        const x = i * drawW - scrollLeft;
-        if (x + drawW < 0 || x > w) continue;
-        // Find the closest thumbnail for this position
-        const t = (i * drawW / totalWidth) * duration;
-        let best = thumbnails[0];
-        let bestDist = Math.abs(t - best.time);
-        for (const thumb of thumbnails) {
-          const d = Math.abs(t - thumb.time);
-          if (d < bestDist) { best = thumb; bestDist = d; }
-        }
-        ctx.drawImage(best.img, x, 0, drawW, h);
-      }
+    if (thumbnailSprite && duration > 0) {
+      ctx.drawImage(thumbnailSprite, -scrollLeft, 0, totalWidth, h);
     }
 
     // Auto-detected cut overlays
@@ -293,7 +308,7 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, duration }: WaveformTimelineP
       ctx.fill();
     }
   }, [
-    thumbnails, containerWidth, totalWidth, scrollLeft, duration,
+    thumbnailSprite, containerWidth, totalWidth, scrollLeft, duration,
     cuts, activeCuts, manualCuts, activeManualCuts,
     hoveredCut, playheadPosition, timeToX,
     razorMode, razorStart, razorPreview,
