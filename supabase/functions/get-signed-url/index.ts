@@ -27,12 +27,12 @@ Deno.serve(async (req: Request) => {
     const { s3_key } = await req.json();
 
     if (!s3_key || typeof s3_key !== "string") {
-      return errorResponse("s3_key is required", 400);
+      return errorResponse("bad_request", "s3_key is required", 400);
     }
 
     // Verify the key belongs to this user (keys start with uploads/{user_id}/)
     if (!s3_key.startsWith(`uploads/${user.id}/`)) {
-      return errorResponse("Unauthorized", 403);
+      return errorResponse("unauthorized", "Unauthorized", 403);
     }
 
     const command = new GetObjectCommand({
@@ -48,6 +48,6 @@ Deno.serve(async (req: Request) => {
       return errorResponse(err.message, 401);
     }
     console.error("get-signed-url error:", err);
-    return errorResponse("Failed to generate signed URL", 500);
+    return errorResponse("internal_error", "Failed to generate signed URL", 500);
   }
 });
