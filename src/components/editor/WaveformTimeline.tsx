@@ -47,7 +47,7 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
   const [hoveredCut, setHoveredCut] = useState<string | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [razorPreview, setRazorPreview] = useState<number | null>(null);
-  const [thumbnails, setThumbnails] = useState<{ time: number; img: HTMLImageElement }[]>([]);
+  const [thumbnailSprite, setThumbnailSprite] = useState<HTMLImageElement | null>(null);
 
   // Prefer server-generated thumbnail sprite, fall back to client-side extraction
   useEffect(() => {
