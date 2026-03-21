@@ -20,6 +20,21 @@ const ProjectEditor = () => {
   const [title, setTitle] = useState('');
   const [editingTitle, setEditingTitle] = useState(false);
 
+  const extractSignedUrl = (response: unknown) => {
+    if (!response || typeof response !== 'object') return null;
+
+    const payload = response as {
+      data?: {
+        url?: string;
+        data?: {
+          url?: string;
+        };
+      };
+    };
+
+    return payload.data?.url || payload.data?.data?.url || null;
+  };
+
   useEffect(() => {
     return () => reset();
   }, [reset]);
@@ -75,13 +90,15 @@ const ProjectEditor = () => {
         const { data: videoSigned } = await supabase.functions.invoke('get-signed-url', {
           body: { s3_key: videoKey },
         });
-        if (videoSigned?.data?.data?.url) setVideoUrl(videoSigned.data.data.url);
+        const nextVideoUrl = extractSignedUrl(videoSigned);
+        if (nextVideoUrl) setVideoUrl(nextVideoUrl);
 
         if (vid.waveform_s3_key) {
           const { data: waveformSigned } = await supabase.functions.invoke('get-signed-url', {
             body: { s3_key: vid.waveform_s3_key },
           });
-          if (waveformSigned?.data?.data?.url) setWaveformUrl(waveformSigned.data.data.url);
+          const nextWaveformUrl = extractSignedUrl(waveformSigned);
+          if (nextWaveformUrl) setWaveformUrl(nextWaveformUrl);
         }
 
         // Fetch cut map
