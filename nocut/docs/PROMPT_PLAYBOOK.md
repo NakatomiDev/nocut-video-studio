@@ -506,7 +506,7 @@ POST-COMPLETION (mandatory):
 
 **Tool: Claude Code (manual steps required)**
 
-```
+````
 Provision the NoCut AWS infrastructure using the Terraform config from Prompt 0.3.1 and verify all services are reachable.
 
 [Include deviations from DEVIATION_LOG.md — especially any Terraform file changes or variable naming differences]
@@ -605,7 +605,7 @@ POST-COMPLETION (mandatory):
 1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
 2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: Terraform apply output summary, actual resource names/ARNs, any issues encountered.
 3. Commit both file updates to the current branch.
-```
+````
 
 **After completion:** Update DEVIATION_LOG.md with actual resource names, endpoints, and any Terraform changes needed. Ensure `.env` and `terraform.tfvars` are in `.gitignore`.
 
@@ -615,7 +615,7 @@ POST-COMPLETION (mandatory):
 
 **Tool: Claude Code (manual steps required)**
 
-```
+````
 Set up the GCP project and Vertex AI access for NoCut's Phase 2 AI fill generation. This is optional for MVP but recommended to configure early so it's ready when needed.
 
 [Include deviations from DEVIATION_LOG.md]
@@ -688,7 +688,7 @@ POST-COMPLETION (mandatory):
 1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
 2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: GCP project ID, service account email, APIs enabled.
 3. Commit both file updates to the current branch.
-```
+````
 
 **After completion:** Update DEVIATION_LOG.md. Note this is optional for MVP — the AI engine uses crossfade fallback in Phase 1. GCP is only needed for Phase 2 real AI generation.
 

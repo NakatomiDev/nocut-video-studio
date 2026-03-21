@@ -24,6 +24,14 @@ venv/
 *.tfstate.backup
 *.tfvars
 !*.tfvars.example
+.terraform-outputs.json
+
+# ── CloudFront signing keys ──
+cf_private_key.pem
+cf_public_key.pem
+
+# ── GCP ──
+gcp-sa-key.json
 
 # ── IDE ──
 .vscode/
