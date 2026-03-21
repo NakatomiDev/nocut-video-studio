@@ -16,6 +16,7 @@ const ProjectEditor = () => {
   const [error, setError] = useState<string | null>(null);
   const [processingStatus, setProcessingStatus] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [waveformUrl, setWaveformUrl] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [editingTitle, setEditingTitle] = useState(false);
 
@@ -68,9 +69,20 @@ const ProjectEditor = () => {
 
       if (vid) {
         setVideo(vid);
-        // Use proxy or original s3_key — in production this would be a CloudFront/presigned URL
-        if (vid.proxy_s3_key) setVideoUrl(vid.proxy_s3_key);
-        else setVideoUrl(vid.s3_key);
+
+        // Get signed URLs for video and waveform
+        const videoKey = vid.proxy_s3_key || vid.s3_key;
+        const { data: videoSigned } = await supabase.functions.invoke('get-signed-url', {
+          body: { s3_key: videoKey },
+        });
+        if (videoSigned?.data?.url) setVideoUrl(videoSigned.data.url);
+
+        if (vid.waveform_s3_key) {
+          const { data: waveformSigned } = await supabase.functions.invoke('get-signed-url', {
+            body: { s3_key: vid.waveform_s3_key },
+          });
+          if (waveformSigned?.data?.url) setWaveformUrl(waveformSigned.data.url);
+        }
 
         // Fetch cut map
         const { data: cm } = await supabase
@@ -207,7 +219,7 @@ const ProjectEditor = () => {
           {/* Waveform timeline — 40% */}
           <div className="h-[40%]">
             <WaveformTimeline
-              waveformUrl={project?.status === 'ready' && video?.waveform_s3_key || null}
+              waveformUrl={waveformUrl}
               duration={video?.duration || 0}
             />
           </div>
