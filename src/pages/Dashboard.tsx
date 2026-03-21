@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Plus, Scissors, Video } from "lucide-react";
 import ProjectCard from "@/components/ProjectCard";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
 
 interface Project {
   id: string;
@@ -16,7 +15,6 @@ interface Project {
 const Dashboard = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  const { session } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
