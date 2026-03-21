@@ -16,12 +16,13 @@ _s3_client = None
 def _get_s3_client():
     global _s3_client
     if _s3_client is None:
-        _s3_client = boto3.client(
-            "s3",
-            region_name=config.AWS_REGION,
-            aws_access_key_id=config.AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=config.AWS_SECRET_ACCESS_KEY,
-        )
+        # On ECS, credentials come from the task role via the default credential chain.
+        # Only set explicit credentials when provided (local development).
+        kwargs = {"region_name": config.AWS_REGION}
+        if config.AWS_ACCESS_KEY_ID and config.AWS_SECRET_ACCESS_KEY:
+            kwargs["aws_access_key_id"] = config.AWS_ACCESS_KEY_ID
+            kwargs["aws_secret_access_key"] = config.AWS_SECRET_ACCESS_KEY
+        _s3_client = boto3.client("s3", **kwargs)
     return _s3_client
 
 
