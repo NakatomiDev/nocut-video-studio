@@ -149,3 +149,15 @@ A running log of architectural decisions that deviate from the original spec or 
 - `src/App.tsx` — Added `/project/:projectId` route (protected, no AppLayout)
 **Deviation:** (1) Used Zustand instead of React context for editor state — better perf for frequent playhead updates. (2) Video URL uses raw s3_key/proxy_s3_key — needs CloudFront/presigned URLs in production. (3) Signed URL generation deferred. (4) Status 'ready' triggers page reload for simplicity. (5) activeCuts uses Set<string> for O(1) toggle.
 **Impact:** Editor page at `/project/:projectId` is functional. Timeline Canvas components come in prompt 3.2.2. Video URLs need CloudFront for production.
+
+### [2026-03-21] — Prompt 3.2.2: Waveform timeline component
+
+**Area:** Frontend / Editor
+**Original plan:** Build a Canvas-based waveform timeline with zoom/scroll, silence overlays, draggable playhead with snap, and video sync.
+**Files created:**
+- `src/components/editor/WaveformTimeline.tsx` — Canvas waveform renderer with zoom (1-10x), scroll, silence overlays, playhead with cut-boundary snap (100ms), RAF animation loop
+**Files modified:**
+- `src/pages/ProjectEditor.tsx` — Replaced "Timeline loading..." placeholder with WaveformTimeline component
+- `nocut/docs/PROMPT_PLAYBOOK.md` — Marked Prompt 3.2.2 complete
+**Deviation:** (1) Waveform data falls back to random mock data when URL is unavailable — allows visual testing without a real waveform JSON endpoint. (2) Uses ResizeObserver for responsive canvas sizing instead of fixed dimensions. (3) Silence overlay colors use HSL with design tokens (primary at 30% opacity) instead of hardcoded hex. (4) Tooltip uses radix Tooltip primitive for cut hover info rather than a custom DOM tooltip. (5) Scrollbar is a custom draggable div rather than native overflow-x — gives consistent styling and avoids canvas clipping issues. (6) Auto-scroll follows playhead during playback with a 50px margin.
+**Impact:** The timeline is interactive but waveform data depends on the transcoder generating waveform JSON and storing the URL in `videos.waveform_s3_key`. Until then, mock data is shown.
