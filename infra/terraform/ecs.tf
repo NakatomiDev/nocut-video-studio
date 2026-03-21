@@ -118,6 +118,7 @@ resource "aws_ecs_task_definition" "detector" {
         { name = "REDIS_HOST", value = aws_elasticache_replication_group.redis.primary_endpoint_address },
         { name = "REDIS_PORT", value = "6379" },
         { name = "REDIS_TLS", value = "true" },
+        { name = "NUMBA_CACHE_DIR", value = "/tmp/numba_cache" },
       ]
 
       secrets = [
