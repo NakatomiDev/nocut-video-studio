@@ -220,7 +220,22 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
 
     // Video thumbnail filmstrip
     if (thumbnailSprite && duration > 0) {
-      ctx.drawImage(thumbnailSprite, -scrollLeft, 0, totalWidth, h);
+      const spriteAspect = thumbnailSprite.naturalWidth / thumbnailSprite.naturalHeight;
+      const drawH = h;
+      const drawW = drawH * spriteAspect;
+
+      // If the sprite is narrower than totalWidth, tile it; otherwise stretch proportionally
+      if (drawW >= totalWidth) {
+        // Single draw covers the timeline
+        ctx.drawImage(thumbnailSprite, -scrollLeft, 0, drawW, drawH);
+      } else {
+        // Tile the sprite to fill the visible area
+        const scaleRatio = totalWidth / drawW;
+        const scaledW = totalWidth;
+        const scaledH = drawH * scaleRatio;
+        const yOffset = (h - scaledH) / 2;
+        ctx.drawImage(thumbnailSprite, -scrollLeft, yOffset, scaledW, scaledH);
+      }
     }
 
     // Auto-detected cut overlays
