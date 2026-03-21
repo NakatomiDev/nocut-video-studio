@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { MoreHorizontal, Video } from "lucide-react";
@@ -13,32 +14,45 @@ const statusColors: Record<string, string> = {
 };
 
 interface ProjectCardProps {
+  id: string;
   title: string;
   status: string;
   date: string;
 }
 
-const ProjectCard = ({ title, status, date }: ProjectCardProps) => (
-  <Card className="group cursor-pointer border-border transition-colors hover:border-primary/40">
-    <div className="flex aspect-video items-center justify-center rounded-t-lg bg-muted">
-      <Video className="h-10 w-10 text-muted-foreground" />
-    </div>
-    <CardContent className="flex items-start justify-between p-4">
-      <div className="min-w-0 flex-1">
-        <h3 className="truncate text-sm font-medium text-foreground">{title}</h3>
-        <p className="mt-1 text-xs text-muted-foreground">{date}</p>
-        <Badge
-          variant="outline"
-          className={`mt-2 text-[10px] font-medium capitalize ${statusColors[status] ?? ""}`}
-        >
-          {status}
-        </Badge>
+const ProjectCard = ({ id, title, status, date }: ProjectCardProps) => {
+  const navigate = useNavigate();
+
+  return (
+    <Card
+      className="group cursor-pointer border-border transition-colors hover:border-primary/40"
+      onClick={() => navigate(`/editor/${id}`)}
+    >
+      <div className="flex aspect-video items-center justify-center rounded-t-lg bg-muted">
+        <Video className="h-10 w-10 text-muted-foreground" />
       </div>
-      <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground">
-        <MoreHorizontal className="h-4 w-4" />
-      </Button>
-    </CardContent>
-  </Card>
-);
+      <CardContent className="flex items-start justify-between p-4">
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-sm font-medium text-foreground">{title}</h3>
+          <p className="mt-1 text-xs text-muted-foreground">{date}</p>
+          <Badge
+            variant="outline"
+            className={`mt-2 text-[10px] font-medium capitalize ${statusColors[status] ?? ""}`}
+          >
+            {status}
+          </Badge>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0 text-muted-foreground"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </CardContent>
+    </Card>
+  );
+};
 
 export default ProjectCard;

@@ -1,15 +1,66 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Plus, Scissors, Video } from "lucide-react";
 import ProjectCard from "@/components/ProjectCard";
+import { supabase } from "@/integrations/supabase/client";
 
-// Mock data — will be replaced with Supabase query
-const mockProjects: { id: string; title: string; status: string; date: string }[] = [];
+interface Project {
+  id: string;
+  title: string;
+  status: string;
+  created_at: string;
+}
 
 const Dashboard = () => {
-  const [projects] = useState(mockProjects);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchProjects = async () => {
+      const { data, error } = await supabase
+        .from("projects")
+        .select("id, title, status, created_at")
+        .order("created_at", { ascending: false });
+
+      if (!error && data) {
+        setProjects(data);
+      }
+      setLoading(false);
+    };
+
+    fetchProjects();
+
+    // Subscribe to realtime changes
+    const channel = supabase
+      .channel("projects-dashboard")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "projects" },
+        (payload) => {
+          if (payload.eventType === "INSERT") {
+            setProjects((prev) => [payload.new as Project, ...prev]);
+          } else if (payload.eventType === "UPDATE") {
+            setProjects((prev) =>
+              prev.map((p) => (p.id === (payload.new as Project).id ? (payload.new as Project) : p))
+            );
+          } else if (payload.eventType === "DELETE") {
+            setProjects((prev) => prev.filter((p) => p.id !== (payload.old as { id: string }).id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const formatDate = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  };
 
   return (
     <div className="p-6 lg:p-8">
@@ -21,7 +72,11 @@ const Dashboard = () => {
         </Button>
       </div>
 
-      {projects.length === 0 ? (
+      {loading ? (
+        <div className="mt-24 flex items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
+      ) : projects.length === 0 ? (
         <div className="mt-24 flex flex-col items-center justify-center text-center">
           <div className="relative mb-6">
             <Video className="h-16 w-16 text-muted-foreground" />
@@ -39,7 +94,13 @@ const Dashboard = () => {
       ) : (
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {projects.map((p) => (
-            <ProjectCard key={p.id} title={p.title} status={p.status} date={p.date} />
+            <ProjectCard
+              key={p.id}
+              id={p.id}
+              title={p.title}
+              status={p.status}
+              date={formatDate(p.created_at)}
+            />
           ))}
         </div>
       )}
