@@ -11,7 +11,7 @@ import { ArrowLeft, Loader2, AlertTriangle } from 'lucide-react';
 const ProjectEditor = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const { project, setProject, setVideo, setCutMap, reset } = useEditorStore();
+  const { project, video, setProject, setVideo, setCutMap, reset } = useEditorStore();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [processingStatus, setProcessingStatus] = useState<string | null>(null);
