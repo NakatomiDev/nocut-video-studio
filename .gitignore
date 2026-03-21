@@ -23,9 +23,13 @@ dist-ssr
 *.sln
 *.sw?
 
+# Supabase
+supabase/.temp/
+
 # Secrets
 nocut/.env
 *.pem
+.terraform-outputs.json
 
 # Terraform
 *.tfvars
