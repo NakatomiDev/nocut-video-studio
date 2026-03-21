@@ -41,7 +41,7 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, duration }: WaveformTimelineP
     addManualCut,
   } = useEditorStore();
 
-  const [waveformData, setWaveformData] = useState<number[]>([]);
+  const [_waveformData, setWaveformData] = useState<number[]>([]);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [hoveredCut, setHoveredCut] = useState<string | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -183,35 +183,28 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, duration }: WaveformTimelineP
     ctx.fillStyle = 'hsl(230, 50%, 10%)';
     ctx.fillRect(0, 0, w, h);
 
-    // Video thumbnails
+    // Video thumbnail filmstrip
     if (thumbnails.length > 0 && duration > 0) {
-      const thumbW = thumbnails[0].img.width;
       const thumbH = thumbnails[0].img.height;
+      const thumbW = thumbnails[0].img.width;
       const scale = h / thumbH;
       const drawW = thumbW * scale;
-      for (const thumb of thumbnails) {
-        const x = timeToX(thumb.time) - scrollLeft;
+      const interval = duration / thumbnails.length;
+
+      // Fill the visible area with evenly-spaced thumbnails
+      const totalThumbs = Math.ceil(totalWidth / drawW);
+      for (let i = 0; i < totalThumbs; i++) {
+        const x = i * drawW - scrollLeft;
         if (x + drawW < 0 || x > w) continue;
-        ctx.globalAlpha = 0.35;
-        ctx.drawImage(thumb.img, x, 0, drawW, h);
-      }
-      ctx.globalAlpha = 1;
-    }
-
-    const centerY = h / 2;
-    const maxBarH = h * 0.42;
-
-    // Waveform bars
-    if (waveformData.length > 0 && duration > 0) {
-      const samplesPerPixel = waveformData.length / totalWidth;
-      const startSample = Math.floor(scrollLeft * samplesPerPixel);
-      const endSample = Math.min(Math.ceil((scrollLeft + w) * samplesPerPixel), waveformData.length);
-      const barWidth = Math.max(1, totalWidth / waveformData.length - 0.5);
-      ctx.fillStyle = 'hsl(220, 13%, 36%)';
-      for (let i = startSample; i < endSample; i++) {
-        const x = (i / waveformData.length) * totalWidth - scrollLeft;
-        const amp = waveformData[i] * maxBarH;
-        ctx.fillRect(x, centerY - amp, barWidth, amp * 2);
+        // Find the closest thumbnail for this position
+        const t = (i * drawW / totalWidth) * duration;
+        let best = thumbnails[0];
+        let bestDist = Math.abs(t - best.time);
+        for (const thumb of thumbnails) {
+          const d = Math.abs(t - thumb.time);
+          if (d < bestDist) { best = thumb; bestDist = d; }
+        }
+        ctx.drawImage(best.img, x, 0, drawW, h);
       }
     }
 
@@ -300,7 +293,7 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, duration }: WaveformTimelineP
       ctx.fill();
     }
   }, [
-    waveformData, thumbnails, containerWidth, totalWidth, scrollLeft, duration,
+    thumbnails, containerWidth, totalWidth, scrollLeft, duration,
     cuts, activeCuts, manualCuts, activeManualCuts,
     hoveredCut, playheadPosition, timeToX,
     razorMode, razorStart, razorPreview,
