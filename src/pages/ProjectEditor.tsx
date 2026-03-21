@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useEditorStore } from '@/stores/editorStore';
 import VideoPlayer from '@/components/editor/VideoPlayer';
+import WaveformTimeline from '@/components/editor/WaveformTimeline';
 import CutsPanel from '@/components/editor/CutsPanel';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Loader2, AlertTriangle } from 'lucide-react';
@@ -10,7 +11,7 @@ import { ArrowLeft, Loader2, AlertTriangle } from 'lucide-react';
 const ProjectEditor = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const { project, setProject, setVideo, setCutMap, reset } = useEditorStore();
+  const { project, video, setProject, setVideo, setCutMap, reset } = useEditorStore();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [processingStatus, setProcessingStatus] = useState<string | null>(null);
@@ -203,9 +204,12 @@ const ProjectEditor = () => {
             <VideoPlayer videoUrl={videoUrl} />
           </div>
 
-          {/* Timeline placeholder — 40% */}
-          <div className="h-[40%] border-t border-border flex items-center justify-center">
-            <p className="text-muted-foreground text-sm">Timeline loading...</p>
+          {/* Waveform timeline — 40% */}
+          <div className="h-[40%]">
+            <WaveformTimeline
+              waveformUrl={project?.status === 'ready' && video?.waveform_s3_key || null}
+              duration={video?.duration || 0}
+            />
           </div>
         </div>
 
