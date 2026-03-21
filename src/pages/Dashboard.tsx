@@ -23,22 +23,30 @@ const Dashboard = () => {
     if (!session) return;
 
     const fetchProjects = async () => {
+      // Ensure the client has the current session token before querying
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (!currentSession) {
+        console.error("Dashboard: no active Supabase session");
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from("projects")
         .select("id, title, status, created_at")
         .order("created_at", { ascending: false });
 
       if (error) {
-        console.error("Failed to fetch projects:", error);
-      } else if (data) {
-        setProjects(data);
+        console.error("Dashboard: failed to fetch projects:", error.message, error.details);
+      } else {
+        console.log("Dashboard: fetched", data?.length ?? 0, "projects");
+        setProjects(data ?? []);
       }
       setLoading(false);
     };
 
     fetchProjects();
 
-    // Subscribe to realtime changes
     const channel = supabase
       .channel("projects-dashboard")
       .on(
@@ -90,7 +98,7 @@ const Dashboard = () => {
           </div>
           <h2 className="text-xl font-semibold text-foreground">No projects yet</h2>
           <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-            Upload your first video to get started
+            Upload a video to get started with NoCut
           </p>
           <Button className="mt-6 gap-2" onClick={() => navigate("/upload")}>
             <Plus className="h-4 w-4" />
