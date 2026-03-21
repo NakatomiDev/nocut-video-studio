@@ -62,33 +62,12 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
         img.onload = () => resolve();
         img.onerror = () => reject(new Error('sprite failed to load'));
       });
-      if (cancelled) return true;
 
-      const frameHeight = img.height;
-      const frameWidth = Math.max(1, frameHeight * 1.5);
-      const count = Math.max(1, Math.floor(img.width / frameWidth));
-      const results: { time: number; img: HTMLImageElement }[] = [];
-
-      for (let i = 0; i < count; i++) {
-        const slice = document.createElement('canvas');
-        slice.width = frameWidth;
-        slice.height = frameHeight;
-        const ctx = slice.getContext('2d');
-        if (!ctx) continue;
-        ctx.drawImage(img, i * frameWidth, 0, frameWidth, frameHeight, 0, 0, frameWidth, frameHeight);
-        const frame = new Image();
-        frame.src = slice.toDataURL('image/jpeg', 0.8);
-        await new Promise<void>((resolve) => {
-          frame.onload = () => resolve();
-          frame.onerror = () => resolve();
-        });
-        results.push({ time: (i / count) * duration, img: frame });
+      if (!cancelled) {
+        setThumbnailSprite(img);
       }
 
-      if (!cancelled && results.length > 0) {
-        setThumbnails(results);
-      }
-      return results.length > 0;
+      return true;
     };
 
     const generateFallback = async () => {
@@ -104,8 +83,8 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
       });
 
       const thumbCanvas = document.createElement('canvas');
-      const thumbH = 60;
-      const thumbW = Math.round((video.videoWidth / video.videoHeight) * thumbH) || 80;
+      const thumbH = 72;
+      const thumbW = Math.round((video.videoWidth / video.videoHeight) * thumbH) || 96;
       thumbCanvas.width = thumbW;
       thumbCanvas.height = thumbH;
       const tCtx = thumbCanvas.getContext('2d');
@@ -113,38 +92,43 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
 
       const count = Math.min(Math.max(Math.ceil(duration / 2), 5), 60);
       const interval = duration / count;
-      const results: { time: number; img: HTMLImageElement }[] = [];
+      const stripCanvas = document.createElement('canvas');
+      stripCanvas.width = thumbW * count;
+      stripCanvas.height = thumbH;
+      const stripCtx = stripCanvas.getContext('2d');
+      if (!stripCtx) return;
 
       for (let i = 0; i < count; i++) {
         if (cancelled) return;
-        const t = i * interval;
+        const t = Math.min(duration, i * interval);
         video.currentTime = t;
         await new Promise<void>((resolve) => {
           video.onseeked = () => resolve();
         });
+        tCtx.clearRect(0, 0, thumbW, thumbH);
         tCtx.drawImage(video, 0, 0, thumbW, thumbH);
-        const img = new Image();
-        img.src = thumbCanvas.toDataURL('image/jpeg', 0.6);
-        await new Promise<void>((resolve) => {
-          img.onload = () => resolve();
-          img.onerror = () => resolve();
-        });
-        results.push({ time: t, img });
+        stripCtx.drawImage(thumbCanvas, i * thumbW, 0);
       }
 
-      if (!cancelled) setThumbnails(results);
+      const stripImage = new Image();
+      stripImage.src = stripCanvas.toDataURL('image/jpeg', 0.75);
+      await new Promise<void>((resolve) => {
+        stripImage.onload = () => resolve();
+        stripImage.onerror = () => resolve();
+      });
+
+      if (!cancelled) {
+        setThumbnailSprite(stripImage);
+      }
     };
 
-    setThumbnails([]);
-    loadSprite().then((loaded) => {
-      if (!loaded) {
-        generateFallback().catch(() => {});
-      }
-    }).catch(() => {
-      generateFallback().catch(() => {});
-    });
+    setThumbnailSprite(null);
+    loadSprite()
+      .catch(() => generateFallback().catch(() => {}));
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [thumbnailSpriteUrl, videoUrl, duration]);
 
   // Escape key to cancel razor
