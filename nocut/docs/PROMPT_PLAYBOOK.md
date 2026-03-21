@@ -766,7 +766,7 @@ POST-COMPLETION (mandatory):
 
 ## 2.2 — Upload UI
 
-### - [ ] Prompt 2.2.1 — Build upload flow UI
+### - [x] Prompt 2.2.1 — Build upload flow UI *(completed 2026-03-21)*
 
 **Tool: Lovable**
 
