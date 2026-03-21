@@ -502,6 +502,198 @@ POST-COMPLETION (mandatory):
 
 ---
 
+### - [ ] Prompt 0.3.2 — Provision AWS infrastructure and verify connectivity
+
+**Tool: Claude Code (manual steps required)**
+
+```
+Provision the NoCut AWS infrastructure using the Terraform config from Prompt 0.3.1 and verify all services are reachable.
+
+[Include deviations from DEVIATION_LOG.md — especially any Terraform file changes or variable naming differences]
+
+**Prerequisites:**
+- An AWS account with admin access (or scoped IAM user with permissions for S3, CloudFront, ECR, ECS, ElastiCache, IAM, VPC)
+- AWS CLI installed and configured (`aws configure` with access key, secret key, region)
+- Terraform >= 1.5 installed
+
+**Step 1 — Configure Terraform variables:**
+- Copy `infra/terraform/terraform.tfvars.example` to `infra/terraform/terraform.tfvars`
+- Fill in real values:
+  - environment = "dev"
+  - aws_region = your preferred region (e.g., "us-east-1")
+  - s3_bucket_name = a globally unique bucket name (e.g., "nocut-media-dev-{your-id}")
+  - cloudfront_key_pair_id = generate a CloudFront key pair in AWS console, paste the ID here
+  - redis_auth_token = generate a strong random token (e.g., `openssl rand -hex 32`)
+- Add `terraform.tfvars` to `.gitignore` if not already present (it contains secrets)
+
+**Step 2 — Initialize and apply Terraform:**
+```bash
+cd infra/terraform
+terraform init
+terraform plan -out=tfplan    # Review the plan carefully
+terraform apply tfplan
+```
+- Save the outputs: `terraform output -json > ../../.terraform-outputs.json`
+- Add `.terraform-outputs.json` to `.gitignore`
+
+**Step 3 — Populate environment variables:**
+- Copy `.env.example` to `.env`
+- Fill in AWS values from Terraform outputs:
+  - AWS_ACCESS_KEY_ID = your IAM access key
+  - AWS_SECRET_ACCESS_KEY = your IAM secret key
+  - AWS_S3_BUCKET = S3 bucket name from `terraform output s3_bucket_name`
+  - AWS_REGION = your chosen region
+  - AWS_CLOUDFRONT_KEYPAIR_ID = key pair ID from Step 1
+  - REDIS_URL = ElastiCache endpoint from `terraform output redis_endpoint`
+- Fill in Supabase values:
+  - SUPABASE_URL = from Supabase dashboard → Settings → API
+  - SUPABASE_ANON_KEY = from Supabase dashboard → Settings → API
+  - SUPABASE_SERVICE_ROLE_KEY = from Supabase dashboard → Settings → API
+
+**Step 4 — Link Supabase project:**
+```bash
+supabase link --project-ref YOUR_PROJECT_REF
+supabase db push   # Apply migrations to the remote Supabase instance
+```
+
+**Step 5 — Verify connectivity:**
+Create a script at `infra/scripts/verify-infra.sh` that checks:
+
+1. **S3 access**: Upload a test file, download it, delete it
+   ```bash
+   echo "test" > /tmp/nocut-test.txt
+   aws s3 cp /tmp/nocut-test.txt s3://$AWS_S3_BUCKET/test/connectivity-check.txt
+   aws s3 cp s3://$AWS_S3_BUCKET/test/connectivity-check.txt /tmp/nocut-test-download.txt
+   diff /tmp/nocut-test.txt /tmp/nocut-test-download.txt && echo "✓ S3 read/write OK"
+   aws s3 rm s3://$AWS_S3_BUCKET/test/connectivity-check.txt
+   ```
+
+2. **ECR access**: Login to ECR and verify repos exist
+   ```bash
+   aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+   aws ecr describe-repositories --repository-names nocut-transcoder nocut-detector nocut-ai-engine nocut-exporter && echo "✓ ECR repos OK"
+   ```
+
+3. **Redis connectivity** (from within the VPC or via VPN/bastion):
+   ```bash
+   redis-cli -h $REDIS_HOST -p 6379 -a $REDIS_AUTH_TOKEN ping && echo "✓ Redis OK"
+   ```
+
+4. **Supabase connectivity**:
+   ```bash
+   curl -s -H "apikey: $SUPABASE_ANON_KEY" "$SUPABASE_URL/rest/v1/users?limit=0" -o /dev/null -w "%{http_code}" | grep -q "200" && echo "✓ Supabase API OK"
+   ```
+
+5. **CloudFront**: Verify the distribution exists and is deployed
+   ```bash
+   aws cloudfront list-distributions --query "DistributionList.Items[?Origins.Items[?Id=='S3-nocut-media']].{Id:Id,Status:Status,Domain:DomainName}" && echo "✓ CloudFront OK"
+   ```
+
+Print a summary at the end with pass/fail for each check.
+
+**Step 6 — Push a test Docker image:**
+Build and push one service image to ECR to verify the full Docker → ECR pipeline:
+```bash
+cd services/detector
+docker build -t nocut-detector .
+docker tag nocut-detector:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/nocut-detector:dev
+docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/nocut-detector:dev
+```
+
+---
+POST-COMPLETION (mandatory):
+1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
+2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: Terraform apply output summary, actual resource names/ARNs, any issues encountered.
+3. Commit both file updates to the current branch.
+```
+
+**After completion:** Update DEVIATION_LOG.md with actual resource names, endpoints, and any Terraform changes needed. Ensure `.env` and `terraform.tfvars` are in `.gitignore`.
+
+---
+
+### - [ ] Prompt 0.3.3 — Configure GCP Vertex AI (Phase 2 preparation)
+
+**Tool: Claude Code (manual steps required)**
+
+```
+Set up the GCP project and Vertex AI access for NoCut's Phase 2 AI fill generation. This is optional for MVP but recommended to configure early so it's ready when needed.
+
+[Include deviations from DEVIATION_LOG.md]
+
+**Prerequisites:**
+- A GCP account with billing enabled
+- gcloud CLI installed (`brew install google-cloud-sdk` or equivalent)
+
+**Step 1 — Create GCP project and authenticate:**
+```bash
+gcloud auth login
+gcloud projects create nocut-ai-dev --name="NoCut AI Dev"   # or use an existing project
+gcloud config set project nocut-ai-dev
+gcloud auth application-default login
+```
+
+**Step 2 — Enable required APIs:**
+```bash
+gcloud services enable aiplatform.googleapis.com    # Vertex AI
+gcloud services enable storage.googleapis.com       # Cloud Storage (for model artifacts if needed)
+```
+
+**Step 3 — Create a service account:**
+```bash
+gcloud iam service-accounts create nocut-ai-engine \
+  --display-name="NoCut AI Engine Service Account"
+
+gcloud projects add-iam-policy-binding nocut-ai-dev \
+  --member="serviceAccount:nocut-ai-engine@nocut-ai-dev.iam.gserviceaccount.com" \
+  --role="roles/aiplatform.user"
+
+gcloud iam service-accounts keys create infra/gcp-sa-key.json \
+  --iam-account=nocut-ai-engine@nocut-ai-dev.iam.gserviceaccount.com
+```
+- Add `infra/gcp-sa-key.json` to `.gitignore`
+
+**Step 4 — Update environment variables:**
+- Add to `.env`:
+  - GCP_PROJECT_ID=nocut-ai-dev
+  - GCP_REGION=us-central1
+  - GCP_VERTEX_AI_KEY=path/to/infra/gcp-sa-key.json (or inline the key)
+  - GOOGLE_APPLICATION_CREDENTIALS=infra/gcp-sa-key.json
+
+**Step 5 — Verify Vertex AI access:**
+Create a script at `infra/scripts/verify-gcp.sh`:
+```bash
+#!/bin/bash
+set -e
+export GOOGLE_APPLICATION_CREDENTIALS=infra/gcp-sa-key.json
+
+# Verify authentication
+gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+echo "✓ GCP authentication OK"
+
+# Verify Vertex AI API is accessible
+gcloud ai models list --region=us-central1 --limit=1 2>/dev/null && echo "✓ Vertex AI API OK" || echo "✓ Vertex AI API accessible (no models yet)"
+
+echo ""
+echo "GCP is configured and ready for Phase 2 AI engine integration."
+```
+
+**Step 6 — Add Terraform config for GCP (optional):**
+Create `infra/terraform/gcp.tf` with:
+- Google provider configuration
+- Vertex AI endpoint resource (placeholder for Phase 2)
+- Output the project ID and region
+
+---
+POST-COMPLETION (mandatory):
+1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
+2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: GCP project ID, service account email, APIs enabled.
+3. Commit both file updates to the current branch.
+```
+
+**After completion:** Update DEVIATION_LOG.md. Note this is optional for MVP — the AI engine uses crossfade fallback in Phase 1. GCP is only needed for Phase 2 real AI generation.
+
+---
+
 # SPRINT 1: Auth & Core UI
 
 ---
