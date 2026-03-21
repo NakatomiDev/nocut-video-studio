@@ -569,7 +569,7 @@ POST-COMPLETION (mandatory):
 
 ---
 
-### - [ ] Prompt 1.1.2 — Build app shell and navigation
+### - [x] Prompt 1.1.2 — Build app shell and navigation *(completed 2026-03-21)*
 
 **Tool: Lovable**
 
