@@ -219,7 +219,7 @@ const ProjectEditor = () => {
           {/* Waveform timeline — 40% */}
           <div className="h-[40%]">
             <WaveformTimeline
-              waveformUrl={project?.status === 'ready' && video?.waveform_s3_key || null}
+              waveformUrl={waveformUrl}
               duration={video?.duration || 0}
             />
           </div>
