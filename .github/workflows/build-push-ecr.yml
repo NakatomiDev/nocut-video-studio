@@ -4,8 +4,8 @@ on:
   push:
     branches: [main]
     paths:
-      - "nocut/services/transcoder/**"
-      - "nocut/services/detector/**"
+      - "services/transcoder/**"
+      - "services/detector/**"
   workflow_dispatch:
     inputs:
       service:
@@ -40,9 +40,9 @@ jobs:
         with:
           filters: |
             transcoder:
-              - 'nocut/services/transcoder/**'
+              - 'services/transcoder/**'
             detector:
-              - 'nocut/services/detector/**'
+              - 'services/detector/**'
 
   build-transcoder:
     runs-on: ubuntu-latest
@@ -66,7 +66,7 @@ jobs:
       - name: Build and push transcoder
         uses: docker/build-push-action@v6
         with:
-          context: nocut/services/transcoder
+          context: services/transcoder
           push: true
           tags: |
             ${{ env.ECR_REGISTRY }}/nocut-transcoder:latest
@@ -94,7 +94,7 @@ jobs:
       - name: Build and push detector
         uses: docker/build-push-action@v6
         with:
-          context: nocut/services/detector
+          context: services/detector
           push: true
           tags: |
             ${{ env.ECR_REGISTRY }}/nocut-detector:latest
