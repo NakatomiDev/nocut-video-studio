@@ -611,7 +611,7 @@ POST-COMPLETION (mandatory):
 
 ---
 
-### - [ ] Prompt 0.3.3 — Configure GCP Vertex AI (Phase 2 preparation)
+### - [x] Prompt 0.3.3 — Configure GCP Vertex AI (Phase 2 preparation) *(completed 2026-03-21)*
 
 **Tool: Claude Code (manual steps required)**
 
