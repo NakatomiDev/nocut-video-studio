@@ -1,7 +1,7 @@
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { handleCors } from "../_shared/cors.ts";
-import { getAuthenticatedUser, createServiceClient, AuthError } from "../_shared/auth.ts";
+import { getAuthenticatedUser, AuthError } from "../_shared/auth.ts";
 import { successResponse, errorResponse } from "../_shared/response.ts";
 
 let _s3Client: S3Client | null = null;
@@ -23,7 +23,7 @@ Deno.serve(async (req: Request) => {
   if (corsResponse) return corsResponse;
 
   try {
-    const user = await getAuthenticatedUser(req);
+    const { user } = await getAuthenticatedUser(req);
     const { s3_key } = await req.json();
 
     if (!s3_key || typeof s3_key !== "string") {
@@ -45,7 +45,7 @@ Deno.serve(async (req: Request) => {
     return successResponse({ url });
   } catch (err) {
     if (err instanceof AuthError) {
-      return errorResponse(err.message, 401);
+      return errorResponse("unauthorized", err.message, 401);
     }
     console.error("get-signed-url error:", err);
     return errorResponse("internal_error", "Failed to generate signed URL", 500);
