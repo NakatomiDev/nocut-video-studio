@@ -43,9 +43,10 @@
 2. **ElastiCache resource type changed**: `aws_elasticache_cluster` → `aws_elasticache_replication_group` because `auth_token` and `transit_encryption_enabled` are only supported on replication groups
 3. **`cloudfront_key_pair_id` variable removed**: It was defined in `variables.tf` but never referenced in any resource — the CloudFront public key is created by Terraform and the ID is derived automatically
 4. **Step 4 (Supabase link) skipped**: `supabase` CLI is not installed in this environment
-5. **Step 6 (Docker build/push) skipped**: Docker daemon is not running in this environment; ECR login was verified successfully via AWS API
+5. **Step 6 (Docker build/push)**: Full detector Dockerfile could not build (Docker containers cannot reach external package repos in this environment). Verified pipeline with a minimal busybox test image — successfully built, tagged, pushed to `nocut-detector:dev-test` in ECR, and cleaned up. ECR login, push, and image scanning all confirmed working.
 
 ### Verification results
 All 12 infrastructure checks passed:
 - AWS credentials, S3 (exists + read/write), 4 ECR repos, ECR login, ECS cluster, CloudFront distribution, ElastiCache replication group, Supabase API reachable
 - Redis direct ping: expected warning (not in VPC)
+- Docker → ECR pipeline: verified (busybox test image pushed and deleted successfully)
