@@ -42,7 +42,7 @@
 1. **Region changed**: Used `ap-northeast-1` instead of `us-east-1` (user's AWS account is configured for Tokyo region)
 2. **ElastiCache resource type changed**: `aws_elasticache_cluster` → `aws_elasticache_replication_group` because `auth_token` and `transit_encryption_enabled` are only supported on replication groups
 3. **`cloudfront_key_pair_id` variable removed**: It was defined in `variables.tf` but never referenced in any resource — the CloudFront public key is created by Terraform and the ID is derived automatically
-4. **Step 4 (Supabase link) skipped**: `supabase` CLI is not installed in this environment
+4. **Step 4 (Supabase link)**: Project linked via `npx supabase link`. `supabase db push` could not connect (DNS resolution to Supabase pooler times out from this environment). Verified via Supabase MCP that all 5 migrations were already applied: core_schema, credit_system, rls_policies, job_queue, upload_tracking
 5. **Step 6 (Docker build/push)**: Full detector Dockerfile could not build (Docker containers cannot reach external package repos in this environment). Verified pipeline with a minimal busybox test image — successfully built, tagged, pushed to `nocut-detector:dev-test` in ECR, and cleaned up. ECR login, push, and image scanning all confirmed working.
 
 ### Verification results
