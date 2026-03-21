@@ -75,13 +75,13 @@ const ProjectEditor = () => {
         const { data: videoSigned } = await supabase.functions.invoke('get-signed-url', {
           body: { s3_key: videoKey },
         });
-        if (videoSigned?.url) setVideoUrl(videoSigned.url);
+        if (videoSigned?.data?.url) setVideoUrl(videoSigned.data.url);
 
         if (vid.waveform_s3_key) {
           const { data: waveformSigned } = await supabase.functions.invoke('get-signed-url', {
             body: { s3_key: vid.waveform_s3_key },
           });
-          if (waveformSigned?.url) setWaveformUrl(waveformSigned.url);
+          if (waveformSigned?.data?.url) setWaveformUrl(waveformSigned.data.url);
         }
 
         // Fetch cut map
