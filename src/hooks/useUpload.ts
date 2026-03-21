@@ -70,8 +70,11 @@ export function useUpload() {
     abortRef.current = false;
   }, []);
 
-  const reportChunkComplete = useCallback(
-    async (uploadSessionId: string, chunkIndex: number, etag: string) => {
+  const reportChunkComplete = async (
+    uploadSessionId: string,
+    chunkIndex: number,
+    etag: string
+  ) => {
       const previous = chunkCompleteQueueRef.current.catch(() => undefined);
 
       const current = previous.then(async () => {
@@ -97,9 +100,7 @@ export function useUpload() {
 
       chunkCompleteQueueRef.current = current.catch(() => undefined);
       return current;
-    },
-    []
-  );
+  };
 
   const selectFile = useCallback(async (file: File) => {
     const allowedTypes = [
@@ -388,7 +389,7 @@ export function useUpload() {
         }));
       }
     }
-  }, [state, reportChunkComplete]);
+  }, [state]);
 
   return {
     ...state,
