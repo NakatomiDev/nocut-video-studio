@@ -293,7 +293,7 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, duration }: WaveformTimelineP
       ctx.fill();
     }
   }, [
-    waveformData, thumbnails, containerWidth, totalWidth, scrollLeft, duration,
+    thumbnails, containerWidth, totalWidth, scrollLeft, duration,
     cuts, activeCuts, manualCuts, activeManualCuts,
     hoveredCut, playheadPosition, timeToX,
     razorMode, razorStart, razorPreview,
