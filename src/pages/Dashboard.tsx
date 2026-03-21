@@ -20,13 +20,13 @@ const Dashboard = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!session) return;
-
     const fetchProjects = async () => {
-      // Ensure the client has the current session token before querying
+      setLoading(true);
+      
+      // Wait for a valid session
       const { data: { session: currentSession } } = await supabase.auth.getSession();
       if (!currentSession) {
-        console.error("Dashboard: no active Supabase session");
+        console.warn("Dashboard: no active Supabase session, skipping fetch");
         setLoading(false);
         return;
       }
