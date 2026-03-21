@@ -37,3 +37,10 @@ A running log of architectural decisions that deviate from the original spec or 
 **Original plan:** Enable RLS on all 11 tables. For tables with indirect ownership via `project_id`, use `EXISTS (SELECT 1 FROM projects WHERE projects.id = <table>.project_id AND projects.user_id = auth.uid())`. Create `handle_new_user()` SECURITY DEFINER trigger on `auth.users`.
 **Deviation:** `cut_maps` has `video_id` (not `project_id`), so its policies use a two-table join: `videos → projects`. Similarly, `ai_fills` has `edit_decision_id` (not `project_id`), so its policies join through `edit_decisions → projects`. All other tables, policies, the trigger function, and credit allocation logic match the spec exactly.
 **Impact:** `cut_maps` and `ai_fills` RLS checks involve one extra join hop compared to tables with a direct `project_id` FK. Performance impact is negligible due to indexed foreign keys. No API or caller-side changes needed.
+
+### 2026-03-21 — Job queue and Realtime (004_job_queue.sql)
+
+**Area:** Backend / Database
+**Original plan:** Create `job_queue` table with specified columns, indexes on `(status, priority, created_at)` and `(project_id)`, RLS SELECT-only policy, and enable Supabase Realtime on `job_queue`, `projects`, and `credit_transactions`.
+**Deviation:** Added an extra index on `(user_id)` to support the RLS policy `auth.uid() = user_id` efficiently, since every SELECT query will filter on `user_id` due to RLS. All other columns, constraints, indexes, and Realtime configuration match the spec exactly.
+**Impact:** No downstream impact. The additional `user_id` index improves RLS query performance. Realtime subscriptions are now available for `job_queue`, `projects`, and `credit_transactions`.

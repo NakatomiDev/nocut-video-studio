@@ -378,7 +378,7 @@ POST-COMPLETION (mandatory):
 
 ---
 
-### - [ ] Prompt 0.2.4 — Create job queue table
+### - [x] Prompt 0.2.4 — Create job queue table *(completed 2026-03-21)*
 
 ```
 Create a new Supabase migration file at `supabase/migrations/004_job_queue.sql` for NoCut.
