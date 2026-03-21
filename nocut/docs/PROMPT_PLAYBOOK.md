@@ -634,7 +634,7 @@ POST-COMPLETION (mandatory):
 
 **Tool: Claude Code**
 
-```
+````
 Create a Supabase Edge Function for NoCut's upload flow.
 
 Context: NoCut is a video editing app. Users upload video files which are chunked and sent directly to S3. The Edge Function validates the upload and generates presigned S3 URLs.
@@ -700,7 +700,7 @@ POST-COMPLETION (mandatory):
 1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
 2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: files created/modified, any deviations from the spec, errors encountered.
 3. Commit both file updates to the current branch.
-```
+````
 
 **After completion:** Deviations from 2.1.1: (1) Migration 005_upload_tracking.sql created here (pulled forward from 2.1.2) — adds `multipart_upload_id`, `total_chunks`, `upload_chunks` to `videos`. (2) Uses S3 `CreateMultipartUpload` + `UploadPart` presigned URLs (not simple PUTs). (3) `upload_session_id` = S3 multipart `UploadId` string (not UUID). (4) Shared utilities include `tier-limits.ts` with `MIME_TO_EXTENSION` map. (5) `deno.json` import map created at `supabase/functions/deno.json`.
 
@@ -829,7 +829,7 @@ POST-COMPLETION (mandatory):
 
 **Tool: Claude Code**
 
-```
+````
 Build the transcoding worker service for NoCut at `services/transcoder/`.
 
 [Include any deviations from DEVIATION_LOG.md — e.g., "The job_queue table schema is X, the videos table has columns Y"]
@@ -899,7 +899,7 @@ POST-COMPLETION (mandatory):
 1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
 2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: files created/modified, any deviations from the spec, errors encountered.
 3. Commit both file updates to the current branch.
-```
+````
 
 **After completion:** Update DEVIATION_LOG.md. Note Docker image tag, actual FFmpeg commands used.
 
@@ -915,7 +915,7 @@ POST-COMPLETION (mandatory):
 
 **Tool: Claude Code**
 
-```
+````
 Build the silence detection service for NoCut at `services/detector/`.
 
 [Include deviations from DEVIATION_LOG.md — especially actual DB schema, job_queue format, S3 paths]
@@ -990,7 +990,7 @@ POST-COMPLETION (mandatory):
 1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
 2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: files created/modified, any deviations from the spec, errors encountered.
 3. Commit both file updates to the current branch.
-```
+````
 
 **After completion:** Update DEVIATION_LOG.md. Note detection accuracy, threshold values that work best.
 
@@ -1447,7 +1447,7 @@ POST-COMPLETION (mandatory):
 
 **Tool: Claude Code**
 
-```
+````
 Build the AI fill engine service for NoCut at `services/ai-engine/`.
 
 [Include deviations from DEVIATION_LOG.md — especially job_queue format, S3 paths, Supabase client pattern from other services]
@@ -1544,7 +1544,7 @@ POST-COMPLETION (mandatory):
 1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
 2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: files created/modified, any deviations from the spec, errors encountered.
 3. Commit both file updates to the current branch.
-```
+````
 
 **After completion:** Update DEVIATION_LOG.md. Note whether credits are charged for crossfade in MVP, actual provider pattern.
 
