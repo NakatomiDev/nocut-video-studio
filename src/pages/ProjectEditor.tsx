@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useEditorStore } from '@/stores/editorStore';
 import VideoPlayer from '@/components/editor/VideoPlayer';
+import WaveformTimeline from '@/components/editor/WaveformTimeline';
 import CutsPanel from '@/components/editor/CutsPanel';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Loader2, AlertTriangle } from 'lucide-react';
