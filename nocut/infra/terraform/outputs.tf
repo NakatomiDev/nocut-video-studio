@@ -49,12 +49,12 @@ output "ecs_cluster_arn" {
 
 output "redis_endpoint" {
   description = "ElastiCache Redis endpoint"
-  value       = aws_elasticache_cluster.redis.cache_nodes[0].address
+  value       = aws_elasticache_replication_group.redis.primary_endpoint_address
 }
 
 output "redis_port" {
   description = "ElastiCache Redis port"
-  value       = aws_elasticache_cluster.redis.cache_nodes[0].port
+  value       = 6379
 }
 
 output "ecs_task_execution_role_arn" {

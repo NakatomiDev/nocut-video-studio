@@ -14,18 +14,13 @@ variable "environment" {
 variable "aws_region" {
   description = "AWS region for all resources"
   type        = string
-  default     = "us-east-1"
+  default     = "ap-northeast-1"
 }
 
 variable "s3_bucket_name" {
   description = "Name for the media S3 bucket (will be suffixed with environment)"
   type        = string
   default     = "nocut-media"
-}
-
-variable "cloudfront_key_pair_id" {
-  description = "CloudFront key pair ID for signed URLs"
-  type        = string
 }
 
 variable "cloudfront_public_key_pem" {
