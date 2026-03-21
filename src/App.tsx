@@ -11,6 +11,7 @@ import SignIn from "@/pages/SignIn";
 import Dashboard from "@/pages/Dashboard";
 import Credits from "@/pages/Credits";
 import Settings from "@/pages/Settings";
+import Upload from "@/pages/Upload";
 import NotFound from "@/pages/NotFound";
 import { Loader2 } from "lucide-react";
 
