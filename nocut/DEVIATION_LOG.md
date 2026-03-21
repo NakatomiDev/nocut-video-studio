@@ -52,6 +52,20 @@ A running log of architectural decisions that deviate from the original spec or 
 **Deviation:** (1) Used Origin Access Control (OAC) instead of the legacy Origin Access Identity (OAI) for CloudFront→S3 — OAC is the modern AWS-recommended approach and supports S3 SSE-KMS. (2) Added `cloudfront_public_key_pem` variable and `aws_cloudfront_key_group` resource to manage signed URL keys via Terraform rather than the legacy `cloudfront_key_pair_id` console-only method. The `cloudfront_key_pair_id` variable is kept for reference but the key group is what CloudFront uses. (3) Added ECR lifecycle policies (keep last 10 images) to prevent unbounded image accumulation. (4) Enabled Container Insights on the ECS cluster for observability. (5) Added FARGATE_SPOT as additional capacity provider for cost optimization.
 **Impact:** Callers generating signed URLs must use the CloudFront key group (output from Terraform) rather than a root-account key pair. ECR repos auto-clean old images. No other downstream changes — all resource names follow `nocut-{resource}-{environment}` convention as expected.
 
+### 2026-03-21 — Authentication pages (Sprint 1.1.1)
+
+**Area:** Frontend
+**Original plan:** Create sign-up/sign-in pages with Supabase auth, Google OAuth, protected routes, auth guard, and dark theme with specific colors (#0A0F2E background, #6C5CE7 primary, #A29BFE muted).
+**Deviation:** (1) Colors implemented as HSL design tokens in index.css rather than hex values — `--background: 230 60% 11%` (≈#0A0F2E), `--primary: 252 75% 65%` (≈#6C5CE7), `--muted-foreground: 252 60% 78%` (≈#A29BFE) to follow Tailwind semantic token system. (2) Added `AuthProvider` context pattern with `useAuth` hook for session management across components. (3) Added password reset flow (`handleForgotPassword`) on sign-in page beyond spec requirements. (4) Root `/` route conditionally redirects to `/dashboard` or `/sign-in` based on auth state. (5) Removed old placeholder `Index.tsx` page — the root redirect replaces it.
+**Impact:** Google OAuth requires configuration in the Supabase dashboard (Authentication → Providers → Google) with Google Cloud OAuth credentials. The `handle_new_user` trigger will auto-create user rows on signup. Files created: `src/pages/SignUp.tsx`, `src/pages/SignIn.tsx`, `src/pages/Dashboard.tsx`, `src/hooks/useAuth.tsx`, `src/components/ProtectedRoute.tsx`. Files modified: `src/App.tsx`, `src/index.css`.
+
+### 2026-03-21 — App shell and navigation (Sprint 1.1.2)
+
+**Area:** Frontend
+**Original plan:** Create app shell with 240px sidebar (#0A0F2E), navigation links (Dashboard, Credits, Settings), active link purple highlight, user email + sign-out at bottom. Dashboard with empty state and project cards. Credits placeholder. Settings with email, tier badge, sign-out.
+**Deviation:** (1) Used custom `AppLayout` component instead of shadcn `Sidebar` — simpler for a fixed 3-item nav with no collapsible groups. (2) Sidebar background uses `bg-background` (same #0A0F2E from design tokens) rather than a hardcoded color. (3) Main content area uses `bg-secondary` token (dark gray) instead of hardcoded #111827. (4) Settings tier badge is hardcoded to "Free" — will be dynamic once user data is queried from Supabase `users` table. (5) `ProjectCard` component built with status color mapping using Tailwind utility classes for status-specific colors (yellow/green/blue/red) since these are semantic status indicators, not theme colors.
+**Impact:** All protected routes wrapped in `ProtectedWithLayout` which combines `ProtectedRoute` + `AppLayout`. Files created: `src/components/AppLayout.tsx`, `src/components/ProjectCard.tsx`, `src/pages/Credits.tsx`, `src/pages/Settings.tsx`. Files modified: `src/pages/Dashboard.tsx`, `src/App.tsx`.
+
 ### 2026-03-21 — Upload initiation Edge Function (Prompt 2.1.1)
 
 **Area:** Backend / Edge Functions
