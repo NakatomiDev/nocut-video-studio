@@ -26,7 +26,7 @@ const ProjectCard = ({ id, title, status, date }: ProjectCardProps) => {
   return (
     <Card
       className="group cursor-pointer border-border transition-colors hover:border-primary/40"
-      onClick={() => navigate(`/editor/${id}`)}
+      onClick={() => navigate(`/project/${id}`)}
     >
       <div className="flex aspect-video items-center justify-center rounded-t-lg bg-muted">
         <Video className="h-10 w-10 text-muted-foreground" />

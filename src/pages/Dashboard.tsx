@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Plus, Scissors, Video } from "lucide-react";
 import ProjectCard from "@/components/ProjectCard";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
 
 interface Project {
   id: string;
@@ -16,12 +15,9 @@ interface Project {
 const Dashboard = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  const { session } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!session) return;
-
     const fetchProjects = async () => {
       // Ensure the client has the current session token before querying
       const { data: { session: currentSession } } = await supabase.auth.getSession();
@@ -69,7 +65,7 @@ const Dashboard = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [session]);
+  }, []);
 
   const formatDate = (iso: string) => {
     const d = new Date(iso);
