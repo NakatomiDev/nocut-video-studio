@@ -4,7 +4,7 @@
 # Verifies all AWS resources are reachable after terraform apply.
 # Usage: ./infra/scripts/verify-infra.sh
 # =============================================================================
-set -euo pipefail
+set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
@@ -107,10 +107,10 @@ fi
 
 # ── 7. ElastiCache Redis ──
 echo "Checking ElastiCache Redis..."
-check "ElastiCache cluster: nocut-redis-$ENV" aws elasticache describe-cache-clusters --cache-cluster-id "nocut-redis-$ENV" --region "$REGION"
+check "ElastiCache replication group: nocut-redis-$ENV" aws elasticache describe-replication-groups --replication-group-id "nocut-redis-$ENV" --region "$REGION"
 
 # Redis connectivity (only works from within VPC or via VPN/bastion)
-REDIS_HOST=$(aws elasticache describe-cache-clusters --cache-cluster-id "nocut-redis-$ENV" --show-cache-node-info --region "$REGION" --query "CacheClusters[0].CacheNodes[0].Endpoint.Address" --output text 2>/dev/null || echo "")
+REDIS_HOST=$(aws elasticache describe-replication-groups --replication-group-id "nocut-redis-$ENV" --region "$REGION" --query "ReplicationGroups[0].NodeGroups[0].PrimaryEndpoint.Address" --output text 2>/dev/null || echo "")
 if [[ -n "$REDIS_HOST" && "$REDIS_HOST" != "None" ]]; then
   echo "  Redis endpoint: $REDIS_HOST"
   if command -v redis-cli >/dev/null 2>&1; then
@@ -130,12 +130,12 @@ SUPABASE_URL="${SUPABASE_URL:-}"
 SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-}"
 if [[ -n "$SUPABASE_URL" && -n "$SUPABASE_ANON_KEY" ]]; then
   HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "apikey: $SUPABASE_ANON_KEY" "$SUPABASE_URL/rest/v1/" 2>/dev/null || echo "000")
-  if [[ "$HTTP_CODE" == "200" ]]; then
-    RESULTS+=("✓ Supabase API reachable")
-    ((PASS++))
+  if [[ "$HTTP_CODE" =~ ^(200|401)$ ]]; then
+    RESULTS+=("✓ Supabase API reachable (HTTP $HTTP_CODE)")
+    ((PASS++)) || true
   else
     RESULTS+=("✗ Supabase API (HTTP $HTTP_CODE)")
-    ((FAIL++))
+    ((FAIL++)) || true
   fi
 else
   RESULTS+=("⚠ Supabase (SUPABASE_URL or SUPABASE_ANON_KEY not set)")

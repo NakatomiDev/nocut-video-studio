@@ -502,7 +502,7 @@ POST-COMPLETION (mandatory):
 
 ---
 
-### - [ ] Prompt 0.3.2 — Provision AWS infrastructure and verify connectivity
+### - [x] Prompt 0.3.2 — Provision AWS infrastructure and verify connectivity *(completed 2026-03-21)*
 
 **Tool: Claude Code (manual steps required)**
 
