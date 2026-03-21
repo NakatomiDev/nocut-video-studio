@@ -1058,7 +1058,7 @@ POST-COMPLETION (mandatory):
 
 ---
 
-### - [ ] Prompt 3.2.2 — Build waveform timeline component
+### - [x] Prompt 3.2.2 — Build waveform timeline component *(completed 2026-03-21)*
 
 **Tool: Lovable**
 

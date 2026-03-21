@@ -204,9 +204,12 @@ const ProjectEditor = () => {
             <VideoPlayer videoUrl={videoUrl} />
           </div>
 
-          {/* Timeline placeholder — 40% */}
-          <div className="h-[40%] border-t border-border flex items-center justify-center">
-            <p className="text-muted-foreground text-sm">Timeline loading...</p>
+          {/* Waveform timeline — 40% */}
+          <div className="h-[40%]">
+            <WaveformTimeline
+              waveformUrl={project?.status === 'ready' && useEditorStore.getState().video?.waveform_s3_key || null}
+              duration={useEditorStore.getState().video?.duration || 0}
+            />
           </div>
         </div>
 
