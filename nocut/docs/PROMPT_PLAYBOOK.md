@@ -630,7 +630,7 @@ POST-COMPLETION (mandatory):
 
 ## 2.1 — Upload Backend
 
-### - [ ] Prompt 2.1.1 — Create upload initiation Edge Function
+### - [x] Prompt 2.1.1 — Create upload initiation Edge Function *(completed 2026-03-21)*
 
 **Tool: Claude Code**
 
@@ -702,7 +702,7 @@ POST-COMPLETION (mandatory):
 3. Commit both file updates to the current branch.
 ```
 
-**After completion:** Update DEVIATION_LOG.md. Note actual file paths, any import issues with Deno.
+**After completion:** Deviations from 2.1.1: (1) Migration 005_upload_tracking.sql created here (pulled forward from 2.1.2) — adds `multipart_upload_id`, `total_chunks`, `upload_chunks` to `videos`. (2) Uses S3 `CreateMultipartUpload` + `UploadPart` presigned URLs (not simple PUTs). (3) `upload_session_id` = S3 multipart `UploadId` string (not UUID). (4) Shared utilities include `tier-limits.ts` with `MIME_TO_EXTENSION` map. (5) `deno.json` import map created at `supabase/functions/deno.json`.
 
 ---
 
@@ -713,9 +713,15 @@ POST-COMPLETION (mandatory):
 ```
 Create two more Supabase Edge Functions for NoCut's upload pipeline. These build on the upload-initiate function we already created.
 
-Reference the shared utilities in `supabase/functions/_shared/` (cors.ts, auth.ts, response.ts).
+Reference the shared utilities in `supabase/functions/_shared/` (cors.ts, auth.ts, response.ts, tier-limits.ts).
 
-[Include any deviations from DEVIATION_LOG.md here — e.g., "Note: the shared utilities are at X path and use Y import pattern"]
+**Context from Prompt 2.1.1 (already completed):**
+- Shared utilities at `supabase/functions/_shared/` — import via relative paths: `import { handleCors } from "../_shared/cors.ts"`
+- `supabase/functions/deno.json` handles imports for `@supabase/supabase-js`, `@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner`
+- Migration 005 already applied — `videos` table has `multipart_upload_id` (TEXT), `total_chunks` (INTEGER), `upload_chunks` (JSONB DEFAULT '[]')
+- Look up videos by `multipart_upload_id` to find the associated project/user for ownership verification
+- `upload_session_id` = S3 multipart `UploadId` (string, not UUID)
+- S3 PartNumber = chunk_index + 1 (S3 parts are 1-indexed, API uses 0-indexed chunk_index)
 
 1. **`supabase/functions/upload-chunk-complete/index.ts`**
 
@@ -745,7 +751,7 @@ Reference the shared utilities in `supabase/functions/_shared/` (cors.ts, auth.t
    - Insert a job_queue row: type='video.transcode', status='queued', payload containing video_id and s3_key
    - Return: { project_id, video_id, status: 'transcoding', estimated_processing_seconds }
 
-Also update the videos table if we need an upload_chunks column — create migration `supabase/migrations/005_upload_tracking.sql` if needed.
+Note: Migration 005_upload_tracking.sql was already created in Prompt 2.1.1. The `videos` table already has `multipart_upload_id`, `total_chunks`, and `upload_chunks` columns. No additional migration needed.
 
 ---
 POST-COMPLETION (mandatory):

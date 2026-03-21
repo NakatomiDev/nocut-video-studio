@@ -65,3 +65,18 @@ A running log of architectural decisions that deviate from the original spec or 
 **Original plan:** Create app shell with 240px sidebar (#0A0F2E), navigation links (Dashboard, Credits, Settings), active link purple highlight, user email + sign-out at bottom. Dashboard with empty state and project cards. Credits placeholder. Settings with email, tier badge, sign-out.
 **Deviation:** (1) Used custom `AppLayout` component instead of shadcn `Sidebar` — simpler for a fixed 3-item nav with no collapsible groups. (2) Sidebar background uses `bg-background` (same #0A0F2E from design tokens) rather than a hardcoded color. (3) Main content area uses `bg-secondary` token (dark gray) instead of hardcoded #111827. (4) Settings tier badge is hardcoded to "Free" — will be dynamic once user data is queried from Supabase `users` table. (5) `ProjectCard` component built with status color mapping using Tailwind utility classes for status-specific colors (yellow/green/blue/red) since these are semantic status indicators, not theme colors.
 **Impact:** All protected routes wrapped in `ProtectedWithLayout` which combines `ProtectedRoute` + `AppLayout`. Files created: `src/components/AppLayout.tsx`, `src/components/ProjectCard.tsx`, `src/pages/Credits.tsx`, `src/pages/Settings.tsx`. Files modified: `src/pages/Dashboard.tsx`, `src/App.tsx`.
+
+### 2026-03-21 — Upload initiation Edge Function (Prompt 2.1.1)
+
+**Area:** Backend / Edge Functions
+**Original plan:** Create `supabase/functions/upload-initiate/index.ts` with auth, validation, tier limits, DB record creation, and presigned S3 URL generation. Also create shared utilities (`_shared/cors.ts`, `auth.ts`, `response.ts`, `tier-limits.ts`).
+**Files created:**
+- `supabase/functions/deno.json` — Import map for all Edge Functions
+- `supabase/functions/_shared/cors.ts` — CORS headers and OPTIONS handler
+- `supabase/functions/_shared/auth.ts` — JWT verification and service client factory
+- `supabase/functions/_shared/response.ts` — Consistent JSON response envelope (success/error + meta)
+- `supabase/functions/_shared/tier-limits.ts` — Tier limit constants, MIME type validation, limit enforcement
+- `supabase/functions/upload-initiate/index.ts` — Main upload initiation function
+- `supabase/migrations/005_upload_tracking.sql` — Adds `multipart_upload_id`, `total_chunks`, `upload_chunks` columns to `videos` table
+**Deviation:** (1) Created migration 005_upload_tracking.sql in this prompt rather than deferring to Prompt 2.1.2. The `multipart_upload_id` column is needed by upload-initiate to store the S3 UploadId, and by chunk-complete/upload-complete to look up sessions. Prompt 2.1.2 says "create migration 005 if needed" — it was needed here. (2) Uses S3 `CreateMultipartUpload` + `UploadPart` presigned URLs (not simple PUT URLs) because Prompt 2.1.2 requires `CompleteMultipartUpload` with ETags. (3) The `upload_session_id` in the response is the S3 multipart `UploadId` string, not a UUID — this is the natural session identifier that S3 requires for subsequent part uploads and completion.
+**Impact:** Prompt 2.1.2 can skip creating migration 005. The chunk-complete function should look up videos by `multipart_upload_id` to find the associated project/user for ownership verification. S3 part numbers are 1-indexed internally but the API exposes 0-indexed `chunk_index` — callers must map `PartNumber = chunk_index + 1`.
