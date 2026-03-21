@@ -308,7 +308,7 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
       ctx.fill();
     }
   }, [
-    thumbnails, containerWidth, totalWidth, scrollLeft, duration,
+    thumbnailSprite, containerWidth, totalWidth, scrollLeft, duration,
     cuts, activeCuts, manualCuts, activeManualCuts,
     hoveredCut, playheadPosition, timeToX,
     razorMode, razorStart, razorPreview,
