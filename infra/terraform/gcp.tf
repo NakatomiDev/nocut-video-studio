@@ -11,15 +11,6 @@
 #   4. Create SA key:       See infra/scripts/verify-gcp.sh
 # =============================================================================
 
-terraform {
-  required_providers {
-    google = {
-      source  = "hashicorp/google"
-      version = "~> 5.0"
-    }
-  }
-}
-
 provider "google" {
   project     = var.gcp_project_id
   region      = var.gcp_region
