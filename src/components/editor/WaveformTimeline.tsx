@@ -13,10 +13,11 @@ const SNAP_THRESHOLD_S = 0.1;
 
 interface WaveformTimelineProps {
   waveformUrl: string | null;
+  videoUrl: string | null;
   duration: number;
 }
 
-const WaveformTimeline = ({ waveformUrl, duration }: WaveformTimelineProps) => {
+const WaveformTimeline = ({ waveformUrl, videoUrl, duration }: WaveformTimelineProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const animFrameRef = useRef<number>(0);
@@ -45,6 +46,55 @@ const WaveformTimeline = ({ waveformUrl, duration }: WaveformTimelineProps) => {
   const [hoveredCut, setHoveredCut] = useState<string | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [razorPreview, setRazorPreview] = useState<number | null>(null);
+  const [thumbnails, setThumbnails] = useState<{ time: number; img: HTMLImageElement }[]>([]);
+
+  // Generate video thumbnails
+  useEffect(() => {
+    if (!videoUrl || !duration) return;
+    let cancelled = false;
+    const generate = async () => {
+      const video = document.createElement('video');
+      video.crossOrigin = 'anonymous';
+      video.preload = 'auto';
+      video.muted = true;
+      video.src = videoUrl;
+      await new Promise<void>((resolve, reject) => {
+        video.onloadeddata = () => resolve();
+        video.onerror = () => reject();
+      });
+
+      const thumbCanvas = document.createElement('canvas');
+      const thumbH = 60;
+      const thumbW = Math.round((video.videoWidth / video.videoHeight) * thumbH) || 80;
+      thumbCanvas.width = thumbW;
+      thumbCanvas.height = thumbH;
+      const tCtx = thumbCanvas.getContext('2d');
+      if (!tCtx) return;
+
+      const count = Math.min(Math.max(Math.ceil(duration / 2), 5), 60);
+      const interval = duration / count;
+      const results: { time: number; img: HTMLImageElement }[] = [];
+
+      for (let i = 0; i < count; i++) {
+        if (cancelled) return;
+        const t = i * interval;
+        video.currentTime = t;
+        await new Promise<void>((resolve) => {
+          video.onseeked = () => resolve();
+        });
+        tCtx.drawImage(video, 0, 0, thumbW, thumbH);
+        const img = new Image();
+        img.src = thumbCanvas.toDataURL('image/jpeg', 0.6);
+        await new Promise<void>((resolve) => {
+          img.onload = () => resolve();
+        });
+        results.push({ time: t, img });
+      }
+      if (!cancelled) setThumbnails(results);
+    };
+    generate().catch(() => {});
+    return () => { cancelled = true; };
+  }, [videoUrl, duration]);
 
   // Escape key to cancel razor
   useEffect(() => {
@@ -132,6 +182,21 @@ const WaveformTimeline = ({ waveformUrl, duration }: WaveformTimelineProps) => {
 
     ctx.fillStyle = 'hsl(230, 50%, 10%)';
     ctx.fillRect(0, 0, w, h);
+
+    // Video thumbnails
+    if (thumbnails.length > 0 && duration > 0) {
+      const thumbW = thumbnails[0].img.width;
+      const thumbH = thumbnails[0].img.height;
+      const scale = h / thumbH;
+      const drawW = thumbW * scale;
+      for (const thumb of thumbnails) {
+        const x = timeToX(thumb.time) - scrollLeft;
+        if (x + drawW < 0 || x > w) continue;
+        ctx.globalAlpha = 0.35;
+        ctx.drawImage(thumb.img, x, 0, drawW, h);
+      }
+      ctx.globalAlpha = 1;
+    }
 
     const centerY = h / 2;
     const maxBarH = h * 0.42;
@@ -235,7 +300,7 @@ const WaveformTimeline = ({ waveformUrl, duration }: WaveformTimelineProps) => {
       ctx.fill();
     }
   }, [
-    waveformData, containerWidth, totalWidth, scrollLeft, duration,
+    waveformData, thumbnails, containerWidth, totalWidth, scrollLeft, duration,
     cuts, activeCuts, manualCuts, activeManualCuts,
     hoveredCut, playheadPosition, timeToX,
     razorMode, razorStart, razorPreview,
@@ -331,17 +396,21 @@ const WaveformTimeline = ({ waveformUrl, duration }: WaveformTimelineProps) => {
     [razorMode, razorStart, setRazorStart, addManualCut, getCutAtX, toggleCut, xToTime, snapTime]
   );
 
-  const handleWheel = useCallback(
-    (e: React.WheelEvent) => {
+  // Attach wheel handler as non-passive so preventDefault works for Ctrl+Scroll
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
         setZoom(zoomLevel + (e.deltaY > 0 ? -0.5 : 0.5));
       } else {
         setScrollLeft(Math.max(0, Math.min(totalWidth - containerWidth, scrollLeft + e.deltaX + e.deltaY)));
       }
-    },
-    [zoomLevel, setZoom, scrollLeft, totalWidth, containerWidth]
-  );
+    };
+    el.addEventListener('wheel', handler, { passive: false });
+    return () => el.removeEventListener('wheel', handler);
+  }, [zoomLevel, setZoom, scrollLeft, totalWidth, containerWidth]);
 
   // Scrollbar
   const scrollbarWidth = useMemo(
@@ -424,7 +493,6 @@ const WaveformTimeline = ({ waveformUrl, duration }: WaveformTimelineProps) => {
           onMouseUp={handleMouseUp}
           onMouseLeave={() => { handleMouseUp(); setRazorPreview(null); }}
           onClick={handleClick}
-          onWheel={handleWheel}
         >
           <canvas ref={canvasRef} className="h-full w-full" />
 

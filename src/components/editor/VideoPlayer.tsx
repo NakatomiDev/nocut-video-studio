@@ -18,6 +18,7 @@ const formatTime = (s: number) => {
 
 const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const internalSeekRef = useRef(false);
   const { isPlaying, playheadPosition, setPlayhead, play, pause } = useEditorStore();
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
@@ -27,7 +28,10 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
-    const onTime = () => setPlayhead(v.currentTime);
+    const onTime = () => {
+      internalSeekRef.current = true;
+      setPlayhead(v.currentTime);
+    };
     const onEnd = () => pause();
     const onMeta = () => setDuration(v.duration);
     v.addEventListener('timeupdate', onTime);
@@ -39,6 +43,19 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
       v.removeEventListener('loadedmetadata', onMeta);
     };
   }, [setPlayhead, pause]);
+
+  // Sync external playhead changes (e.g. timeline scrub) to the video element
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (internalSeekRef.current) {
+      internalSeekRef.current = false;
+      return;
+    }
+    if (Math.abs(v.currentTime - playheadPosition) > 0.15) {
+      v.currentTime = playheadPosition;
+    }
+  }, [playheadPosition]);
 
   useEffect(() => {
     const v = videoRef.current;
