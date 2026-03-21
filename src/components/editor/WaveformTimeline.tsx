@@ -219,28 +219,8 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
     ctx.fillRect(0, 0, w, h);
 
     // Video thumbnail filmstrip
-    if (thumbnails.length > 0 && duration > 0) {
-      const thumbH = thumbnails[0].img.height;
-      const thumbW = thumbnails[0].img.width;
-      const scale = h / thumbH;
-      const drawW = thumbW * scale;
-      const interval = duration / thumbnails.length;
-
-      // Fill the visible area with evenly-spaced thumbnails
-      const totalThumbs = Math.ceil(totalWidth / drawW);
-      for (let i = 0; i < totalThumbs; i++) {
-        const x = i * drawW - scrollLeft;
-        if (x + drawW < 0 || x > w) continue;
-        // Find the closest thumbnail for this position
-        const t = (i * drawW / totalWidth) * duration;
-        let best = thumbnails[0];
-        let bestDist = Math.abs(t - best.time);
-        for (const thumb of thumbnails) {
-          const d = Math.abs(t - thumb.time);
-          if (d < bestDist) { best = thumb; bestDist = d; }
-        }
-        ctx.drawImage(best.img, x, 0, drawW, h);
-      }
+    if (thumbnailSprite && duration > 0) {
+      ctx.drawImage(thumbnailSprite, -scrollLeft, 0, totalWidth, h);
     }
 
     // Auto-detected cut overlays
