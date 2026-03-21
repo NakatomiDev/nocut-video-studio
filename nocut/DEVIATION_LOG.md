@@ -17,4 +17,9 @@ A running log of architectural decisions that deviate from the original spec or 
 
 ---
 
-_No deviations logged yet._
+### 2026-03-21 — Core schema migration (001_core_schema.sql)
+
+**Area:** Backend / Database
+**Original plan:** Create 9 core tables (users, projects, videos, cut_maps, edit_decisions, ai_fills, exports, speaker_models, audit_log) with specified columns, types, and indexes.
+**Deviation:** None — all column names, types, constraints, and indexes match the spec exactly.
+**Impact:** No downstream impact. Credit tables and RLS policies deferred to subsequent migrations as planned.
