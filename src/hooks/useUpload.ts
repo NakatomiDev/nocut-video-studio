@@ -52,6 +52,7 @@ export function useUpload() {
   const abortRef = useRef(false);
   const controllersRef = useRef<AbortController[]>([]);
   const completedChunksRef = useRef<Set<number>>(new Set());
+  const chunkCompleteQueueRef = useRef<Promise<void>>(Promise.resolve());
   const uploadSessionRef = useRef<{
     uploadSessionId: string;
     presignedUrls: PresignedUrl[];
@@ -63,10 +64,42 @@ export function useUpload() {
     controllersRef.current.forEach((c) => c.abort());
     controllersRef.current = [];
     completedChunksRef.current = new Set();
+    chunkCompleteQueueRef.current = Promise.resolve();
     uploadSessionRef.current = null;
     setState(initialState);
     abortRef.current = false;
   }, []);
+
+  const reportChunkComplete = useCallback(
+    async (uploadSessionId: string, chunkIndex: number, etag: string) => {
+      const previous = chunkCompleteQueueRef.current.catch(() => undefined);
+
+      const current = previous.then(async () => {
+        const { data, error } = await supabase.functions.invoke(
+          "upload-chunk-complete",
+          {
+            body: {
+              upload_session_id: uploadSessionId,
+              chunk_index: chunkIndex,
+              etag,
+            },
+          }
+        );
+
+        if (error || data?.error) {
+          throw new Error(
+            data?.error?.message ||
+              error?.message ||
+              `Failed to record chunk ${chunkIndex + 1}`
+          );
+        }
+      });
+
+      chunkCompleteQueueRef.current = current.catch(() => undefined);
+      return current;
+    },
+    []
+  );
 
   const selectFile = useCallback(async (file: File) => {
     const allowedTypes = [
@@ -258,14 +291,12 @@ export function useUpload() {
 
           const etag = response.headers.get("ETag") || `"chunk-${chunkIndex}"`;
 
-          // Report chunk completion
-          await supabase.functions.invoke("upload-chunk-complete", {
-            body: {
-              upload_session_id: uploadSessionId,
-              chunk_index: chunkIndex,
-              etag: etag.replace(/"/g, ""),
-            },
-          });
+          // Report chunk completion sequentially to avoid overwriting concurrent updates
+          await reportChunkComplete(
+            uploadSessionId,
+            chunkIndex,
+            etag.replace(/"/g, "")
+          );
 
           completedChunksRef.current.add(chunkIndex);
           bytesUploaded += end - start;
@@ -357,7 +388,7 @@ export function useUpload() {
         }));
       }
     }
-  }, [state]);
+  }, [state, reportChunkComplete]);
 
   return {
     ...state,
