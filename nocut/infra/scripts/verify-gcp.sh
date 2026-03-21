@@ -65,7 +65,7 @@ fi
 
 # ── 3. Authenticate with service account ──
 PROJECT="${GCP_PROJECT_ID:-nocut-ai-dev}"
-REGION="${GCP_REGION:-us-central1}"
+REGION="${GCP_REGION:-asia-northeast1}"
 
 echo "Checking GCP authentication..."
 if [[ -f "$KEY_FILE" ]]; then
