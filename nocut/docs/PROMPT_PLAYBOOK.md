@@ -508,7 +508,7 @@ POST-COMPLETION (mandatory):
 
 ## 1.1 — Authentication
 
-### - [ ] Prompt 1.1.1 — Build sign-up and sign-in pages
+### - [x] Prompt 1.1.1 — Build sign-up and sign-in pages *(completed 2026-03-21)*
 
 **Tool: Lovable**
 
