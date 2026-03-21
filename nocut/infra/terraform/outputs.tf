@@ -66,3 +66,24 @@ output "ecs_task_role_arn" {
   description = "ECS task role ARN"
   value       = aws_iam_role.ecs_task.arn
 }
+
+# ECS Services
+output "ecs_service_transcoder" {
+  description = "Transcoder ECS service name"
+  value       = aws_ecs_service.transcoder.name
+}
+
+output "ecs_service_detector" {
+  description = "Detector ECS service name"
+  value       = aws_ecs_service.detector.name
+}
+
+output "ecs_task_definition_transcoder" {
+  description = "Transcoder task definition ARN"
+  value       = aws_ecs_task_definition.transcoder.arn
+}
+
+output "ecs_task_definition_detector" {
+  description = "Detector task definition ARN"
+  value       = aws_ecs_task_definition.detector.arn
+}

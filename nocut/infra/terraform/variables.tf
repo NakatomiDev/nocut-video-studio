@@ -34,3 +34,54 @@ variable "redis_auth_token" {
   type        = string
   sensitive   = true
 }
+
+# -----------------------------------------------------------------------------
+# ECS Service Configuration
+# -----------------------------------------------------------------------------
+
+variable "supabase_url" {
+  description = "Supabase project URL"
+  type        = string
+}
+
+variable "supabase_service_role_key" {
+  description = "Supabase service-role key (server-side only)"
+  type        = string
+  sensitive   = true
+}
+
+variable "transcoder_cpu" {
+  description = "CPU units for the transcoder task (1024 = 1 vCPU)"
+  type        = number
+  default     = 1024
+}
+
+variable "transcoder_memory" {
+  description = "Memory (MiB) for the transcoder task"
+  type        = number
+  default     = 2048
+}
+
+variable "transcoder_desired_count" {
+  description = "Desired number of transcoder tasks"
+  type        = number
+  default     = 1
+}
+
+variable "detector_cpu" {
+  description = "CPU units for the detector task (1024 = 1 vCPU)"
+  type        = number
+  default     = 512
+}
+
+variable "detector_memory" {
+  description = "Memory (MiB) for the detector task"
+  type        = number
+  default     = 1024
+}
+
+variable "detector_desired_count" {
+  description = "Desired number of detector tasks"
+  type        = number
+  default     = 1
+}

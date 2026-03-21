@@ -13,3 +13,15 @@ YOUR_PUBLIC_KEY_HERE
 -----END PUBLIC KEY-----
 EOF
 redis_auth_token       = "change-me-to-a-strong-token"
+
+# Supabase
+supabase_url               = "https://your-project.supabase.co"
+supabase_service_role_key  = "eyJ..."
+
+# ECS service sizing (defaults are fine for dev)
+# transcoder_cpu           = 1024
+# transcoder_memory        = 2048
+# transcoder_desired_count = 1
+# detector_cpu             = 512
+# detector_memory          = 1024
+# detector_desired_count   = 1
