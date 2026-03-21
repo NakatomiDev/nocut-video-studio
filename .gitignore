@@ -30,6 +30,7 @@ supabase/.temp/
 nocut/.env
 *.pem
 .terraform-outputs.json
+infra/gcp-sa-key.json
 
 # Terraform
 *.tfvars
