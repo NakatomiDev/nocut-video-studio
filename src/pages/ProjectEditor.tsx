@@ -16,6 +16,7 @@ const ProjectEditor = () => {
   const [error, setError] = useState<string | null>(null);
   const [processingStatus, setProcessingStatus] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [waveformUrl, setWaveformUrl] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [editingTitle, setEditingTitle] = useState(false);
 
