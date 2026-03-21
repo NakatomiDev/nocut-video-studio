@@ -23,6 +23,10 @@ dist-ssr
 *.sln
 *.sw?
 
+# Secrets
+nocut/.env
+*.pem
+
 # Terraform
 *.tfvars
 !*.tfvars.example
