@@ -630,7 +630,7 @@ POST-COMPLETION (mandatory):
 
 ## 2.1 — Upload Backend
 
-### - [ ] Prompt 2.1.1 — Create upload initiation Edge Function
+### - [x] Prompt 2.1.1 — Create upload initiation Edge Function *(completed 2026-03-21)*
 
 **Tool: Claude Code**
 

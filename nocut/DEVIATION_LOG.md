@@ -51,3 +51,18 @@ A running log of architectural decisions that deviate from the original spec or 
 **Original plan:** Create 10 Terraform files for S3, CloudFront, ECR, ECS, ElastiCache, IAM, security groups with specified configurations. Use CloudFront key pair ID variable for signed URLs.
 **Deviation:** (1) Used Origin Access Control (OAC) instead of the legacy Origin Access Identity (OAI) for CloudFront→S3 — OAC is the modern AWS-recommended approach and supports S3 SSE-KMS. (2) Added `cloudfront_public_key_pem` variable and `aws_cloudfront_key_group` resource to manage signed URL keys via Terraform rather than the legacy `cloudfront_key_pair_id` console-only method. The `cloudfront_key_pair_id` variable is kept for reference but the key group is what CloudFront uses. (3) Added ECR lifecycle policies (keep last 10 images) to prevent unbounded image accumulation. (4) Enabled Container Insights on the ECS cluster for observability. (5) Added FARGATE_SPOT as additional capacity provider for cost optimization.
 **Impact:** Callers generating signed URLs must use the CloudFront key group (output from Terraform) rather than a root-account key pair. ECR repos auto-clean old images. No other downstream changes — all resource names follow `nocut-{resource}-{environment}` convention as expected.
+
+### 2026-03-21 — Upload initiation Edge Function (Prompt 2.1.1)
+
+**Area:** Backend / Edge Functions
+**Original plan:** Create `supabase/functions/upload-initiate/index.ts` with auth, validation, tier limits, DB record creation, and presigned S3 URL generation. Also create shared utilities (`_shared/cors.ts`, `auth.ts`, `response.ts`, `tier-limits.ts`).
+**Files created:**
+- `supabase/functions/deno.json` — Import map for all Edge Functions
+- `supabase/functions/_shared/cors.ts` — CORS headers and OPTIONS handler
+- `supabase/functions/_shared/auth.ts` — JWT verification and service client factory
+- `supabase/functions/_shared/response.ts` — Consistent JSON response envelope (success/error + meta)
+- `supabase/functions/_shared/tier-limits.ts` — Tier limit constants, MIME type validation, limit enforcement
+- `supabase/functions/upload-initiate/index.ts` — Main upload initiation function
+- `supabase/migrations/005_upload_tracking.sql` — Adds `multipart_upload_id`, `total_chunks`, `upload_chunks` columns to `videos` table
+**Deviation:** (1) Created migration 005_upload_tracking.sql in this prompt rather than deferring to Prompt 2.1.2. The `multipart_upload_id` column is needed by upload-initiate to store the S3 UploadId, and by chunk-complete/upload-complete to look up sessions. Prompt 2.1.2 says "create migration 005 if needed" — it was needed here. (2) Uses S3 `CreateMultipartUpload` + `UploadPart` presigned URLs (not simple PUT URLs) because Prompt 2.1.2 requires `CompleteMultipartUpload` with ETags. (3) The `upload_session_id` in the response is the S3 multipart `UploadId` string, not a UUID — this is the natural session identifier that S3 requires for subsequent part uploads and completion.
+**Impact:** Prompt 2.1.2 can skip creating migration 005. The chunk-complete function should look up videos by `multipart_upload_id` to find the associated project/user for ownership verification. S3 part numbers are 1-indexed internally but the API exposes 0-indexed `chunk_index` — callers must map `PartNumber = chunk_index + 1`.
