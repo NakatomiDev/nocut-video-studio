@@ -17,15 +17,20 @@ interface ChunkEntry {
   completed_at: string;
 }
 
-const s3Client = new S3Client({
-  region: Deno.env.get("AWS_REGION")!,
-  credentials: {
-    accessKeyId: Deno.env.get("AWS_ACCESS_KEY_ID")!,
-    secretAccessKey: Deno.env.get("AWS_SECRET_ACCESS_KEY")!,
-  },
-});
-
-const S3_BUCKET = Deno.env.get("AWS_S3_BUCKET")!;
+// Lazy-init so OPTIONS preflight never crashes due to missing env vars
+let _s3Client: S3Client | null = null;
+function getS3Client(): S3Client {
+  if (!_s3Client) {
+    _s3Client = new S3Client({
+      region: Deno.env.get("AWS_REGION")!,
+      credentials: {
+        accessKeyId: Deno.env.get("AWS_ACCESS_KEY_ID")!,
+        secretAccessKey: Deno.env.get("AWS_SECRET_ACCESS_KEY")!,
+      },
+    });
+  }
+  return _s3Client;
+}
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req);
@@ -123,9 +128,9 @@ Deno.serve(async (req) => {
 
     // 8. Complete S3 multipart upload
     try {
-      await s3Client.send(
+      await getS3Client().send(
         new CompleteMultipartUploadCommand({
-          Bucket: S3_BUCKET,
+          Bucket: Deno.env.get("AWS_S3_BUCKET")!,
           Key: video.s3_key,
           UploadId: upload_session_id,
           MultipartUpload: { Parts: parts },

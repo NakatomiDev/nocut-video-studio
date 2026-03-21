@@ -22,15 +22,20 @@ import {
 
 const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB
 
-const s3Client = new S3Client({
-  region: Deno.env.get("AWS_REGION")!,
-  credentials: {
-    accessKeyId: Deno.env.get("AWS_ACCESS_KEY_ID")!,
-    secretAccessKey: Deno.env.get("AWS_SECRET_ACCESS_KEY")!,
-  },
-});
-
-const S3_BUCKET = Deno.env.get("AWS_S3_BUCKET")!;
+// Lazy-init so OPTIONS preflight never crashes due to missing env vars
+let _s3Client: S3Client | null = null;
+function getS3Client(): S3Client {
+  if (!_s3Client) {
+    _s3Client = new S3Client({
+      region: Deno.env.get("AWS_REGION")!,
+      credentials: {
+        accessKeyId: Deno.env.get("AWS_ACCESS_KEY_ID")!,
+        secretAccessKey: Deno.env.get("AWS_SECRET_ACCESS_KEY")!,
+      },
+    });
+  }
+  return _s3Client;
+}
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req);
@@ -121,16 +126,17 @@ Deno.serve(async (req) => {
     const extension = MIME_TO_EXTENSION[mime_type] ?? "mp4";
     const s3Key = `uploads/${user.id}/${projectId}/source.${extension}`;
     const totalChunks = Math.ceil(file_size_bytes / CHUNK_SIZE);
+    const s3Bucket = Deno.env.get("AWS_S3_BUCKET")!;
 
     // 6. Initiate S3 multipart upload
     let uploadId: string;
     try {
       const createCmd = new CreateMultipartUploadCommand({
-        Bucket: S3_BUCKET,
+        Bucket: s3Bucket,
         Key: s3Key,
         ContentType: mime_type,
       });
-      const createResult = await s3Client.send(createCmd);
+      const createResult = await getS3Client().send(createCmd);
       uploadId = createResult.UploadId!;
     } catch (err) {
       console.error("Failed to initiate S3 multipart upload:", err);
@@ -158,9 +164,9 @@ Deno.serve(async (req) => {
       console.error("Failed to create video record:", videoError);
       // Clean up: abort multipart upload and delete project
       try {
-        await s3Client.send(
+        await getS3Client().send(
           new AbortMultipartUploadCommand({
-            Bucket: S3_BUCKET,
+            Bucket: s3Bucket,
             Key: s3Key,
             UploadId: uploadId,
           }),
@@ -175,12 +181,12 @@ Deno.serve(async (req) => {
     const presignedUrls = await Promise.all(
       Array.from({ length: totalChunks }, async (_, i) => {
         const cmd = new UploadPartCommand({
-          Bucket: S3_BUCKET,
+          Bucket: s3Bucket,
           Key: s3Key,
           UploadId: uploadId,
           PartNumber: i + 1, // S3 parts are 1-indexed
         });
-        const url = await getSignedUrl(s3Client, cmd, { expiresIn: 3600 });
+        const url = await getSignedUrl(getS3Client(), cmd, { expiresIn: 3600 });
         return { chunk_index: i, url, expires_at: expiresAt };
       }),
     );
