@@ -12,6 +12,7 @@ import Dashboard from "@/pages/Dashboard";
 import Credits from "@/pages/Credits";
 import Settings from "@/pages/Settings";
 import Upload from "@/pages/Upload";
+import ProjectEditor from "@/pages/ProjectEditor";
 import NotFound from "@/pages/NotFound";
 import { Loader2 } from "lucide-react";
 
