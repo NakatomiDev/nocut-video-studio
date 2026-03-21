@@ -24,7 +24,9 @@ const Dashboard = () => {
         .select("id, title, status, created_at")
         .order("created_at", { ascending: false });
 
-      if (!error && data) {
+      if (error) {
+        console.error("Failed to fetch projects:", error);
+      } else if (data) {
         setProjects(data);
       }
       setLoading(false);
