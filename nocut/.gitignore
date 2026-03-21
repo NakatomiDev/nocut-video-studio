@@ -1,0 +1,39 @@
+# ── Environment ──
+.env
+.env.local
+.env.*.local
+
+# ── Node.js ──
+node_modules/
+dist/
+build/
+.turbo/
+*.tsbuildinfo
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.mypy_cache/
+
+# ── Terraform ──
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+!*.tfvars.example
+
+# ── IDE ──
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# ── Docker ──
+docker-compose.override.yml
+
+# ── Supabase ──
+supabase/.temp/
