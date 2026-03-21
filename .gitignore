@@ -1,4 +1,4 @@
-# Logs
+# ── Logs ──
 logs
 *.log
 npm-debug.log*
@@ -7,15 +7,32 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# ── Node.js ──
+node_modules/
+dist/
+dist-ssr/
+build/
+.turbo/
+*.tsbuildinfo
 *.local
 
-# Editor directories and files
+# ── Python ──
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.mypy_cache/
+
+# ── Environment ──
+.env
+.env.local
+.env.*.local
+
+# ── Editor / IDE ──
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
 *.suo
 *.ntvs*
@@ -23,20 +40,23 @@ dist-ssr
 *.sln
 *.sw?
 
-# Supabase
+# ── Supabase ──
 supabase/.temp/
 
-# Secrets
-nocut/.env
+# ── Secrets ──
 *.pem
 .terraform-outputs.json
+.terraform-outputs-nocut.json
 infra/gcp-sa-key.json
 
-# Terraform
-*.tfvars
-!*.tfvars.example
+# ── Terraform ──
 .terraform/
 *.tfstate
 *.tfstate.backup
+*.tfvars
+!*.tfvars.example
 *.tfplan
 tfplan
+
+# ── Docker ──
+docker-compose.override.yml
