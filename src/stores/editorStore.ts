@@ -11,27 +11,69 @@ export interface Cut {
   auto_accept: boolean;
 }
 
+export interface ManualCut {
+  id: string;
+  start: number;
+  end: number;
+  duration: number;
+}
+
+interface CreditBalance {
+  total: number;
+  monthly: number;
+  topup: number;
+}
+
 interface EditorState {
   project: Tables<'projects'> | null;
   video: Tables<'videos'> | null;
   cutMap: Tables<'cut_maps'> | null;
   cuts: Cut[];
   activeCuts: Set<string>;
+  manualCuts: ManualCut[];
+  activeManualCuts: Set<string>;
   playheadPosition: number;
   isPlaying: boolean;
   zoomLevel: number;
+  creditEstimate: number;
+  creditBalance: CreditBalance;
+  razorMode: boolean;
+  razorStart: number | null;
 
   setProject: (project: Tables<'projects'>) => void;
   setVideo: (video: Tables<'videos'>) => void;
   setCutMap: (cutMap: Tables<'cut_maps'>) => void;
   setCuts: (cuts: Cut[]) => void;
   toggleCut: (cutId: string) => void;
+  addManualCut: (start: number, end: number) => void;
+  removeManualCut: (id: string) => void;
+  toggleManualCut: (cutId: string) => void;
   setPlayhead: (time: number) => void;
   play: () => void;
   pause: () => void;
   setZoom: (level: number) => void;
+  setCreditBalance: (balance: CreditBalance) => void;
+  setRazorMode: (active: boolean) => void;
+  setRazorStart: (time: number | null) => void;
   reset: () => void;
 }
+
+const calcCredits = (
+  cuts: Cut[],
+  activeCuts: Set<string>,
+  manualCuts: ManualCut[],
+  activeManualCuts: Set<string>
+) => {
+  const autoDur = cuts
+    .filter((c) => activeCuts.has(c.id))
+    .reduce((s, c) => s + c.duration, 0);
+  const manualDur = manualCuts
+    .filter((c) => activeManualCuts.has(c.id))
+    .reduce((s, c) => s + c.duration, 0);
+  return Math.ceil(autoDur + manualDur);
+};
+
+let manualCutCounter = 0;
 
 export const useEditorStore = create<EditorState>((set) => ({
   project: null,
@@ -39,9 +81,15 @@ export const useEditorStore = create<EditorState>((set) => ({
   cutMap: null,
   cuts: [],
   activeCuts: new Set<string>(),
+  manualCuts: [],
+  activeManualCuts: new Set<string>(),
   playheadPosition: 0,
   isPlaying: false,
   zoomLevel: 1,
+  creditEstimate: 0,
+  creditBalance: { total: 0, monthly: 0, topup: 0 },
+  razorMode: false,
+  razorStart: null,
 
   setProject: (project) => set({ project }),
   setVideo: (video) => set({ video }),
@@ -56,8 +104,13 @@ export const useEditorStore = create<EditorState>((set) => ({
       confidence: c.confidence ?? 0,
       auto_accept: c.auto_accept ?? false,
     }));
-    const activeCuts = new Set(cuts.filter(c => c.auto_accept).map(c => c.id));
-    set({ cutMap, cuts, activeCuts });
+    const activeCuts = new Set(cuts.filter((c) => c.auto_accept).map((c) => c.id));
+    set((state) => ({
+      cutMap,
+      cuts,
+      activeCuts,
+      creditEstimate: calcCredits(cuts, activeCuts, state.manualCuts, state.activeManualCuts),
+    }));
   },
   setCuts: (cuts) => set({ cuts }),
   toggleCut: (cutId) =>
@@ -65,12 +118,55 @@ export const useEditorStore = create<EditorState>((set) => ({
       const next = new Set(state.activeCuts);
       if (next.has(cutId)) next.delete(cutId);
       else next.add(cutId);
-      return { activeCuts: next };
+      return {
+        activeCuts: next,
+        creditEstimate: calcCredits(state.cuts, next, state.manualCuts, state.activeManualCuts),
+      };
+    }),
+  addManualCut: (start, end) =>
+    set((state) => {
+      const s = Math.min(start, end);
+      const e = Math.max(start, end);
+      if (e - s < 0.1) return state;
+      const id = `manual-${++manualCutCounter}`;
+      const cut: ManualCut = { id, start: s, end: e, duration: e - s };
+      const manualCuts = [...state.manualCuts, cut];
+      const activeManualCuts = new Set(state.activeManualCuts);
+      activeManualCuts.add(id);
+      return {
+        manualCuts,
+        activeManualCuts,
+        creditEstimate: calcCredits(state.cuts, state.activeCuts, manualCuts, activeManualCuts),
+      };
+    }),
+  removeManualCut: (id) =>
+    set((state) => {
+      const manualCuts = state.manualCuts.filter((c) => c.id !== id);
+      const activeManualCuts = new Set(state.activeManualCuts);
+      activeManualCuts.delete(id);
+      return {
+        manualCuts,
+        activeManualCuts,
+        creditEstimate: calcCredits(state.cuts, state.activeCuts, manualCuts, activeManualCuts),
+      };
+    }),
+  toggleManualCut: (cutId) =>
+    set((state) => {
+      const next = new Set(state.activeManualCuts);
+      if (next.has(cutId)) next.delete(cutId);
+      else next.add(cutId);
+      return {
+        activeManualCuts: next,
+        creditEstimate: calcCredits(state.cuts, state.activeCuts, state.manualCuts, next),
+      };
     }),
   setPlayhead: (time) => set({ playheadPosition: time }),
   play: () => set({ isPlaying: true }),
   pause: () => set({ isPlaying: false }),
   setZoom: (level) => set({ zoomLevel: Math.max(1, Math.min(10, level)) }),
+  setCreditBalance: (creditBalance) => set({ creditBalance }),
+  setRazorMode: (razorMode) => set({ razorMode, razorStart: null }),
+  setRazorStart: (razorStart) => set({ razorStart }),
   reset: () =>
     set({
       project: null,
@@ -78,8 +174,14 @@ export const useEditorStore = create<EditorState>((set) => ({
       cutMap: null,
       cuts: [],
       activeCuts: new Set(),
+      manualCuts: [],
+      activeManualCuts: new Set(),
       playheadPosition: 0,
       isPlaying: false,
       zoomLevel: 1,
+      creditEstimate: 0,
+      creditBalance: { total: 0, monthly: 0, topup: 0 },
+      razorMode: false,
+      razorStart: null,
     }),
 }));
