@@ -237,6 +237,7 @@ const ProjectEditor = () => {
           <div className="h-[40%]">
             <WaveformTimeline
               waveformUrl={waveformUrl}
+              videoUrl={videoUrl}
               duration={video?.duration || 0}
             />
           </div>
