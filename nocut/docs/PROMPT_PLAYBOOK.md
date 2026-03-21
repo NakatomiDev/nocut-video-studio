@@ -34,6 +34,14 @@ After each prompt, append to a running log:
 
 Keep this log in a file called `DEVIATION_LOG.md` in your repo root.
 
+### Tracking Progress
+
+Each prompt heading below has a checkbox. When a prompt is completed:
+- The checkbox is checked: `- [x]`
+- A completion date is appended: *(completed YYYY-MM-DD)*
+
+Every prompt's code block includes **POST-COMPLETION** instructions at the end. These tell the AI to automatically update both this playbook (check the box) and the deviation log after finishing the task. Just copy-paste the entire code block as-is.
+
 ---
 
 # SPRINT 0: Project Setup
@@ -44,7 +52,7 @@ Keep this log in a file called `DEVIATION_LOG.md` in your repo root.
 
 **Tool: Claude Code**
 
-### Prompt 0.1.1 — Create monorepo structure
+### - [x] Prompt 0.1.1 — Create monorepo structure *(completed 2026-03-21)*
 
 ```
 Create a GitHub monorepo for a project called "NoCut" — a web-based video editing app. Initialize the following directory structure:
@@ -83,6 +91,12 @@ For .gitignore, include standard patterns for Node.js, Python, Terraform, .env f
 Initialize DEVIATION_LOG.md with a header and the template format from above.
 
 Do NOT initialize Supabase yet — just create the directory structure.
+
+---
+POST-COMPLETION (mandatory):
+1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
+2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: files created/modified, any deviations from the spec, errors encountered.
+3. Commit both file updates to the current branch.
 ```
 
 **After completion:** Update DEVIATION_LOG.md with the actual structure created.
@@ -93,7 +107,7 @@ Do NOT initialize Supabase yet — just create the directory structure.
 
 **Tool: Claude Code**
 
-### Prompt 0.2.1 — Initialize Supabase and create core tables
+### - [x] Prompt 0.2.1 — Initialize Supabase and create core tables *(completed 2026-03-21)*
 
 ```
 I'm building NoCut, a video editing app. I need to set up the Supabase database schema.
@@ -211,13 +225,19 @@ Add appropriate indexes:
 
 Do NOT create credit tables yet — those come in the next migration.
 Do NOT create RLS policies yet — those come in a separate migration.
+
+---
+POST-COMPLETION (mandatory):
+1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
+2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: files created/modified, any deviations from the spec, errors encountered.
+3. Commit both file updates to the current branch.
 ```
 
 **After completion:** Update DEVIATION_LOG.md. Note any column type changes or naming differences.
 
 ---
 
-### Prompt 0.2.2 — Create credit system tables
+### - [x] Prompt 0.2.2 — Create credit system tables *(completed 2026-03-21)*
 
 ```
 Create a new Supabase migration file at `supabase/migrations/002_credit_system.sql` for the NoCut credit system.
@@ -277,13 +297,19 @@ CREATE OR REPLACE FUNCTION refund_credits(
 RETURNS TABLE(success BOOLEAN, credits_refunded INTEGER, message TEXT)
 
 This should reverse the deduction, adding credits back to the original ledger entries.
+
+---
+POST-COMPLETION (mandatory):
+1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
+2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: files created/modified, any deviations from the spec, errors encountered.
+3. Commit both file updates to the current branch.
 ```
 
 **After completion:** Update DEVIATION_LOG.md. Test the deduction function with sample data.
 
 ---
 
-### Prompt 0.2.3 — Create RLS policies
+### - [x] Prompt 0.2.3 — Create RLS policies *(completed 2026-03-21)*
 
 ```
 Create a new Supabase migration file at `supabase/migrations/003_rls_policies.sql` for NoCut.
@@ -340,13 +366,19 @@ Test by verifying:
 1. The trigger fires on auth.users insert
 2. RLS prevents cross-user data access
 3. The credit deduction function works with service role
+
+---
+POST-COMPLETION (mandatory):
+1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
+2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: files created/modified, any deviations from the spec, errors encountered.
+3. Commit both file updates to the current branch.
 ```
 
 **After completion:** Update DEVIATION_LOG.md. Note if any policy needed adjustment.
 
 ---
 
-### Prompt 0.2.4 — Create job queue table
+### - [ ] Prompt 0.2.4 — Create job queue table
 
 ```
 Create a new Supabase migration file at `supabase/migrations/004_job_queue.sql` for NoCut.
@@ -380,6 +412,12 @@ ALTER PUBLICATION supabase_realtime ADD TABLE job_queue;
 Also enable Realtime on the projects table and credit_transactions table:
 ALTER PUBLICATION supabase_realtime ADD TABLE projects;
 ALTER PUBLICATION supabase_realtime ADD TABLE credit_transactions;
+
+---
+POST-COMPLETION (mandatory):
+1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
+2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: files created/modified, any deviations from the spec, errors encountered.
+3. Commit both file updates to the current branch.
 ```
 
 **After completion:** Update DEVIATION_LOG.md. Verify Realtime is enabled.
@@ -390,7 +428,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE credit_transactions;
 
 **Tool: Claude Code**
 
-### Prompt 0.3.1 — Create Terraform foundation
+### - [ ] Prompt 0.3.1 — Create Terraform foundation
 
 ```
 Create the Terraform configuration for NoCut's AWS infrastructure in `infra/terraform/`.
@@ -452,6 +490,12 @@ Variables should include: environment (dev/staging/prod), aws_region, s3_bucket_
 Use `terraform.tfvars.example` with placeholder values.
 
 Backend config: S3 backend with DynamoDB locking (comment out for initial setup, user can enable after first apply).
+
+---
+POST-COMPLETION (mandatory):
+1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
+2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: files created/modified, any deviations from the spec, errors encountered.
+3. Commit both file updates to the current branch.
 ```
 
 **After completion:** Update DEVIATION_LOG.md. Note the actual resource names created. Do NOT apply yet — review first.
@@ -464,7 +508,7 @@ Backend config: S3 backend with DynamoDB locking (comment out for initial setup,
 
 ## 1.1 — Authentication
 
-### Prompt 1.1.1 — Build sign-up and sign-in pages
+### - [ ] Prompt 1.1.1 — Build sign-up and sign-in pages
 
 **Tool: Lovable**
 
@@ -513,13 +557,19 @@ Build the authentication pages:
    - / → Redirect to /dashboard if authed, /sign-in if not
 
 Use Tailwind CSS for all styling. Dark theme throughout.
+
+---
+POST-COMPLETION (mandatory):
+1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
+2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: files created/modified, any deviations from the spec, errors encountered.
+3. Commit both file updates to the current branch.
 ```
 
 **After completion:** Update DEVIATION_LOG.md. Note the actual component names, any Supabase config needed (URL, anon key).
 
 ---
 
-### Prompt 1.1.2 — Build app shell and navigation
+### - [ ] Prompt 1.1.2 — Build app shell and navigation
 
 **Tool: Lovable**
 
@@ -562,6 +612,12 @@ Building on the NoCut auth pages we just created, build the main app shell that 
    - "Sign Out" button
 
 Make sure the sidebar navigation works with the existing routing. All pages should be wrapped in the ProtectedRoute from the previous step.
+
+---
+POST-COMPLETION (mandatory):
+1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
+2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: files created/modified, any deviations from the spec, errors encountered.
+3. Commit both file updates to the current branch.
 ```
 
 **After completion:** Update DEVIATION_LOG.md. Note component names, routing structure.
@@ -574,7 +630,7 @@ Make sure the sidebar navigation works with the existing routing. All pages shou
 
 ## 2.1 — Upload Backend
 
-### Prompt 2.1.1 — Create upload initiation Edge Function
+### - [ ] Prompt 2.1.1 — Create upload initiation Edge Function
 
 **Tool: Claude Code**
 
@@ -638,13 +694,19 @@ IMPORTANT: Also create `supabase/functions/_shared/` directory with:
 - `tier-limits.ts` — Tier limit constants and validation function
 
 These shared utilities will be reused by all Edge Functions.
+
+---
+POST-COMPLETION (mandatory):
+1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
+2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: files created/modified, any deviations from the spec, errors encountered.
+3. Commit both file updates to the current branch.
 ```
 
 **After completion:** Update DEVIATION_LOG.md. Note actual file paths, any import issues with Deno.
 
 ---
 
-### Prompt 2.1.2 — Create chunk-complete and upload-complete Edge Functions
+### - [ ] Prompt 2.1.2 — Create chunk-complete and upload-complete Edge Functions
 
 **Tool: Claude Code**
 
@@ -684,6 +746,12 @@ Reference the shared utilities in `supabase/functions/_shared/` (cors.ts, auth.t
    - Return: { project_id, video_id, status: 'transcoding', estimated_processing_seconds }
 
 Also update the videos table if we need an upload_chunks column — create migration `supabase/migrations/005_upload_tracking.sql` if needed.
+
+---
+POST-COMPLETION (mandatory):
+1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
+2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: files created/modified, any deviations from the spec, errors encountered.
+3. Commit both file updates to the current branch.
 ```
 
 **After completion:** Update DEVIATION_LOG.md.
@@ -692,7 +760,7 @@ Also update the videos table if we need an upload_chunks column — create migra
 
 ## 2.2 — Upload UI
 
-### Prompt 2.2.1 — Build upload flow UI
+### - [ ] Prompt 2.2.1 — Build upload flow UI
 
 **Tool: Lovable**
 
@@ -737,6 +805,12 @@ Build the video upload flow for NoCut. This connects to our Supabase Edge Functi
    - Cancel button that aborts all in-progress uploads
 
 Use the Supabase JS client for Edge Function calls. Use fetch() for direct S3 uploads (presigned URLs).
+
+---
+POST-COMPLETION (mandatory):
+1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
+2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: files created/modified, any deviations from the spec, errors encountered.
+3. Commit both file updates to the current branch.
 ```
 
 **After completion:** Update DEVIATION_LOG.md. Note actual component structure, any Supabase Realtime setup differences.
@@ -745,7 +819,7 @@ Use the Supabase JS client for Edge Function calls. Use fetch() for direct S3 up
 
 ## 2.3 — Transcoding Worker
 
-### Prompt 2.3.1 — Build transcoding Docker service
+### - [ ] Prompt 2.3.1 — Build transcoding Docker service
 
 **Tool: Claude Code**
 
@@ -813,6 +887,12 @@ services/transcoder/
 **Environment variables**: REDIS_URL, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_S3_BUCKET, AWS_REGION
 
 Include proper logging (console.log with JSON format including job_id, project_id for correlation).
+
+---
+POST-COMPLETION (mandatory):
+1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
+2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: files created/modified, any deviations from the spec, errors encountered.
+3. Commit both file updates to the current branch.
 ```
 
 **After completion:** Update DEVIATION_LOG.md. Note Docker image tag, actual FFmpeg commands used.
@@ -825,7 +905,7 @@ Include proper logging (console.log with JSON format including job_id, project_i
 
 ## 3.1 — Silence Detection
 
-### Prompt 3.1.1 — Build silence detection service
+### - [ ] Prompt 3.1.1 — Build silence detection service
 
 **Tool: Claude Code**
 
@@ -898,6 +978,12 @@ For MVP, I recommend polling Supabase job_queue every 5 seconds for 'queued' job
 **requirements.txt**: librosa, numpy, pydub, supabase, httpx, ffmpeg-python (or just subprocess calls)
 
 Include a test file with a simple test case using a generated silent audio clip.
+
+---
+POST-COMPLETION (mandatory):
+1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
+2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: files created/modified, any deviations from the spec, errors encountered.
+3. Commit both file updates to the current branch.
 ```
 
 **After completion:** Update DEVIATION_LOG.md. Note detection accuracy, threshold values that work best.
@@ -906,7 +992,7 @@ Include a test file with a simple test case using a generated silent audio clip.
 
 ## 3.2 — Timeline Editor
 
-### Prompt 3.2.1 — Build editor page layout
+### - [ ] Prompt 3.2.1 — Build editor page layout
 
 **Tool: Lovable**
 
@@ -954,13 +1040,19 @@ This is the core editing experience. For this prompt, build the page layout and 
    - Actions: toggleCut(cutId), setPlayhead(time), play(), pause(), setZoom(level)
 
 Build this as a foundation — the actual Canvas-based timeline components come next.
+
+---
+POST-COMPLETION (mandatory):
+1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
+2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: files created/modified, any deviations from the spec, errors encountered.
+3. Commit both file updates to the current branch.
 ```
 
 **After completion:** Update DEVIATION_LOG.md. Note the Zustand store shape, component names, data loading pattern.
 
 ---
 
-### Prompt 3.2.2 — Build waveform timeline component
+### - [ ] Prompt 3.2.2 — Build waveform timeline component
 
 **Tool: Lovable**
 
@@ -1005,13 +1097,19 @@ This replaces the "Timeline loading..." placeholder from the previous prompt.
    - The playhead position is stored in Zustand and shared between the video player and timeline
 
 Keep the Canvas rendering performant — pre-render the waveform bitmap at the current zoom level and only re-draw when zoom changes or the view scrolls. Use requestAnimationFrame for playhead animation.
+
+---
+POST-COMPLETION (mandatory):
+1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
+2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: files created/modified, any deviations from the spec, errors encountered.
+3. Commit both file updates to the current branch.
 ```
 
 **After completion:** Update DEVIATION_LOG.md. Note Canvas performance, any issues with waveform rendering.
 
 ---
 
-### Prompt 3.2.3 — Build manual cut tool and cut list
+### - [ ] Prompt 3.2.3 — Build manual cut tool and cut list
 
 **Tool: Lovable**
 
@@ -1070,6 +1168,12 @@ Update the Zustand store to include:
 - addManualCut(start, end), removeManualCut(id)
 - creditEstimate: number
 - creditBalance: { total, monthly, topup }
+
+---
+POST-COMPLETION (mandatory):
+1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
+2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: files created/modified, any deviations from the spec, errors encountered.
+3. Commit both file updates to the current branch.
 ```
 
 **After completion:** Update DEVIATION_LOG.md. Note the final editor component tree, state shape.
@@ -1082,7 +1186,7 @@ Update the Zustand store to include:
 
 ## 4.1 — Credit Backend
 
-### Prompt 4.1.1 — Create credit Edge Functions
+### - [ ] Prompt 4.1.1 — Create credit Edge Functions
 
 **Tool: Claude Code**
 
@@ -1156,6 +1260,12 @@ Create these Edge Functions:
      - Return: { edit_decision_id, credits_charged, credits_remaining, estimated_processing_seconds }
 
 Reuse the shared utilities from _shared/ for auth, CORS, and response formatting.
+
+---
+POST-COMPLETION (mandatory):
+1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
+2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: files created/modified, any deviations from the spec, errors encountered.
+3. Commit both file updates to the current branch.
 ```
 
 **After completion:** Update DEVIATION_LOG.md. Note actual function names (Supabase may require kebab-case), Stripe integration details.
@@ -1164,7 +1274,7 @@ Reuse the shared utilities from _shared/ for auth, CORS, and response formatting
 
 ## 4.2 — RevenueCat + Stripe Webhooks
 
-### Prompt 4.2.1 — Create webhook handlers
+### - [ ] Prompt 4.2.1 — Create webhook handlers
 
 **Tool: Claude Code**
 
@@ -1234,6 +1344,12 @@ Create webhook handler Edge Functions for NoCut.
    - Always return 200 OK
 
 For Stripe signature verification in Deno Edge Functions, you'll need to use the Stripe webhook construct event utility. Import stripe from npm:stripe.
+
+---
+POST-COMPLETION (mandatory):
+1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
+2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: files created/modified, any deviations from the spec, errors encountered.
+3. Commit both file updates to the current branch.
 ```
 
 **After completion:** Update DEVIATION_LOG.md. Note webhook URLs for configuring in RevenueCat and Stripe dashboards.
@@ -1242,7 +1358,7 @@ For Stripe signature verification in Deno Edge Functions, you'll need to use the
 
 ## 4.3 — Payments UI
 
-### Prompt 4.3.1 — Build credits page and paywall
+### - [ ] Prompt 4.3.1 — Build credits page and paywall
 
 **Tool: Lovable**
 
@@ -1305,6 +1421,12 @@ Build the credits page and payment flows for NoCut.
    - After top-up: auto-retry the export
 
 Connect the credits page to the sidebar navigation (Credits link). Update the Settings page to show current plan from RevenueCat customerInfo.
+
+---
+POST-COMPLETION (mandatory):
+1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
+2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: files created/modified, any deviations from the spec, errors encountered.
+3. Commit both file updates to the current branch.
 ```
 
 **After completion:** Update DEVIATION_LOG.md. Note RevenueCat SDK initialization pattern, Stripe redirect handling.
@@ -1315,7 +1437,7 @@ Connect the credits page to the sidebar navigation (Credits link). Update the Se
 
 ---
 
-### Prompt 5.1.1 — Build AI Engine service scaffold
+### - [ ] Prompt 5.1.1 — Build AI Engine service scaffold
 
 **Tool: Claude Code**
 
@@ -1410,6 +1532,12 @@ class CrossfadeFillGenerator(FillGenerator):
 Handle credit refunds: if all gaps fall back to crossfade (which they will in MVP), the credits should technically be refunded since no AI was used. For MVP, we can skip the refund logic and charge credits anyway (the crossfade IS the product for now), OR refund and make crossfade free. Decision: charge credits for now — the user sees a seamless result.
 
 Include error handling: if any gap fails completely, update that gap's ai_fills entry with method='hard_cut' and trigger a credit refund for that gap.
+
+---
+POST-COMPLETION (mandatory):
+1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
+2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: files created/modified, any deviations from the spec, errors encountered.
+3. Commit both file updates to the current branch.
 ```
 
 **After completion:** Update DEVIATION_LOG.md. Note whether credits are charged for crossfade in MVP, actual provider pattern.
@@ -1420,7 +1548,7 @@ Include error handling: if any gap fails completely, update that gap's ai_fills 
 
 ---
 
-### Prompt 6.1.1 — Build export service
+### - [ ] Prompt 6.1.1 — Build export service
 
 **Tool: Claude Code**
 
@@ -1504,13 +1632,19 @@ Use Node.js with FFmpeg (child_process) OR Python with subprocess — whichever 
 **Error handling**: On failure, update project status to 'failed', job_queue to 'failed'. Do NOT refund credits on export failure (the AI fills were already generated). User can retry the export.
 
 **Dockerfile**: Same base as transcoder (Node.js + FFmpeg or Python + FFmpeg).
+
+---
+POST-COMPLETION (mandatory):
+1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
+2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: files created/modified, any deviations from the spec, errors encountered.
+3. Commit both file updates to the current branch.
 ```
 
 **After completion:** Update DEVIATION_LOG.md.
 
 ---
 
-### Prompt 6.1.2 — Build export UI
+### - [ ] Prompt 6.1.2 — Build export UI
 
 **Tool: Lovable**
 
@@ -1552,6 +1686,12 @@ Build the export progress and completion UI for NoCut.
      - Show error message
      - "Try Again" button (re-submits the EDL)
      - Note: credits were already charged for AI fills, not refunded on export failure
+
+---
+POST-COMPLETION (mandatory):
+1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
+2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: files created/modified, any deviations from the spec, errors encountered.
+3. Commit both file updates to the current branch.
 ```
 
 **After completion:** Update DEVIATION_LOG.md.
@@ -1562,7 +1702,7 @@ Build the export progress and completion UI for NoCut.
 
 ---
 
-### Prompt 7.1.1 — End-to-end testing checklist
+### - [ ] Prompt 7.1.1 — End-to-end testing checklist
 
 **Tool: Claude Code**
 
@@ -1607,13 +1747,19 @@ For each test, document:
 - Pass/Fail
 
 Also create a simple smoke test script that can be run after each deploy.
+
+---
+POST-COMPLETION (mandatory):
+1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
+2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: files created/modified, any deviations from the spec, errors encountered.
+3. Commit both file updates to the current branch.
 ```
 
 **After completion:** Run through the test plan. Document all failures in DEVIATION_LOG.md with fixes.
 
 ---
 
-### Prompt 7.1.2 — UI polish pass
+### - [ ] Prompt 7.1.2 — UI polish pass
 
 **Tool: Lovable**
 
@@ -1656,13 +1802,19 @@ Do a polish pass on the entire NoCut app. Review all pages and components and fi
    - Active sidebar link should be clearly highlighted
    - Browser back/forward should work correctly
    - Page titles should update for each route (document.title)
+
+---
+POST-COMPLETION (mandatory):
+1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
+2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: files created/modified, any deviations from the spec, errors encountered.
+3. Commit both file updates to the current branch.
 ```
 
 **After completion:** Final DEVIATION_LOG.md update.
 
 ---
 
-### Prompt 7.1.3 — Set up CI/CD and deployment
+### - [ ] Prompt 7.1.3 — Set up CI/CD and deployment
 
 **Tool: Claude Code**
 
@@ -1705,6 +1857,12 @@ Set up CI/CD and deployment for NoCut.
    - Document the Lovable publish process (it's done through the Lovable UI)
    - Note custom domain configuration steps
    - Note environment variable configuration in Lovable for Supabase URL, anon key, RevenueCat key
+
+---
+POST-COMPLETION (mandatory):
+1. Mark this prompt as complete in `docs/PROMPT_PLAYBOOK.md` by changing `- [ ]` to `- [x]` on the prompt heading and appending *(completed YYYY-MM-DD)*.
+2. Append a deviation log entry to `DEVIATION_LOG.md` using the template format. Include: files created/modified, any deviations from the spec, errors encountered.
+3. Commit both file updates to the current branch.
 ```
 
 **After completion:** Final DEVIATION_LOG.md update. MVP is ready for testing!
