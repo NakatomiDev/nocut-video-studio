@@ -87,21 +87,16 @@ const ProjectEditor = () => {
 
         // Get signed URLs for video and waveform
         const videoKey = vid.proxy_s3_key || vid.s3_key;
-        console.log('[Editor] fetching signed URL for video key:', videoKey);
         const videoResult = await supabase.functions.invoke('get-signed-url', {
           body: { s3_key: videoKey },
         });
-        console.log('[Editor] video signed result:', JSON.stringify(videoResult));
         const nextVideoUrl = videoResult.data?.url || videoResult.data?.data?.url || null;
-        console.log('[Editor] extracted video URL:', nextVideoUrl);
         if (nextVideoUrl) setVideoUrl(nextVideoUrl);
-        else console.warn('[Editor] could not extract video URL from:', videoResult);
 
         if (vid.waveform_s3_key) {
           const waveformResult = await supabase.functions.invoke('get-signed-url', {
             body: { s3_key: vid.waveform_s3_key },
           });
-          console.log('[Editor] waveform signed result:', JSON.stringify(waveformResult));
           const nextWaveformUrl = waveformResult.data?.url || waveformResult.data?.data?.url || null;
           if (nextWaveformUrl) setWaveformUrl(nextWaveformUrl);
         }
