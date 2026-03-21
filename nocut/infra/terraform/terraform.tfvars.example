@@ -1,0 +1,15 @@
+# =============================================================================
+# NoCut — Terraform Variables (example)
+# Copy to terraform.tfvars and fill in real values.
+# =============================================================================
+
+environment            = "dev"
+aws_region             = "us-east-1"
+s3_bucket_name         = "nocut-media"
+cloudfront_key_pair_id = "KXXXXXXXXXXXXXXXXXX"
+cloudfront_public_key_pem = <<-EOF
+-----BEGIN PUBLIC KEY-----
+YOUR_PUBLIC_KEY_HERE
+-----END PUBLIC KEY-----
+EOF
+redis_auth_token       = "change-me-to-a-strong-token"
