@@ -51,6 +51,7 @@ const App = () => (
             <Route path="/credits" element={<ProtectedWithLayout><Credits /></ProtectedWithLayout>} />
             <Route path="/settings" element={<ProtectedWithLayout><Settings /></ProtectedWithLayout>} />
             <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
+            <Route path="/project/:projectId" element={<ProtectedRoute><ProjectEditor /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
