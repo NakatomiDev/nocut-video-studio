@@ -69,7 +69,7 @@ const Dashboard = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [session]);
+  }, []);
 
   const formatDate = (iso: string) => {
     const d = new Date(iso);
