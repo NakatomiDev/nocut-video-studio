@@ -428,7 +428,7 @@ POST-COMPLETION (mandatory):
 
 **Tool: Claude Code**
 
-### - [ ] Prompt 0.3.1 — Create Terraform foundation
+### - [x] Prompt 0.3.1 — Create Terraform foundation *(completed 2026-03-21)*
 
 ```
 Create the Terraform configuration for NoCut's AWS infrastructure in `infra/terraform/`.
