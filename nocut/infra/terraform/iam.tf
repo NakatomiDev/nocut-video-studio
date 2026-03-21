@@ -25,6 +25,24 @@ resource "aws_iam_role_policy_attachment" "ecs_task_execution_managed" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+# Execution role needs Secrets Manager access to inject secrets at container start
+resource "aws_iam_role_policy" "ecs_task_execution_secrets" {
+  name = "nocut-ecs-exec-secrets-${var.environment}"
+  role = aws_iam_role.ecs_task_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "SecretsManagerRead"
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
+        Resource = "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:nocut/*"
+      }
+    ]
+  })
+}
+
 # -----------------------------------------------------------------------------
 # ECS Task Role (S3, Redis, Secrets Manager access for running containers)
 # -----------------------------------------------------------------------------

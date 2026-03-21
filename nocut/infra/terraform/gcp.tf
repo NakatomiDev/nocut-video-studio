@@ -37,7 +37,7 @@ variable "gcp_project_id" {
 variable "gcp_region" {
   description = "GCP region for Vertex AI resources"
   type        = string
-  default     = "us-central1"
+  default     = "asia-northeast1"
 }
 
 variable "gcp_credentials_file" {
