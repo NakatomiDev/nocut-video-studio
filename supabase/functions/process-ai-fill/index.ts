@@ -12,6 +12,7 @@ interface EdlEntry {
   end: number;
   type: string;
   fill_duration: number;
+  model?: string;
 }
 
 let _s3Client: S3Client | null = null;
@@ -115,7 +116,7 @@ Deno.serve(async (req) => {
     const edlJson = editDecision.edl_json as EdlEntry[];
     const totalFillSeconds = editDecision.total_fill_seconds as number;
     const creditsCharged = editDecision.credits_charged as number;
-    const fillModel = (editDecision.model as string) ?? "veo3.1-fast";
+    const defaultModel = (editDecision.model as string) ?? "veo3.1-fast";
 
     const { data: projectVideo } = await serviceClient
       .from("videos")
@@ -200,7 +201,7 @@ Deno.serve(async (req) => {
           startTime: gap.end, // fill starts where the cut ends
           duration: gap.fill_duration,
           sourceVideoKey,
-          model: fillModel,
+          model: gap.model ?? defaultModel,
         });
       } catch (fillErr) {
         const msg = `AI fill generation failed for gap ${gap.gap_index}: ${(fillErr as Error).message}`;
