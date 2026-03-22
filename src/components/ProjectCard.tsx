@@ -48,7 +48,7 @@ interface ProjectCardProps {
   thumbnailUrl?: string | null;
 }
 
-const ProjectCard = ({ id, title, status, date }: ProjectCardProps) => {
+const ProjectCard = ({ id, title, status, date, thumbnailUrl }: ProjectCardProps) => {
   const navigate = useNavigate();
   const [renameOpen, setRenameOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
