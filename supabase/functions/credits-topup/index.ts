@@ -7,10 +7,10 @@ import Stripe from "stripe";
 // Stripe price IDs — set these in Supabase Dashboard > Edge Functions > Secrets
 // or via `supabase secrets set STRIPE_PRICE_nocut_credits_10=price_xxx ...`
 const STRIPE_PRICE_IDS: Record<string, string> = {
-  nocut_credits_10: Deno.env.get("STRIPE_PRICE_nocut_credits_10") ?? "",
-  nocut_credits_30: Deno.env.get("STRIPE_PRICE_nocut_credits_30") ?? "",
-  nocut_credits_75: Deno.env.get("STRIPE_PRICE_nocut_credits_75") ?? "",
-  nocut_credits_200: Deno.env.get("STRIPE_PRICE_nocut_credits_200") ?? "",
+  nocut_credits_10:  Deno.env.get("STRIPE_PRICE_nocut_credits_10") ?? "",
+  nocut_credits_40:  Deno.env.get("STRIPE_PRICE_nocut_credits_40") ?? "",
+  nocut_credits_100: Deno.env.get("STRIPE_PRICE_nocut_credits_100") ?? "",
+  nocut_credits_250: Deno.env.get("STRIPE_PRICE_nocut_credits_250") ?? "",
 };
 
 const APP_URL = Deno.env.get("APP_URL") ?? "http://localhost:5173";

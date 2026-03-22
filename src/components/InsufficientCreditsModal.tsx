@@ -7,9 +7,9 @@ import { Loader2 } from "lucide-react";
 
 const TOPUP_PACKS = [
   { id: "nocut_credits_10", credits: 10, price: "$4.99", name: "Starter" },
-  { id: "nocut_credits_30", credits: 30, price: "$11.99", name: "Standard" },
-  { id: "nocut_credits_75", credits: 75, price: "$24.99", name: "Value" },
-  { id: "nocut_credits_200", credits: 200, price: "$54.99", name: "Bulk" },
+  { id: "nocut_credits_40", credits: 40, price: "$14.99", name: "Standard" },
+  { id: "nocut_credits_100", credits: 100, price: "$34.99", name: "Pro" },
+  { id: "nocut_credits_250", credits: 250, price: "$79.99", name: "Studio" },
 ];
 
 interface InsufficientCreditsModalProps {
