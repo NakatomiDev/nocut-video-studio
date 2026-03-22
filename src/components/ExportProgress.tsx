@@ -80,7 +80,9 @@ const ExportProgress = ({ projectId, onComplete, onRetry }: ExportProgressProps)
     const progressPct = (job.progress_percent as number) ?? 0;
 
     if (jobType === 'ai.fill') {
-      if (status === 'processing') {
+      if (status === 'queued') {
+        advanceStage('generating', 0);
+      } else if (status === 'processing') {
         advanceStage('generating', Math.min(progressPct * 0.6, 60));
       } else if (status === 'complete') {
         advanceStage('exporting', 60);
@@ -88,7 +90,9 @@ const ExportProgress = ({ projectId, onComplete, onRetry }: ExportProgressProps)
         advanceStage('failed', 0, (job.error_message as string) || 'AI fill generation failed');
       }
     } else if (jobType === 'video.export') {
-      if (status === 'processing') {
+      if (status === 'queued') {
+        advanceStage('exporting', 60);
+      } else if (status === 'processing') {
         const s = progressPct >= 90 ? 'finalizing' as const : 'exporting' as const;
         advanceStage(s, 60 + Math.min(progressPct * 0.4, 40));
       } else if (status === 'complete') {
