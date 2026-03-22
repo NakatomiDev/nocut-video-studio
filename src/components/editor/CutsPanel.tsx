@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useEditorStore, FILL_DURATION_OPTIONS, BUSINESS_FILL_DURATION_OPTIONS } from '@/stores/editorStore';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
@@ -38,10 +38,11 @@ const typeBadgeClass: Record<string, string> = {
 
 interface CutsPanelProps {
   thumbnailSpriteUrl?: string | null;
+  videoUrl?: string | null;
   duration: number;
 }
 
-const CutsPanel = ({ thumbnailSpriteUrl, duration }: CutsPanelProps) => {
+const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) => {
   const {
     cuts,
     activeCuts,
@@ -492,27 +493,83 @@ const CutsPanel = ({ thumbnailSpriteUrl, duration }: CutsPanelProps) => {
         </DialogContent>
       </Dialog>
 
-      {/* Lightbox for zoomed thumbnail */}
+      {/* Lightbox for zoomed frame — uses video seek for full-res */}
       <Dialog open={!!lightbox} onOpenChange={(open) => { if (!open) setLightbox(null); }}>
         <DialogContent className="max-w-2xl p-0 overflow-hidden bg-black/95 border-border">
           <DialogHeader className="p-4 pb-2">
             <DialogTitle className="text-sm text-foreground">{lightbox?.label}</DialogTitle>
+            <DialogDescription className="sr-only">Full resolution frame preview</DialogDescription>
           </DialogHeader>
           <div className="flex items-center justify-center p-4 pt-0">
-            {lightbox && thumbnailSpriteUrl && (
-              <CutThumbnail
-                spriteUrl={thumbnailSpriteUrl}
-                time={lightbox.time}
-                duration={duration}
-                width={560}
-                height={315}
-                className="rounded-lg"
-              />
-            )}
+            {lightbox && <LightboxFrame videoUrl={videoUrl} time={lightbox.time} />}
           </div>
         </DialogContent>
       </Dialog>
     </div>
+  );
+};
+
+/** Full-resolution frame preview by seeking a hidden video element */
+const LightboxFrame = ({ videoUrl, time }: { videoUrl?: string | null; time: number }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if (!videoUrl) return;
+    setReady(false);
+    let cancelled = false;
+
+    const video = document.createElement('video');
+    video.crossOrigin = 'anonymous';
+    video.preload = 'auto';
+    video.muted = true;
+    video.src = videoUrl;
+
+    video.onloadeddata = () => {
+      if (cancelled) return;
+      video.currentTime = time;
+    };
+
+    video.onseeked = () => {
+      if (cancelled) return;
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
+      const maxW = 560;
+      const scale = Math.min(1, maxW / vw);
+      const w = Math.round(vw * scale);
+      const h = Math.round(vh * scale);
+
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.scale(dpr, dpr);
+      ctx.drawImage(video, 0, 0, w, h);
+      setReady(true);
+    };
+
+    video.onerror = () => { if (!cancelled) setReady(false); };
+
+    return () => { cancelled = true; };
+  }, [videoUrl, time]);
+
+  if (!videoUrl) {
+    return <div className="w-[560px] h-[315px] bg-muted rounded-lg flex items-center justify-center text-muted-foreground text-sm">No video available</div>;
+  }
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className={`rounded-lg ${ready ? '' : 'bg-muted'}`}
+      style={{ display: 'block', maxWidth: '100%' }}
+    />
   );
 };
 
