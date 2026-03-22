@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useEditorStore, FILL_DURATION_OPTIONS, BUSINESS_FILL_DURATION_OPTIONS, AI_FILL_MODELS, MODEL_CREDITS_PER_SEC, DEFAULT_AI_FILL_MODEL, type AiFill, type AiFillModel } from '@/stores/editorStore';
+import { useEditorStore, AI_FILL_MODELS, MODEL_CREDITS_PER_SEC, DEFAULT_AI_FILL_MODEL, getAvailableModels, getModelDurations, type AiFill, type AiFillModel } from '@/stores/editorStore';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -102,9 +102,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     fetchBalance();
   }, [setCreditBalance]);
 
-  const fillOptions = userTier === 'business'
-    ? BUSINESS_FILL_DURATION_OPTIONS
-    : FILL_DURATION_OPTIONS;
+  const availableModels = getAvailableModels(userTier);
 
   const hasActiveCuts = activeCuts.size > 0 || activeManualCuts.size > 0;
   const insufficientCredits = creditEstimate > creditBalance.total;
@@ -190,6 +188,8 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     const currentFill = fillDurations.get(cutId) || 0;
     const currentModel = fillModels.get(cutId) ?? DEFAULT_AI_FILL_MODEL;
     const creditsPerSec = MODEL_CREDITS_PER_SEC[currentModel];
+    const modelDurations = getModelDurations(currentModel, userTier);
+    const modelConfig = AI_FILL_MODELS.find((m) => m.id === currentModel);
     // Check if this cut already has a generated AI fill
     const generatedFill = aiFills.find((f) => {
       const allCuts = [...cuts, ...manualCuts.map((c) => ({ ...c, type: 'manual' }))];
@@ -200,13 +200,49 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
 
     return (
       <div className="flex flex-col gap-1.5 pl-5 mt-1">
+        {/* Model selector first — durations depend on it */}
         <div className="flex items-center gap-2">
           {generatedFill ? (
             <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
           ) : (
             <Sparkles className="h-3 w-3 text-primary shrink-0" />
           )}
-          <span className="text-[10px] text-muted-foreground whitespace-nowrap">AI Fill:</span>
+          <span className="text-[10px] text-muted-foreground whitespace-nowrap">Model:</span>
+          <Select
+            value={currentModel}
+            onValueChange={(val) => {
+              const newModel = val as AiFillModel;
+              setFillModel(cutId, newModel);
+              // Reset duration if current one is invalid for new model
+              const newDurations = getModelDurations(newModel, userTier);
+              if (currentFill > 0 && !newDurations.includes(currentFill)) {
+                setFillDuration(cutId, newDurations[0] ?? 0);
+              }
+            }}
+          >
+            <SelectTrigger
+              className="h-6 w-[170px] text-[10px] px-2"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {availableModels.map((m) => (
+                <SelectItem key={m.id} value={m.id}>
+                  {m.label} ({m.creditsPerSec}cr/s){m.audio ? ' 🔊' : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {generatedFill && (
+            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[9px] ml-1">
+              Generated
+            </Badge>
+          )}
+        </div>
+        {/* Duration selector — filtered by model + tier */}
+        <div className="flex items-center gap-2 pl-5">
+          <span className="text-[10px] text-muted-foreground whitespace-nowrap">Duration:</span>
           <Select
             value={currentFill > 0 ? String(currentFill) : 'none'}
             onValueChange={(val) => {
@@ -214,14 +250,14 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
             }}
           >
             <SelectTrigger
-              className="h-6 w-[100px] text-[10px] px-2"
+              className="h-6 w-[120px] text-[10px] px-2"
               onClick={(e) => e.stopPropagation()}
             >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="none">None (free)</SelectItem>
-              {fillOptions.map((sec) => {
+              {modelDurations.map((sec) => {
                 const credits = sec * creditsPerSec;
                 return (
                   <SelectItem key={sec} value={String(sec)}>
@@ -231,35 +267,10 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
               })}
             </SelectContent>
           </Select>
-          {generatedFill && (
-            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[9px] ml-1">
-              Generated
-            </Badge>
+          {modelConfig && !modelConfig.audio && (
+            <span className="text-[9px] text-muted-foreground">Silent</span>
           )}
         </div>
-        {currentFill > 0 && (
-          <div className="flex items-center gap-2 pl-5">
-            <span className="text-[10px] text-muted-foreground whitespace-nowrap">Model:</span>
-            <Select
-              value={currentModel}
-              onValueChange={(val) => setFillModel(cutId, val as AiFillModel)}
-            >
-              <SelectTrigger
-                className="h-6 w-[150px] text-[10px] px-2"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {AI_FILL_MODELS.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.label} ({m.creditsPerSec}cr/s)
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
       </div>
     );
   };
