@@ -176,3 +176,33 @@ A running log of architectural decisions that deviate from the original spec or 
 **Deviation:** (1) Skipped the `/projects/:id/estimate` Edge Function call — credit estimate is calculated client-side from active cut durations (same logic, avoids unnecessary network round-trip for an estimate). (2) Export confirmation inserts directly into `edit_decisions` table instead of calling a `/projects/:id/edl` Edge Function — the Edge Function doesn't exist yet and the insert achieves the same result with RLS protection. (3) Drag-to-select not implemented separately — the two-click razor workflow covers the same use case. (4) Used `violet-500` Tailwind utility for manual cut indicators instead of a design token since there's no semantic token for "manual cut" in the design system.
 **Files created/modified:** `src/stores/editorStore.ts` (updated), `src/components/editor/CutsPanel.tsx` (rewritten), `src/components/editor/WaveformTimeline.tsx` (updated with razor tool).
 **Impact:** Manual cuts work end-to-end in the editor UI. Edge Functions for estimate/EDL should be created when the export pipeline is built.
+
+### 2026-03-22 — Credit Edge Functions (Prompt 4.1.1)
+
+**Area:** Backend / Supabase Edge Functions
+**Original plan:** Create 5 credit-related Edge Functions: credits-balance, credits-history, credits-topup, project-estimate, project-edl.
+**Files created:**
+- `supabase/functions/_shared/credits.ts` — Shared credit utilities (balance query, gap estimation, topup product config, tier fill limits)
+- `supabase/functions/credits-balance/index.ts` — GET endpoint returning monthly/topup/total balance with ledger breakdown
+- `supabase/functions/credits-history/index.ts` — GET endpoint with paginated credit transactions joined with project titles
+- `supabase/functions/credits-topup/index.ts` — POST endpoint creating Stripe Checkout sessions for credit top-ups
+- `supabase/functions/project-estimate/index.ts` — POST endpoint estimating credits required for a set of gaps
+- `supabase/functions/project-edl/index.ts` — POST endpoint that deducts credits, creates edit_decision + job_queue rows
+**Files modified:**
+- `supabase/functions/_shared/cors.ts` — Added GET to Access-Control-Allow-Methods (was POST-only)
+- `supabase/functions/deno.json` — Added `stripe` import map entry (esm.sh/stripe@14)
+- `docs/PROMPT_PLAYBOOK.md` — Marked Prompt 4.1.1 complete
+**Deviation:** (1) Extracted shared credit logic into `_shared/credits.ts` (getCreditBalance, estimateGaps, TOPUP_PRODUCTS, MAX_FILL_DURATION) rather than duplicating across functions — follows existing `_shared/` pattern. (2) Stripe price IDs are configured via per-product env vars (`STRIPE_PRICE_nocut_credits_10`, etc.) rather than a single JSON config — simpler for Supabase secrets management. (3) `project-edl` requires `project_id` in the request body (not URL path) — consistent with other POST endpoints in the codebase. (4) RevenueCat entitlement check simplified to a DB tier lookup (`users.tier`) as specified for MVP — full RevenueCat SDK integration deferred to webhook functions (Prompt 4.2.1). (5) `deduct_credits` RPC uses `out_` prefixed return columns matching the actual DB function signature (deviation 002 from credit system migration). (6) Stripe SDK imported via esm.sh CDN (`https://esm.sh/stripe@14`) for Deno compatibility rather than npm specifier. (7) `credits-balance` and `credits-history` use the user's auth-scoped supabaseClient (respects RLS) rather than the service client, since credit_ledger and credit_transactions already have SELECT RLS policies for own rows.
+**Impact:** All 5 credit Edge Functions are ready to deploy. Requires Stripe secrets to be configured in Supabase for the topup flow. The webhooks-stripe function (Prompt 4.2.1) is needed to actually credit the ledger after Stripe payment completes.
+
+### 2026-03-22 — Webhook handler Edge Functions (Prompt 4.2.1)
+
+**Area:** Backend / Supabase Edge Functions
+**Original plan:** Create webhooks-revenuecat and webhooks-stripe Edge Functions to handle subscription events and top-up purchase completions.
+**Files created:**
+- `supabase/functions/webhooks-revenuecat/index.ts` — Handles INITIAL_PURCHASE, RENEWAL, PRODUCT_CHANGE, CANCELLATION, EXPIRATION, BILLING_ISSUE, UNCANCELLATION events
+- `supabase/functions/webhooks-stripe/index.ts` — Handles checkout.session.completed and charge.refunded events
+**Files modified:**
+- `docs/PROMPT_PLAYBOOK.md` — Marked Prompt 4.2.1 complete
+**Deviation:** (1) CANCELLATION and UNCANCELLATION only log — the `users` table has no `cancel_at_period_end` column and adding a migration was out of scope for this prompt; the subscription remains active until EXPIRATION fires. (2) BILLING_ISSUE only logs — no `billing_issue` flag column exists on users table for the same reason. (3) Both webhooks use `createServiceClient()` (service role) since they're called by external services, not authenticated users — no user JWT is available. (4) RevenueCat auth uses Bearer token in Authorization header (standard RevenueCat webhook auth pattern) rather than a custom header. (5) Stripe signature verification uses `stripe.webhooks.constructEventAsync()` (async variant required in Deno Edge Functions where `crypto.subtle` is async). (6) For charge.refunded, credits are zeroed out on the ledger entry directly rather than using the `refund_credits()` Postgres function — the refund_credits function expects a credit_transaction_id (from a deduction), but a Stripe refund maps to a ledger entry via `stripe_payment_id`; direct update is simpler and correct. (7) RevenueCat webhook falls back to matching by `revenuecat_id` column if `app_user_id` doesn't match a user UUID — supports both UUID and RevenueCat-assigned IDs. (8) Both webhooks return 200 even on internal errors to prevent infinite retry loops from Stripe/RevenueCat — errors are logged for manual investigation. (9) Webhook functions use a local `jsonResponse()` helper instead of the shared `successResponse`/`errorResponse` — webhook responses are simple `{ok: true}` payloads, not the full `{data, meta}` envelope expected by frontend clients.
+**Impact:** Full subscription lifecycle and top-up purchase flow is now handled server-side. Requires env vars: `REVENUECAT_WEBHOOK_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`. RevenueCat webhook URL should be set to `<SUPABASE_URL>/functions/v1/webhooks-revenuecat`, Stripe webhook endpoint to `<SUPABASE_URL>/functions/v1/webhooks-stripe` with events `checkout.session.completed` and `charge.refunded`.
