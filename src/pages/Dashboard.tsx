@@ -127,6 +127,7 @@ const Dashboard = () => {
               title={p.title}
               status={p.status}
               date={formatDate(p.created_at)}
+              thumbnailUrl={p.thumbnailUrl}
             />
           ))}
         </div>
