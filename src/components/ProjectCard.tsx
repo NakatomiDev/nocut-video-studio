@@ -45,6 +45,7 @@ interface ProjectCardProps {
   title: string;
   status: string;
   date: string;
+  thumbnailUrl?: string | null;
 }
 
 const ProjectCard = ({ id, title, status, date }: ProjectCardProps) => {
