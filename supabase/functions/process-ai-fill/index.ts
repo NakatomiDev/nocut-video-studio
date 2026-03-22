@@ -451,4 +451,18 @@ async function failJob(
     .from("edit_decisions")
     .update({ status: "failed" })
     .eq("id", editDecisionId);
+
+  // Also update project status so realtime subscribers see the failure
+  const { data: ed } = await serviceClient
+    .from("edit_decisions")
+    .select("project_id")
+    .eq("id", editDecisionId)
+    .single();
+
+  if (ed?.project_id) {
+    await serviceClient
+      .from("projects")
+      .update({ status: "failed", error_message: message })
+      .eq("id", ed.project_id);
+  }
 }
