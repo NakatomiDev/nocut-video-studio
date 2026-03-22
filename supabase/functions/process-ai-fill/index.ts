@@ -1,4 +1,4 @@
-import { S3Client, CopyObjectCommand } from "npm:@aws-sdk/client-s3";
+import { S3Client, CopyObjectCommand, PutObjectCommand } from "npm:@aws-sdk/client-s3";
 import { handleCors } from "../_shared/cors.ts";
 import {
   getAuthenticatedUser,
