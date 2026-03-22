@@ -42,7 +42,7 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
     addManualCut,
   } = useEditorStore();
 
-  const [_waveformData, setWaveformData] = useState<number[]>([]);
+  const [waveformData, setWaveformData] = useState<number[]>([]);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [hoveredCut, setHoveredCut] = useState<string | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
