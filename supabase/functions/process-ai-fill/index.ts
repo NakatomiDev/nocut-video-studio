@@ -1,4 +1,4 @@
-import { S3Client, CopyObjectCommand } from "npm:@aws-sdk/client-s3";
+import { S3Client, CopyObjectCommand, PutObjectCommand } from "npm:@aws-sdk/client-s3";
 import { handleCors } from "../_shared/cors.ts";
 import {
   getAuthenticatedUser,
@@ -350,20 +350,21 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
     throw new Error("GOOGLE_AI_API_KEY is not set — cannot call Veo API");
   }
 
-  // Map our model names to Google Veo GA model IDs
+  // Map our model names to Gemini API model IDs (use -preview suffix for generativelanguage.googleapis.com)
   const MODEL_API_IDS: Record<string, string> = {
-    "veo2":                  "veo-2.0-generate-001",
-    "veo3.1-fast":           "veo-3.1-fast-generate-001",
-    "veo3.1-fast-audio":     "veo-3.1-fast-generate-001",
-    "veo3.1-standard":       "veo-3.1-generate-001",
-    "veo3.1-standard-audio": "veo-3.1-generate-001",
-    "veo3-standard-audio":   "veo-3.0-generate-001",
+    "veo2":                  "veo-2.0-generate-preview",
+    "veo3.1-fast":           "veo-3.1-fast-generate-preview",
+    "veo3.1-fast-audio":     "veo-3.1-fast-generate-preview",
+    "veo3.1-standard":       "veo-3.1-generate-preview",
+    "veo3.1-standard-audio": "veo-3.1-generate-preview",
+    "veo3-standard-audio":   "veo-3.0-generate-preview",
   };
-  const apiModelId = MODEL_API_IDS[model] ?? "veo-2.0-generate-001";
+  const apiModelId = MODEL_API_IDS[model] ?? "veo-2.0-generate-preview";
   const includeAudio = model.endsWith("-audio");
 
+  // Gemini API uses predictLongRunning endpoint
   const generateResponse = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${apiModelId}:generateVideos`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${apiModelId}:predictLongRunning`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
@@ -411,12 +412,40 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
 
     const pollResult = await pollResponse.json();
     if (pollResult.done) {
-      const videoUri = pollResult.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri;
+      // predictLongRunning returns result in response.generateVideoResponse or result
+      const response = pollResult.response ?? pollResult.result;
+      const generatedSamples =
+        response?.generateVideoResponse?.generatedSamples ??
+        response?.generatedSamples ??
+        [];
+      const videoUri = generatedSamples[0]?.video?.uri;
       if (!videoUri) {
+        console.error("Veo completed but no video URI found. Full response:", JSON.stringify(pollResult));
         throw new Error("Veo completed but returned no video URI");
       }
 
+      // Download the generated video and upload to S3
       const s3Key = `ai-fills/${request.projectId}/${request.editDecisionId}/gap_${request.gapIndex}_${request.duration}s.mp4`;
+      
+      // Fetch the video from Google's URI (includes API key for access)
+      const videoDownloadUrl = `${videoUri}?key=${apiKey}`;
+      const videoResponse = await fetch(videoDownloadUrl);
+      if (!videoResponse.ok) {
+        throw new Error(`Failed to download generated video (${videoResponse.status})`);
+      }
+      const videoBytes = new Uint8Array(await videoResponse.arrayBuffer());
+
+      // Upload to S3
+      const bucket = Deno.env.get("AWS_S3_BUCKET");
+      if (bucket) {
+        await getS3Client().send(new PutObjectCommand({
+          Bucket: bucket,
+          Key: s3Key,
+          Body: videoBytes,
+          ContentType: "video/mp4",
+        }));
+      }
+
       return {
         s3_key: s3Key,
         provider: "veo",
