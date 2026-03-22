@@ -64,19 +64,11 @@ interface EditorState {
   reset: () => void;
 }
 
-const calcCredits = (
-  cuts: Cut[],
-  activeCuts: Set<string>,
-  manualCuts: ManualCut[],
-  activeManualCuts: Set<string>
-) => {
-  const autoDur = cuts
-    .filter((c) => activeCuts.has(c.id))
-    .reduce((s, c) => s + c.duration, 0);
-  const manualDur = manualCuts
-    .filter((c) => activeManualCuts.has(c.id))
-    .reduce((s, c) => s + c.duration, 0);
-  return Math.ceil(autoDur + manualDur);
+/** Credits = sum of AI fill durations selected (cuts themselves are free) */
+const calcCredits = (fillDurations: Map<string, number>) => {
+  let total = 0;
+  fillDurations.forEach((sec) => { total += sec; });
+  return total;
 };
 
 let manualCutCounter = 0;
