@@ -344,8 +344,6 @@ async function generateAiFill(request: FillRequest): Promise<FillResponse> {
 }
 
 async function generateVeoFill(request: FillRequest, model: string): Promise<FillResponse> {
-  const gcpProjectId = Deno.env.get("GCP_PROJECT_ID");
-  const gcpRegion = Deno.env.get("GCP_REGION") || "us-central1";
   const apiKey = Deno.env.get("GOOGLE_AI_API_KEY");
 
   if (!apiKey) {
