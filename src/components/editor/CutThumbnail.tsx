@@ -48,15 +48,19 @@ const CutThumbnail = ({
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.scale(dpr, dpr);
 
-      const ratio = Math.max(0, Math.min(1, time / duration));
-      const sourceHeight = image.naturalHeight;
-      const sourceWidth = Math.min(
-        image.naturalWidth,
-        Math.max(sourceHeight * (width / height), sourceHeight)
-      );
-      const sourceX = Math.max(0, Math.min(image.naturalWidth - sourceWidth, ratio * image.naturalWidth - sourceWidth / 2));
+      // The sprite is a horizontal strip of equally-spaced frames.
+      // Each frame has the full height and a width equal to height * (16/9).
+      const frameHeight = image.naturalHeight;
+      const frameAspect = 16 / 9;
+      const frameWidth = Math.round(frameHeight * frameAspect);
+      const totalFrames = Math.max(1, Math.round(image.naturalWidth / frameWidth));
 
-      ctx.drawImage(image, sourceX, 0, sourceWidth, sourceHeight, 0, 0, width, height);
+      // Find the frame index closest to the requested time
+      const ratio = Math.max(0, Math.min(1, time / duration));
+      const frameIndex = Math.min(totalFrames - 1, Math.round(ratio * (totalFrames - 1)));
+      const sourceX = frameIndex * frameWidth;
+
+      ctx.drawImage(image, sourceX, 0, frameWidth, frameHeight, 0, 0, width, height);
       setReady(true);
     };
 
