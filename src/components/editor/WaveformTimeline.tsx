@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { useEditorStore } from '@/stores/editorStore';
-import { ZoomIn, ZoomOut, Scissors } from 'lucide-react';
+import { ZoomIn, ZoomOut, Scissors, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
@@ -40,6 +40,9 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
     setRazorMode,
     setRazorStart,
     addManualCut,
+    aiFills,
+    showFills,
+    toggleShowFills,
   } = useEditorStore();
 
   const [waveformData, setWaveformData] = useState<number[]>([]);
@@ -314,6 +317,32 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
     const overlayY = thumbY;
     const overlayH = thumbH + dividerH + waveH;
 
+    // --- AI Fill overlays (rendered before cuts so cuts draw on top) ---
+    if (showFills && aiFills.length > 0) {
+      for (const fill of aiFills) {
+        const x1 = timeToX(fill.startTime) - scrollLeft;
+        const fillEnd = fill.startTime + fill.duration;
+        const x2 = timeToX(fillEnd) - scrollLeft;
+        if (x2 < 0 || x1 > w) continue;
+
+        // Green/teal fill overlay
+        ctx.fillStyle = 'hsla(160, 70%, 45%, 0.25)';
+        ctx.fillRect(x1, overlayY, x2 - x1, overlayH);
+        ctx.strokeStyle = 'hsla(160, 70%, 45%, 0.7)';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(x1, overlayY, x2 - x1, overlayH);
+
+        // Small "AI" label
+        const labelW = x2 - x1;
+        if (labelW > 20) {
+          ctx.fillStyle = 'hsla(160, 70%, 45%, 0.9)';
+          ctx.font = 'bold 9px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('AI', x1 + labelW / 2, overlayY + 10);
+        }
+      }
+    }
+
     for (const cut of cuts) {
       const isActive = activeCuts.has(cut.id);
       const isHovered = hoveredCut === cut.id;
@@ -381,6 +410,7 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
     cuts, activeCuts, manualCuts, activeManualCuts,
     hoveredCut, playheadPosition, timeToX,
     razorMode, razorStart, razorPreview,
+    aiFills, showFills,
   ]);
 
   // RAF loop
@@ -539,6 +569,27 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
           </Tooltip>
 
           <div className="w-px h-4 bg-border" />
+
+          {aiFills.length > 0 && (
+            <>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={showFills ? 'default' : 'ghost'}
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={toggleShowFills}
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">
+                  {showFills ? 'Hide AI fill regions' : 'Show AI fill regions'}
+                </TooltipContent>
+              </Tooltip>
+              <div className="w-px h-4 bg-border" />
+            </>
+          )}
 
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setZoom(zoomLevel - 1)} disabled={zoomLevel <= 1}>
             <ZoomOut className="h-3.5 w-3.5" />
