@@ -282,6 +282,8 @@ export const useEditorStore = create<EditorState>((set) => ({
       nextFills.delete(id);
       const nextModels = new Map(state.fillModels);
       nextModels.delete(id);
+      // Persist to DB
+      persistManualCuts(state.cutMap, state.cuts, manualCuts);
       return {
         manualCuts,
         activeManualCuts,
