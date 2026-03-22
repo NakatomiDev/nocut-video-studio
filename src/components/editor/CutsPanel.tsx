@@ -29,10 +29,11 @@ const typeBadgeClass: Record<string, string> = {
 };
 
 interface CutsPanelProps {
-  videoUrl?: string | null;
+  thumbnailSpriteUrl?: string | null;
+  duration: number;
 }
 
-const CutsPanel = ({ videoUrl }: CutsPanelProps) => {
+const CutsPanel = ({ thumbnailSpriteUrl, duration }: CutsPanelProps) => {
   const {
     cuts,
     activeCuts,
@@ -51,7 +52,6 @@ const CutsPanel = ({ videoUrl }: CutsPanelProps) => {
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [exporting, setExporting] = useState(false);
 
-  // Fetch credit balance
   useEffect(() => {
     const fetchBalance = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -82,7 +82,6 @@ const CutsPanel = ({ videoUrl }: CutsPanelProps) => {
     if (!project) return;
     setExporting(true);
     try {
-      // Build EDL from active cuts
       const activeCutsList = cuts.filter((c) => activeCuts.has(c.id));
       const activeManualList = manualCuts.filter((c) => activeManualCuts.has(c.id));
       const allCuts = [
@@ -107,87 +106,103 @@ const CutsPanel = ({ videoUrl }: CutsPanelProps) => {
     }
   }, [project, cuts, activeCuts, manualCuts, activeManualCuts, creditEstimate]);
 
+  const renderPreview = (start: number, end: number) => (
+    <div className="flex items-center gap-2 pl-5">
+      <div className="flex flex-col items-center gap-0.5">
+        <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={start} duration={duration} width={72} height={40} />
+        <span className="text-[9px] text-muted-foreground font-mono">Start</span>
+      </div>
+      <div className="flex-1 border-t border-dashed border-muted-foreground/30" />
+      <div className="flex flex-col items-center gap-0.5">
+        <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={end} duration={duration} width={72} height={40} />
+        <span className="text-[9px] text-muted-foreground font-mono">End</span>
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex h-full flex-col border-l border-border bg-card">
       <div className="border-b border-border p-4">
         <h3 className="text-sm font-semibold text-foreground">Cuts</h3>
-        <p className="text-xs text-muted-foreground mt-1">
+        <p className="mt-1 text-xs text-muted-foreground">
           {cuts.length + manualCuts.length} total · {activeCuts.size + activeManualCuts.size} active
         </p>
       </div>
 
       <ScrollArea className="flex-1">
-        <div className="p-2 space-y-1">
-          {/* Detected Pauses */}
-          <div className="px-3 pt-2 pb-1">
+        <div className="space-y-1 p-2">
+          <div className="px-3 pb-1 pt-2">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
               Detected Pauses ({cuts.length})
             </span>
           </div>
           {cuts.length === 0 && (
-            <p className="text-xs text-muted-foreground p-3 text-center">No pauses detected</p>
+            <p className="p-3 text-center text-xs text-muted-foreground">No pauses detected</p>
           )}
           {cuts.map((cut) => (
             <div
               key={cut.id}
-              className="flex items-center gap-3 rounded-md p-3 hover:bg-secondary/50 transition-colors cursor-pointer"
+              className="flex flex-col gap-2 rounded-md p-3 transition-colors hover:bg-secondary/50 cursor-pointer"
               onClick={() => setPlayhead(cut.start)}
             >
-              <div className="h-2 w-2 rounded-full bg-primary shrink-0" />
-              <Switch
-                checked={activeCuts.has(cut.id)}
-                onCheckedChange={(e) => { e; toggleCut(cut.id); }}
-                onClick={(e) => e.stopPropagation()}
-              />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <Badge
-                    variant="outline"
-                    className={typeBadgeClass[cut.type] || 'border-border text-muted-foreground'}
-                  >
-                    {cut.type}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground">{cut.duration.toFixed(1)}s</span>
+              <div className="flex items-center gap-3">
+                <div className="h-2 w-2 shrink-0 rounded-full bg-primary" />
+                <Switch
+                  checked={activeCuts.has(cut.id)}
+                  onCheckedChange={(e) => {
+                    e;
+                    toggleCut(cut.id);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      variant="outline"
+                      className={typeBadgeClass[cut.type] || 'border-border text-muted-foreground'}
+                    >
+                      {cut.type}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">{cut.duration.toFixed(1)}s</span>
+                  </div>
+                  <p className="mt-1 font-mono text-xs text-muted-foreground">
+                    {formatTimestamp(cut.start)} → {formatTimestamp(cut.end)}
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1 font-mono">
-                  {formatTimestamp(cut.start)} → {formatTimestamp(cut.end)}
-                </p>
               </div>
+              {activeCuts.has(cut.id) && thumbnailSpriteUrl && renderPreview(cut.start, cut.end)}
             </div>
           ))}
 
-          {/* Manual Cuts */}
-          <div className="px-3 pt-4 pb-1">
+          <div className="px-3 pb-1 pt-4">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
               Manual Cuts ({manualCuts.length})
             </span>
           </div>
           {manualCuts.length === 0 && (
-            <p className="text-xs text-muted-foreground p-3 text-center">
-              Use the razor tool to add cuts
-            </p>
+            <p className="p-3 text-center text-xs text-muted-foreground">Use the razor tool to add cuts</p>
           )}
           {manualCuts.map((cut) => (
             <div
               key={cut.id}
-              className="flex flex-col gap-2 rounded-md p-3 hover:bg-secondary/50 transition-colors cursor-pointer"
+              className="flex flex-col gap-2 rounded-md p-3 transition-colors hover:bg-secondary/50 cursor-pointer"
               onClick={() => setPlayhead(cut.start)}
             >
               <div className="flex items-center gap-3">
-                <div className="h-2 w-2 rounded-full bg-violet-500 shrink-0" />
+                <div className="h-2 w-2 shrink-0 rounded-full bg-primary" />
                 <Switch
                   checked={activeManualCuts.has(cut.id)}
                   onCheckedChange={() => toggleManualCut(cut.id)}
                   onClick={(e) => e.stopPropagation()}
                 />
-                <div className="flex-1 min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="border-violet-500/30 text-violet-400 bg-violet-500/20">
+                    <Badge variant="outline" className="border-border text-foreground bg-secondary">
                       manual
                     </Badge>
                     <span className="text-xs text-muted-foreground">{cut.duration.toFixed(1)}s</span>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1 font-mono">
+                  <p className="mt-1 font-mono text-xs text-muted-foreground">
                     {formatTimestamp(cut.start)} → {formatTimestamp(cut.end)}
                   </p>
                 </div>
@@ -195,30 +210,21 @@ const CutsPanel = ({ videoUrl }: CutsPanelProps) => {
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive"
-                  onClick={(e) => { e.stopPropagation(); removeManualCut(cut.id); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeManualCut(cut.id);
+                  }}
                 >
                   <X className="h-3 w-3" />
                 </Button>
               </div>
-              {activeManualCuts.has(cut.id) && videoUrl && (
-                <div className="flex items-center gap-2 pl-5">
-                  <div className="flex flex-col items-center gap-0.5">
-                    <CutThumbnail videoUrl={videoUrl} time={cut.start} width={72} height={40} />
-                    <span className="text-[9px] text-muted-foreground font-mono">Start</span>
-                  </div>
-                  <div className="flex-1 border-t border-dashed border-muted-foreground/30" />
-                  <div className="flex flex-col items-center gap-0.5">
-                    <CutThumbnail videoUrl={videoUrl} time={cut.end} width={72} height={40} />
-                    <span className="text-[9px] text-muted-foreground font-mono">End</span>
-                  </div>
-                </div>
-              )}
+              {activeManualCuts.has(cut.id) && thumbnailSpriteUrl && renderPreview(cut.start, cut.end)}
             </div>
           ))}
         </div>
       </ScrollArea>
 
-      <div className="border-t border-border p-4 space-y-3">
+      <div className="space-y-3 border-t border-border p-4">
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground">Estimated credits</span>
           <span className="text-sm font-semibold text-foreground">{creditEstimate}</span>
@@ -233,16 +239,11 @@ const CutsPanel = ({ videoUrl }: CutsPanelProps) => {
             <span className="text-xs font-medium">Insufficient credits</span>
           </div>
         )}
-        <Button
-          className="w-full"
-          disabled={!hasActiveCuts || insufficientCredits}
-          onClick={() => setShowExportDialog(true)}
-        >
+        <Button className="w-full" disabled={!hasActiveCuts || insufficientCredits} onClick={() => setShowExportDialog(true)}>
           Export ({creditEstimate} credits)
         </Button>
       </div>
 
-      {/* Export Confirmation Dialog */}
       <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
         <DialogContent>
           <DialogHeader>
