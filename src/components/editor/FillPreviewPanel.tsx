@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useEditorStore } from '@/stores/editorStore';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -29,8 +29,12 @@ const FillPreviewPanel = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   const fill = selectedFill;
+  const isMock = fill?.provider === 'mock';
+  const startSec = isMock ? (fill?.startTime ?? 0) : 0;
+  const endSec = isMock ? (fill?.startTime ?? 0) + (fill?.duration ?? 0) : Infinity;
 
   useEffect(() => {
     if (!fill?.s3Key) {
@@ -59,7 +63,7 @@ const FillPreviewPanel = () => {
         const url = data?.url || data?.data?.url;
         console.log('[FillPreview] Got URL:', url ? 'yes' : 'no');
         if (url) {
-          setVideoUrl(url);
+          setVideoUrl(isMock ? `${url}#t=${startSec},${endSec}` : url);
         } else {
           setError('Fill video not available yet');
         }
@@ -69,7 +73,7 @@ const FillPreviewPanel = () => {
     return () => {
       cancelled = true;
     };
-  }, [fill?.id, fill?.s3Key]);
+  }, [fill?.id, fill?.s3Key, fill?.provider, fill?.startTime, fill?.duration]);
 
   if (!fill) return null;
 
@@ -107,12 +111,28 @@ const FillPreviewPanel = () => {
         {error && <span className="text-xs text-muted-foreground px-4 text-center">{error}</span>}
         {!loading && !error && videoUrl && (
           <video
+            ref={videoRef}
             key={videoUrl}
             src={videoUrl}
             className="w-full h-full object-contain"
             controls
             preload="auto"
             crossOrigin="anonymous"
+            onLoadedMetadata={() => {
+              if (videoRef.current && isMock) {
+                videoRef.current.currentTime = startSec;
+              }
+            }}
+            onTimeUpdate={() => {
+              if (videoRef.current && isMock) {
+                if (videoRef.current.currentTime >= endSec) {
+                  videoRef.current.pause();
+                  videoRef.current.currentTime = startSec;
+                } else if (videoRef.current.currentTime < startSec) {
+                  videoRef.current.currentTime = startSec;
+                }
+              }
+            }}
             onError={(e) => {
               console.error('[FillPreview] Video load error:', e);
               setError('Failed to load video file');
