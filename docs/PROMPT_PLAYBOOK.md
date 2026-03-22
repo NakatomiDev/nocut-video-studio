@@ -1635,7 +1635,7 @@ POST-COMPLETION (mandatory):
 
 ---
 
-### - [ ] Prompt 5.1.1 — Build AI Engine service scaffold
+### - [x] Prompt 5.1.1 — Build AI Engine service scaffold *(completed 2026-03-22)*
 
 **Tool: Claude Code**
 
@@ -1746,7 +1746,7 @@ POST-COMPLETION (mandatory):
 
 ---
 
-### - [ ] Prompt 6.1.1 — Build export service
+### - [x] Prompt 6.1.1 — Build export service *(completed 2026-03-22)*
 
 **Tool: Claude Code**
 

@@ -221,3 +221,47 @@ A running log of architectural decisions that deviate from the original spec or 
 - `docs/PROMPT_PLAYBOOK.md` — Marked Prompt 4.3.1 complete
 **Deviation:** (1) RevenueCat Web SDK (`@revenuecat/purchases-js`) was NOT installed — the `REVENUECAT_WEB_BILLING_KEY` secret is not configured in the project. The upgrade paywall buttons log to console with a TODO placeholder; actual RevenueCat purchase flow will be wired when the SDK key is available. (2) The credits-history hook uses `fetch()` with the full function URL instead of `supabase.functions.invoke()` because the history endpoint is a GET request and `functions.invoke` defaults to POST. (3) Balance response parsing handles both `data.balance` and `data.data.balance` patterns per the edge function response envelope. (4) Settings page tier badge is still hardcoded to "Free" — will be dynamic once RevenueCat customerInfo is available. (5) The green color `text-green-500` is used for positive credit transactions as a semantic status color (similar to how destructive red is used for deductions), not a theme token.
 **Impact:** Credits page is fully functional for viewing balance and purchasing top-ups via Stripe Checkout. Upgrade paywall is UI-complete but purchase buttons require RevenueCat SDK configuration. InsufficientCreditsModal can be imported and used in the editor when project-edl returns 402.
+
+### 2026-03-22 — AI Engine service scaffold (Prompt 5.1.1)
+
+**Area:** Backend / Services
+**Original plan:** Create a Python service at `services/ai-engine/` that consumes `ai.fill` jobs from the Supabase job_queue, extracts boundary frames via FFmpeg, generates crossfade fill segments (MVP), composites with temporal blending and color matching, validates quality via SSIM, encodes to MP4, uploads to S3, updates `ai_fills` table, and enqueues `video.export` jobs.
+**Files created:**
+- `services/ai-engine/Dockerfile` — python:3.11-slim + FFmpeg, runs as non-root
+- `services/ai-engine/requirements.txt` — numpy, opencv-python-headless, supabase, httpx, boto3, pytest
+- `services/ai-engine/src/__init__.py` — Package init
+- `services/ai-engine/src/config.py` — Environment variables with configurable boundary/ramp/quality thresholds
+- `services/ai-engine/src/supabase_client.py` — Service-role client with job lifecycle helpers, ai_fills insertion, export job enqueuing, credit refund via RPC
+- `services/ai-engine/src/s3_utils.py` — S3 download/upload via boto3
+- `services/ai-engine/src/boundary_analyzer.py` — FFprobe for video metadata, FFmpeg rawvideo extraction of boundary frames as numpy arrays
+- `services/ai-engine/src/fill_generator.py` — FillGenerator ABC + CrossfadeFillGenerator (linear alpha blend)
+- `services/ai-engine/src/compositor.py` — Boundary crossfade ramps + LAB color space histogram matching
+- `services/ai-engine/src/validator.py` — SSIM computation (Gaussian-weighted), temporal smoothness scoring, composite quality metric
+- `services/ai-engine/src/enrollment.py` — Stub returning None (Phase 2 will use MediaPipe)
+- `services/ai-engine/src/main.py` — Entry point with Supabase job_queue poller, per-gap pipeline orchestration, error handling with hard_cut fallback and credit refund
+- `services/ai-engine/tests/__init__.py` — Package init
+- `services/ai-engine/tests/test_fill_generator.py` — 14 tests covering crossfade generation, compositor boundary ramps, SSIM validation, temporal smoothness
+**Files modified:**
+- `docs/PROMPT_PLAYBOOK.md` — Marked Prompt 5.1.1 complete
+**Deviation:** (1) Uses pure Supabase job_queue polling (no Redis/BullMQ), matching the detector service pattern — simpler for MVP. (2) Used `opencv-python-headless` instead of full OpenCV — avoids GUI dependencies in Docker. (3) SSIM is computed with a custom Gaussian-weighted implementation rather than importing `skimage.metrics.structural_similarity` — avoids pulling in scikit-image as a dependency. (4) Color matching uses LAB color space histogram transfer (mean/std matching per channel) rather than simple histogram equalization — produces more natural color transitions. (5) Compositor lazily imports config to avoid requiring Supabase env vars during unit tests; falls back to a default ramp of 5 frames. (6) Credit refund for failed gaps calls the `refund_credits` Postgres RPC function via `client.rpc()` — the RPC uses `out_` prefixed return columns per deviation 002. Refund failures are logged but don't block the pipeline. (7) Credits are charged for crossfade fills in MVP as specified — crossfade IS the product for now. (8) The `_encode_frames_to_mp4` function pipes raw RGB frames directly to FFmpeg stdin rather than writing intermediate image files — more efficient and avoids disk I/O for large fills.
+**Impact:** The AI engine completes the processing pipeline: upload → transcode → detect → (editor) → ai.fill → export. The `CrossfadeFillGenerator` can be swapped for real AI providers (D-ID, Veo) in Phase 2 via the `FillGenerator` ABC. S3 path convention `ai-fills/{user_id}/{project_id}/fill_{gap_index}.mp4` is established. The exporter service (Prompt 6.1.1) will read these fill segments to assemble the final video.
+
+### 2026-03-22 — Export service (Prompt 6.1.1)
+
+**Area:** Backend / Services
+**Original plan:** Create a Node.js service at `services/exporter/` that consumes `video.export` jobs, assembles final videos from source segments and AI fill clips using FFmpeg concat, applies audio normalization, adds watermark for free tier, scales resolution per tier limits, uploads to S3, generates CloudFront signed download URLs, and updates the exports table.
+**Files created:**
+- `services/exporter/package.json` — Dependencies: @aws-sdk/client-s3, @aws-sdk/cloudfront-signer, @aws-sdk/lib-storage, @supabase/supabase-js
+- `services/exporter/tsconfig.json` — ES2022/NodeNext target (matches transcoder)
+- `services/exporter/Dockerfile` — node:20-slim + FFmpeg, runs as non-root (matches transcoder)
+- `services/exporter/src/config.ts` — Env vars: Supabase, AWS, CloudFront signing, tier resolution limits
+- `services/exporter/src/supabase.ts` — Service-role client, job lifecycle helpers, edit_decisions/ai_fills/exports queries, user tier lookup
+- `services/exporter/src/s3.ts` — Download/upload with multipart support, CloudFront signed URL generation
+- `services/exporter/src/assembler.ts` — Segment extraction, re-encoding for codec consistency, FFmpeg concat demuxer, video probing
+- `services/exporter/src/watermark.ts` — drawtext overlay for free-tier exports
+- `services/exporter/src/audio.ts` — EBU R128 loudnorm normalization
+- `services/exporter/src/index.ts` — Entry point with Supabase job_queue poller, full pipeline orchestration
+**Files modified:**
+- `docs/PROMPT_PLAYBOOK.md` — Marked Prompt 6.1.1 complete
+**Deviation:** (1) Uses pure Supabase job_queue polling (no BullMQ/Redis) unlike the transcoder — the exporter processes one job at a time sequentially, so BullMQ's concurrency management adds no value. This also eliminates the Redis dependency. (2) All segments are re-encoded before concat (not `-c copy`) to ensure consistent codec, timebase, resolution, and fps across source and fill segments — fill segments from the AI engine may have different encoding parameters. (3) Fill segments get a silent audio track generated via `anullsrc` lavfi filter since AI fill MP4s may be video-only — prevents audio desync in the final concat. (4) `@aws-sdk/cloudfront-signer` is used for signed URL generation instead of manually computing RSA signatures — official AWS SDK approach. Falls back to plain S3 URL when CloudFront is not configured. (5) Resolution scaling is enforced based on user tier (free=720p, pro=1080p, business=2160p) and capped to source resolution — never upscales. (6) The `edl_json` is read from the `edit_decisions` table rather than the job payload — the job payload only contains `project_id` and `edit_decision_id`, and the full EDL is in the database. Source video s3_key is queried from the `videos` table rather than being in the payload. (7) Credits are NOT refunded on export failure as specified — the AI fills were already generated. (8) `fill_summary_json` is built from `ai_fills` rows at export time, counting methods (ai_fill, crossfade, hard_cut) and carrying forward `credits_charged` from the edit_decision. `credits_refunded` is set to 0 for MVP.
+**Impact:** The full end-to-end pipeline is now complete: upload → transcode → detect → (editor) → ai.fill → export → download. The exporter reads fill segments from `ai-fills/{user_id}/{project_id}/fill_{gap_index}.mp4` and writes final exports to `exports/{user_id}/{project_id}/{export_id}.mp4`. CloudFront signed URLs provide secure 1-hour download links. The project status transitions to `complete` after successful export.
