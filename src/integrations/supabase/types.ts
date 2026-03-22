@@ -23,6 +23,7 @@ export type Database = {
           generation_time_ms: number | null
           id: string
           method: string
+          model: string | null
           provider: string | null
           quality_score: number | null
           s3_key: string | null
@@ -35,6 +36,7 @@ export type Database = {
           generation_time_ms?: number | null
           id?: string
           method: string
+          model?: string | null
           provider?: string | null
           quality_score?: number | null
           s3_key?: string | null
@@ -47,6 +49,7 @@ export type Database = {
           generation_time_ms?: number | null
           id?: string
           method?: string
+          model?: string | null
           provider?: string | null
           quality_score?: number | null
           s3_key?: string | null
@@ -240,8 +243,10 @@ export type Database = {
           created_at: string | null
           credit_transaction_id: string | null
           credits_charged: number
+          credits_per_sec: number | null
           edl_json: Json
           id: string
+          model: string | null
           project_id: string
           status: string
           total_fill_seconds: number
@@ -250,8 +255,10 @@ export type Database = {
           created_at?: string | null
           credit_transaction_id?: string | null
           credits_charged?: number
+          credits_per_sec?: number | null
           edl_json: Json
           id?: string
+          model?: string | null
           project_id: string
           status?: string
           total_fill_seconds?: number
@@ -260,8 +267,10 @@ export type Database = {
           created_at?: string | null
           credit_transaction_id?: string | null
           credits_charged?: number
+          credits_per_sec?: number | null
           edl_json?: Json
           id?: string
+          model?: string | null
           project_id?: string
           status?: string
           total_fill_seconds?: number
