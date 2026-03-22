@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { X, AlertTriangle } from 'lucide-react';
+import CutThumbnail from './CutThumbnail';
 import {
   Dialog,
   DialogContent,
