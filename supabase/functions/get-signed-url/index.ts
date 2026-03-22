@@ -1,7 +1,7 @@
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { handleCors } from "../_shared/cors.ts";
-import { getAuthenticatedUser, AuthError } from "../_shared/auth.ts";
+import { getAuthenticatedUser, createServiceClient, AuthError } from "../_shared/auth.ts";
 import { successResponse, errorResponse } from "../_shared/response.ts";
 
 let _s3Client: S3Client | null = null;
@@ -35,8 +35,29 @@ Deno.serve(async (req: Request) => {
       return errorResponse("bad_request", "Invalid s3_key", 400);
     }
 
-    // Verify the key belongs to this user (keys start with uploads/{user_id}/)
-    if (!s3_key.startsWith(`uploads/${user.id}/`)) {
+    // Verify the key belongs to this user.
+    // uploads/{user_id}/... — direct ownership via path prefix.
+    // ai-fills/{project_id}/... — ownership verified via project lookup.
+    if (s3_key.startsWith(`uploads/${user.id}/`)) {
+      // Direct ownership — OK
+    } else if (s3_key.startsWith("ai-fills/")) {
+      // Extract project_id from the path: ai-fills/{project_id}/...
+      const parts = s3_key.split("/");
+      const projectId = parts[1];
+      if (!projectId) {
+        return errorResponse("bad_request", "Invalid ai-fills path", 400);
+      }
+      const svc = createServiceClient();
+      const { data: proj } = await svc
+        .from("projects")
+        .select("id")
+        .eq("id", projectId)
+        .eq("user_id", user.id)
+        .single();
+      if (!proj) {
+        return errorResponse("unauthorized", "Unauthorized", 403);
+      }
+    } else {
       return errorResponse("unauthorized", "Unauthorized", 403);
     }
 

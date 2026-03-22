@@ -52,6 +52,12 @@ interface EditorState {
   aiFills: AiFill[];
   /** Whether to show AI fill overlays on timeline */
   showFills: boolean;
+  /** Fill IDs that the user has "inserted" into the timeline for playback */
+  insertedFills: Set<string>;
+  /** Signed URLs for fill video clips, keyed by fill ID */
+  fillVideoUrls: Map<string, string>;
+  /** Currently selected fill for preview (null = none) */
+  selectedFill: AiFill | null;
   /** Maps cutId → selected AI fill duration in seconds (0 = no fill, just cut) */
   fillDurations: Map<string, number>;
   playheadPosition: number;
@@ -80,6 +86,10 @@ interface EditorState {
   setRazorStart: (time: number | null) => void;
   setAiFills: (fills: AiFill[]) => void;
   toggleShowFills: () => void;
+  selectFill: (fill: AiFill | null) => void;
+  insertFill: (fillId: string) => void;
+  removeFill: (fillId: string) => void;
+  setFillVideoUrl: (fillId: string, url: string) => void;
   reset: () => void;
 }
 
@@ -102,6 +112,9 @@ export const useEditorStore = create<EditorState>((set) => ({
   activeManualCuts: new Set<string>(),
   aiFills: [],
   showFills: true,
+  insertedFills: new Set<string>(),
+  fillVideoUrls: new Map<string, string>(),
+  selectedFill: null,
   fillDurations: new Map<string, number>(),
   playheadPosition: 0,
   isPlaying: false,
@@ -218,6 +231,25 @@ export const useEditorStore = create<EditorState>((set) => ({
   setRazorStart: (razorStart) => set({ razorStart }),
   setAiFills: (aiFills) => set({ aiFills }),
   toggleShowFills: () => set((state) => ({ showFills: !state.showFills })),
+  selectFill: (selectedFill) => set({ selectedFill }),
+  insertFill: (fillId) =>
+    set((state) => {
+      const next = new Set(state.insertedFills);
+      next.add(fillId);
+      return { insertedFills: next };
+    }),
+  removeFill: (fillId) =>
+    set((state) => {
+      const next = new Set(state.insertedFills);
+      next.delete(fillId);
+      return { insertedFills: next };
+    }),
+  setFillVideoUrl: (fillId, url) =>
+    set((state) => {
+      const next = new Map(state.fillVideoUrls);
+      next.set(fillId, url);
+      return { fillVideoUrls: next };
+    }),
   reset: () =>
     set({
       project: null,
@@ -229,6 +261,9 @@ export const useEditorStore = create<EditorState>((set) => ({
       activeManualCuts: new Set(),
       aiFills: [],
       showFills: true,
+      insertedFills: new Set(),
+      fillVideoUrls: new Map(),
+      selectedFill: null,
       fillDurations: new Map(),
       playheadPosition: 0,
       isPlaying: false,
