@@ -376,7 +376,7 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
           sampleCount: 1,
           durationSeconds: request.duration,
           aspectRatio: "16:9",
-          ...(includeAudio ? { includeAudio: true } : {}),
+          ...(includeAudio ? { generateAudio: true } : {}),
         },
       }),
     },

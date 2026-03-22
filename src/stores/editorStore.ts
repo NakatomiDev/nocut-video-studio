@@ -31,9 +31,6 @@ export interface ManualCut {
   duration: number;
 }
 
-export const FILL_DURATION_OPTIONS = [1, 2, 3, 5] as const;
-export const BUSINESS_FILL_DURATION_OPTIONS = [1, 2, 3, 5, 10] as const;
-
 export type AiFillModel =
   | "veo3.1-fast"
   | "veo3.1-fast-audio"
@@ -42,14 +39,40 @@ export type AiFillModel =
   | "veo3.1-standard-audio"
   | "veo3-standard-audio";
 
-export const AI_FILL_MODELS: { id: AiFillModel; label: string; creditsPerSec: number; badge?: string }[] = [
-  { id: "veo3.1-fast", label: "Fast", creditsPerSec: 1 },
-  { id: "veo3.1-fast-audio", label: "Fast + Audio", creditsPerSec: 2 },
-  { id: "veo2", label: "Veo 2", creditsPerSec: 2 },
-  { id: "veo3.1-standard", label: "Standard", creditsPerSec: 3 },
-  { id: "veo3.1-standard-audio", label: "Standard + Audio", creditsPerSec: 4, badge: "Best" },
-  { id: "veo3-standard-audio", label: "Premium Audio", creditsPerSec: 6 },
+export interface AiFillModelConfig {
+  id: AiFillModel;
+  label: string;
+  creditsPerSec: number;
+  audio: boolean;
+  durations: number[];
+  badge?: string;
+}
+
+export const AI_FILL_MODELS: AiFillModelConfig[] = [
+  { id: "veo3.1-fast",           label: "Veo 3.1 Fast",             creditsPerSec: 1, audio: false, durations: [4, 6, 8] },
+  { id: "veo3.1-fast-audio",     label: "Veo 3.1 Fast + Audio",     creditsPerSec: 2, audio: true,  durations: [4, 6, 8] },
+  { id: "veo2",                  label: "Veo 2",                    creditsPerSec: 2, audio: false, durations: [5, 6, 8] },
+  { id: "veo3.1-standard",       label: "Veo 3.1 Standard",         creditsPerSec: 3, audio: false, durations: [4, 6, 8] },
+  { id: "veo3.1-standard-audio", label: "Veo 3.1 Standard + Audio", creditsPerSec: 4, audio: true,  durations: [4, 6, 8], badge: "Best" },
+  { id: "veo3-standard-audio",   label: "Veo 3 Premium Audio",      creditsPerSec: 6, audio: true,  durations: [4, 6, 8] },
 ];
+
+/** Max fill duration per tier (seconds). */
+const TIER_MAX_DURATION: Record<string, number> = { free: 4, pro: 8, business: 8 };
+
+/** Get models available for a tier (only those with at least one valid duration). */
+export function getAvailableModels(tier: string): AiFillModelConfig[] {
+  const max = TIER_MAX_DURATION[tier] ?? 4;
+  return AI_FILL_MODELS.filter((m) => m.durations.some((d) => d <= max));
+}
+
+/** Get valid durations for a model + tier combination. */
+export function getModelDurations(modelId: AiFillModel, tier: string): number[] {
+  const max = TIER_MAX_DURATION[tier] ?? 4;
+  const model = AI_FILL_MODELS.find((m) => m.id === modelId);
+  if (!model) return [];
+  return model.durations.filter((d) => d <= max);
+}
 
 export const MODEL_CREDITS_PER_SEC: Record<AiFillModel, number> = Object.fromEntries(
   AI_FILL_MODELS.map((m) => [m.id, m.creditsPerSec]),

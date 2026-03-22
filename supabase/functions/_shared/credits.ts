@@ -53,11 +53,11 @@ export async function getCreditBalance(
   };
 }
 
-/** Max fill duration per gap by tier (seconds). */
+/** Max fill duration per gap by tier (seconds). Must match Veo API limits (4/6/8s). */
 export const MAX_FILL_DURATION: Record<string, number> = {
-  free: 1,
-  pro: 5,
-  business: 5,
+  free: 4,
+  pro: 8,
+  business: 8,
 };
 
 export interface GapEstimate {
