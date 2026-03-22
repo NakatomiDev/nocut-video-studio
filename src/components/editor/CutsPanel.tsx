@@ -333,17 +333,96 @@ const CutsPanel = ({ thumbnailSpriteUrl, duration }: CutsPanelProps) => {
         </Button>
       </div>
 
-      <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
-        <DialogContent>
+      <Dialog open={showExportDialog} onOpenChange={(open) => { setShowExportDialog(open); if (!open) setExpandedReviewId(null); }}>
+        <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Confirm Export</DialogTitle>
+            <DialogTitle>Review Edits</DialogTitle>
             <DialogDescription>
               {creditEstimate > 0
-                ? `This will use ${creditEstimate} credit${creditEstimate !== 1 ? 's' : ''} for AI fill transitions.`
-                : 'This export uses cuts only — no credits will be charged.'}
+                ? `${creditEstimate} credit${creditEstimate !== 1 ? 's' : ''} for AI fills · Click any edit to preview`
+                : 'All cuts are free — click any edit to preview'}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2 text-sm">
+
+          <ScrollArea className="flex-1 -mx-6 px-6">
+            <div className="space-y-2 max-h-[45vh]">
+              {(() => {
+                const activeCutsList = cuts.filter((c) => activeCuts.has(c.id));
+                const activeManualList = manualCuts.filter((c) => activeManualCuts.has(c.id));
+                const allEdits = [
+                  ...activeCutsList.map((c) => ({ id: c.id, start: c.start, end: c.end, duration: c.duration, type: c.type, fill: fillDurations.get(c.id) || 0 })),
+                  ...activeManualList.map((c) => ({ id: c.id, start: c.start, end: c.end, duration: c.duration, type: 'manual' as string, fill: fillDurations.get(c.id) || 0 })),
+                ].sort((a, b) => a.start - b.start);
+
+                return allEdits.map((edit, idx) => {
+                  const isExpanded = expandedReviewId === edit.id;
+                  return (
+                    <div
+                      key={edit.id}
+                      className={`rounded-lg border transition-colors cursor-pointer ${
+                        isExpanded ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/40'
+                      }`}
+                      onClick={() => setExpandedReviewId(isExpanded ? null : edit.id)}
+                    >
+                      <div className="flex items-center gap-3 p-3">
+                        <span className="text-[10px] font-mono text-muted-foreground w-5 text-center">{idx + 1}</span>
+                        <Badge
+                          variant="outline"
+                          className={
+                            edit.type === 'manual'
+                              ? 'border-border text-foreground bg-secondary'
+                              : typeBadgeClass[edit.type] || 'border-border text-muted-foreground'
+                          }
+                        >
+                          {edit.type}
+                        </Badge>
+                        <span className="font-mono text-xs text-muted-foreground flex-1">
+                          {formatTimestamp(edit.start)} → {formatTimestamp(edit.end)}
+                        </span>
+                        <span className="text-xs text-muted-foreground">{edit.duration.toFixed(1)}s</span>
+                        {edit.fill > 0 ? (
+                          <Badge className="bg-primary/20 text-primary border-primary/30 text-[10px]">
+                            <Sparkles className="h-2.5 w-2.5 mr-1" />
+                            {edit.fill}s fill
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] text-muted-foreground border-border">
+                            cut only
+                          </Badge>
+                        )}
+                      </div>
+
+                      {isExpanded && thumbnailSpriteUrl && (
+                        <div className="px-3 pb-3 pt-1 border-t border-border/50">
+                          <div className="flex items-stretch gap-3">
+                            <div className="flex flex-col items-center gap-1 flex-1">
+                              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Before cut</span>
+                              <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={edit.start} duration={duration} width={180} height={100} />
+                              <span className="text-[10px] font-mono text-muted-foreground">{formatTimestamp(edit.start)}</span>
+                            </div>
+                            <div className="flex flex-col items-center justify-center gap-1">
+                              <div className="h-px w-8 bg-muted-foreground/30" />
+                              {edit.fill > 0 && (
+                                <span className="text-[9px] text-primary font-medium">{edit.fill}s AI fill</span>
+                              )}
+                              <div className="h-px w-8 bg-muted-foreground/30" />
+                            </div>
+                            <div className="flex flex-col items-center gap-1 flex-1">
+                              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">After cut</span>
+                              <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={edit.end} duration={duration} width={180} height={100} />
+                              <span className="text-[10px] font-mono text-muted-foreground">{formatTimestamp(edit.end)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </ScrollArea>
+
+          <div className="space-y-2 text-sm border-t border-border pt-3">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Cuts (removal)</span>
               <span className="font-semibold">{activeCuts.size + activeManualCuts.size} — Free</span>
@@ -360,10 +439,6 @@ const CutsPanel = ({ thumbnailSpriteUrl, duration }: CutsPanelProps) => {
                 </div>
               </>
             )}
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Format</span>
-              <span className="font-semibold">MP4, 1080p</span>
-            </div>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setShowExportDialog(false)}>Cancel</Button>
