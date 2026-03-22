@@ -141,13 +141,13 @@ const CutsPanel = ({ thumbnailSpriteUrl, duration }: CutsPanelProps) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { error: jobError } = await supabase.from('job_queue').insert({
+      const { data: jobRow, error: jobError } = await supabase.from('job_queue').insert({
         project_id: project.id,
         user_id: user.id,
         type: totalFill > 0 ? 'ai.fill' : 'video.export',
         payload: { edit_decision_id: editDecision.id },
         priority: 10,
-      });
+      }).select('id').single();
 
       if (jobError) throw jobError;
 
@@ -157,6 +157,16 @@ const CutsPanel = ({ thumbnailSpriteUrl, duration }: CutsPanelProps) => {
           ? `Export submitted — generating ${totalFill}s of AI fill`
           : 'Export submitted — processing your edits'
       );
+
+      // Invoke the edge function to start processing
+      supabase.functions.invoke('process-ai-fill', {
+        body: { job_id: jobRow.id },
+      }).then(({ error: invokeError }) => {
+        if (invokeError) {
+          console.error('Failed to invoke process-ai-fill:', invokeError);
+          toast.error('AI fill processing failed to start');
+        }
+      });
     } catch (err: any) {
       console.error('Export failed:', err);
       toast.error('Export failed — please try again');
