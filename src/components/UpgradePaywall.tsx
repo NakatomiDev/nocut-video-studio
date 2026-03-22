@@ -26,7 +26,7 @@ const PLANS = [
     name: "Pro",
     monthlyPrice: 14.99,
     annualPrice: 9.99,
-    features: ["60 credits/mo", "1080p export", "30 min max input", "5s AI fills", "Transcript editing", "No watermark"],
+    features: ["40 credits/mo", "1080p export", "30 min max input", "5s AI fills", "Transcript editing", "No watermark"],
     highlight: true,
   },
   {
@@ -34,7 +34,7 @@ const PLANS = [
     name: "Business",
     monthlyPrice: 39.99,
     annualPrice: 29.99,
-    features: ["200 credits/mo", "4K export", "2 hour max input", "5s AI fills", "Multi-speaker", "Batch processing", "Priority processing"],
+    features: ["120 credits/mo", "4K export", "2 hour max input", "5s AI fills", "Multi-speaker", "Batch processing", "Priority processing"],
   },
 ];
 
