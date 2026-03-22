@@ -2,40 +2,50 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
 const disclosureItems = [
-  { label: "販売事業者 (Business Name)", value: "合同会社Nakatomi (Nakatomi LLC)" },
-  { label: "代表者 (Representative)", value: "中冨 太郎" },
-  { label: "所在地 (Address)", value: "〒150-0001 東京都渋谷区神宮前6丁目23-4 桑野ビル2階" },
-  { label: "電話番号 (Phone)", value: "お問い合わせはメールにて承ります。" },
-  { label: "メールアドレス (Email)", value: "support@nakatomi.dev" },
-  { label: "運営統括責任者 (Head of Operations)", value: "中冨 太郎" },
+  { label: "販売業者（事業者）名", value: "Ｎａｋａｔｏｍｉ株式会社" },
+  { label: "所在地（住所）", value: "東京都港区元麻布３丁目１番６号" },
+  { label: "電話番号", value: "090-9952-1444（受付時間：平日 10:00〜18:00 など）" },
+  { label: "メールアドレス", value: "contact@nakatomi.dev" },
+  { label: "サービス提供URL", value: "https://nakatomi.dev/" },
+  { label: "代表責任者名", value: "リチャード・オーマン" },
   {
-    label: "販売価格 (Pricing)",
+    label: "販売価格",
     value:
-      "各サービスページに記載された価格に準じます。価格はすべて税込み表示です。\nPrices are as listed on each service page. All prices include applicable taxes.",
+      "各サービスページに税込価格で表示（例：Free, Pay-as-you-grow, Corporate Starter, Compliance Pro）",
   },
   {
-    label: "支払方法 (Payment Methods)",
-    value: "クレジットカード（Visa, Mastercard, American Express, JCB）",
+    label: "役務の内容および提供時期",
+    value:
+      "Webサービス／SaaS。決済確定後、速やかにサービスを利用開始できます。",
   },
   {
-    label: "支払時期 (Payment Timing)",
+    label: "お支払い方法および支払い時期",
     value:
-      "クレジットカード決済：ご注文時に即時決済。サブスクリプション：毎月の更新日に自動決済。\nCredit card: charged immediately at time of purchase. Subscriptions: charged automatically on each renewal date.",
+      "・クレジットカード決済：決済完了時に確定\n・銀行振込（国内銀行）：請求日より3日以内にお支払いください（例：3日以内）",
   },
   {
-    label: "商品の引渡し時期 (Delivery)",
-    value:
-      "デジタルサービスのため、決済完了後すぐにご利用いただけます。\nAs a digital service, access is granted immediately upon payment completion.",
+    label: "追加料金（該当する場合）",
+    value: "なし（手数料・送料等の追加料金はかかりません）",
   },
   {
-    label: "返品・キャンセルについて (Returns & Cancellations)",
+    label: "契約の申込み有効期限",
     value:
-      "デジタルサービスの性質上、購入後の返品・返金は原則としてお受けしておりません。サブスクリプションはいつでもキャンセル可能で、次回更新日以降の請求は発生しません。未使用クレジットの返金は行っておりません。\nDue to the nature of digital services, refunds are generally not available after purchase. Subscriptions may be cancelled at any time and billing will stop at the next renewal date. Unused credits are non-refundable.",
+      "銀行振込の場合、請求日より3日以内に入金がない場合は注文をキャンセル扱いとします。",
   },
   {
-    label: "動作環境 (System Requirements)",
+    label: "解約・キャンセルについて",
     value:
-      "最新版のGoogle Chrome、Firefox、Safari、Microsoft Edgeが動作するPC環境。安定したインターネット接続が必要です。\nA PC running the latest version of Google Chrome, Firefox, Safari, or Microsoft Edge. A stable internet connection is required.",
+      "ご利用プランはいつでもキャンセル可能です。\nキャンセル申請後、当該請求期間の終了をもってサービスのご利用は停止となります。\nなお、お支払い済の料金については返金いたしません。",
+  },
+  {
+    label: "事業者の責任",
+    value:
+      "サービスに不具合があった場合、利用規約に従い対応いたします。また、サービスの仕様や提供体制の変更がある場合は事前に通知いたします。",
+  },
+  {
+    label: "動作環境（該当する場合）",
+    value:
+      "本サービスはモダンな Web ブラウザ（Chrome / Edge / Firefox / Safari 最新版など）で正常に動作します。JavaScript や Cookie を有効にしてください。",
   },
 ];
 
@@ -66,7 +76,6 @@ const CommercialDisclosure = () => {
       <main className="pt-32 pb-20 px-6">
         <div className="mx-auto max-w-3xl">
           <h1 className="text-3xl font-bold sm:text-4xl">特定商取引法に基づく表記</h1>
-          <p className="mt-2 text-muted-foreground">Commercial Disclosure</p>
 
           <div className="mt-12 divide-y divide-border/50">
             {disclosureItems.map(({ label, value }) => (
