@@ -2,7 +2,8 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { motion } from "framer-motion";
-import { Play, Scissors, Sparkles, Zap, Clock, Shield, ChevronRight, Check } from "lucide-react";
+import { Play, Scissors, Sparkles, Zap, Clock, Shield, ChevronRight, Check, Coins } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import heroMockup from "@/assets/hero-editor-mockup.png";
 import beforeAfter from "@/assets/before-after-mockup.png";
 
@@ -323,7 +324,7 @@ const Landing = () => {
                 name: "Pro",
                 price: "$14.99",
                 period: "/month",
-                credits: "60 credits/month",
+                credits: "40 credits/month",
                 features: ["1080p export", "Up to 30 min videos", "≤ 5s AI fills", "No watermark", "Transcript editing"],
                 cta: "Start Pro Trial",
                 highlight: true,
@@ -332,7 +333,7 @@ const Landing = () => {
                 name: "Business",
                 price: "$39.99",
                 period: "/month",
-                credits: "200 credits/month",
+                credits: "120 credits/month",
                 features: ["4K export", "Up to 2hr videos", "≤ 5s AI fills", "Multi-speaker support", "Batch processing", "Priority rendering"],
                 cta: "Go Business",
                 highlight: false,
@@ -386,6 +387,60 @@ const Landing = () => {
               </motion.div>
             ))}
           </div>
+
+          {/* Credit Top-Ups */}
+          <motion.div
+            className="mt-16 text-center"
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-100px" }}
+            variants={fadeUp}
+            custom={0}
+          >
+            <h3 className="text-2xl font-bold">Need More Credits?</h3>
+            <p className="mx-auto mt-2 max-w-md text-muted-foreground">
+              Top up anytime — no subscription required.
+            </p>
+          </motion.div>
+
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              { credits: 10, price: "$4.99", perCredit: "$0.50", name: "Starter" },
+              { credits: 40, price: "$14.99", perCredit: "$0.37", name: "Standard", badge: "Most Popular" },
+              { credits: 100, price: "$34.99", perCredit: "$0.35", name: "Pro", badge: "Best Value" },
+              { credits: 250, price: "$79.99", perCredit: "$0.32", name: "Studio" },
+            ].map(({ credits, price, perCredit, name, badge }, i) => (
+              <motion.div
+                key={name}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, margin: "-30px" }}
+                variants={fadeUp}
+                custom={i}
+              >
+                <Card className="relative h-full border-border/50 bg-card/50 hover:border-primary/20 transition-all duration-300">
+                  {badge && (
+                    <Badge className="absolute -top-2.5 left-1/2 -translate-x-1/2" variant="secondary">
+                      {badge}
+                    </Badge>
+                  )}
+                  <CardContent className="p-6 text-center">
+                    <Coins className="mx-auto h-8 w-8 text-primary mb-3" />
+                    <h4 className="font-semibold">{name}</h4>
+                    <p className="mt-1 text-3xl font-extrabold">{credits}</p>
+                    <p className="text-xs text-muted-foreground">credits</p>
+                    <p className="mt-3 text-lg font-bold">{price}</p>
+                    <p className="text-xs text-muted-foreground">{perCredit}/credit</p>
+                    <Link to="/sign-up" className="block mt-4">
+                      <Button variant="outline" size="sm" className="w-full">
+                        Buy Credits
+                      </Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -428,6 +483,7 @@ const Landing = () => {
           <div className="flex gap-6 text-sm text-muted-foreground">
             <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
             <a href="#" className="hover:text-foreground transition-colors">Terms</a>
+            <Link to="/commercial-disclosure" className="hover:text-foreground transition-colors">Commercial Disclosure</Link>
             <a href="#" className="hover:text-foreground transition-colors">Support</a>
           </div>
           <p className="text-xs text-muted-foreground">© 2026 NoCut. All rights reserved.</p>
