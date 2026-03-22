@@ -35,6 +35,8 @@ const statusColors: Record<string, string> = {
   uploading: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
   transcoding: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
   detecting: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+  generating: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+  exporting: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
   ready: "bg-green-500/20 text-green-400 border-green-500/30",
   complete: "bg-blue-500/20 text-blue-400 border-blue-500/30",
   failed: "bg-red-500/20 text-red-400 border-red-500/30",
@@ -78,7 +80,27 @@ const ProjectCard = ({ id, title, status, date, thumbnailUrl }: ProjectCardProps
     <>
       <Card
         className="group cursor-pointer border-border transition-colors hover:border-primary/40"
-        onClick={() => navigate(`/project/${id}`)}
+        onClick={() => {
+          if (status === 'complete') {
+            // For complete projects, check for an export first
+            supabase
+              .from('exports')
+              .select('id')
+              .eq('project_id', id)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .single()
+              .then(({ data }) => {
+                if (data) {
+                  navigate(`/project/${id}/export/${data.id}`);
+                } else {
+                  navigate(`/project/${id}`);
+                }
+              });
+          } else {
+            navigate(`/project/${id}`);
+          }
+        }}
       >
         <div className="relative aspect-video overflow-hidden rounded-t-lg bg-muted">
           {thumbnailUrl ? (
