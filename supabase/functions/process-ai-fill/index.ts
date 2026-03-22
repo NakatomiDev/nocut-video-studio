@@ -350,20 +350,21 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
     throw new Error("GOOGLE_AI_API_KEY is not set — cannot call Veo API");
   }
 
-  // Map our model names to Google Veo GA model IDs
+  // Map our model names to Gemini API model IDs (use -preview suffix for generativelanguage.googleapis.com)
   const MODEL_API_IDS: Record<string, string> = {
-    "veo2":                  "veo-2.0-generate-001",
-    "veo3.1-fast":           "veo-3.1-fast-generate-001",
-    "veo3.1-fast-audio":     "veo-3.1-fast-generate-001",
-    "veo3.1-standard":       "veo-3.1-generate-001",
-    "veo3.1-standard-audio": "veo-3.1-generate-001",
-    "veo3-standard-audio":   "veo-3.0-generate-001",
+    "veo2":                  "veo-2.0-generate-preview",
+    "veo3.1-fast":           "veo-3.1-fast-generate-preview",
+    "veo3.1-fast-audio":     "veo-3.1-fast-generate-preview",
+    "veo3.1-standard":       "veo-3.1-generate-preview",
+    "veo3.1-standard-audio": "veo-3.1-generate-preview",
+    "veo3-standard-audio":   "veo-3.0-generate-preview",
   };
-  const apiModelId = MODEL_API_IDS[model] ?? "veo-2.0-generate-001";
+  const apiModelId = MODEL_API_IDS[model] ?? "veo-2.0-generate-preview";
   const includeAudio = model.endsWith("-audio");
 
+  // Gemini API uses predictLongRunning endpoint
   const generateResponse = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${apiModelId}:generateVideos`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${apiModelId}:predictLongRunning`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
