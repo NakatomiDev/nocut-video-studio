@@ -349,13 +349,13 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
     throw new Error("GOOGLE_AI_API_KEY is not set — cannot call Veo API");
   }
 
-  // Map our model names to Gemini API model IDs
+  // Map our model names to Google Veo GA model IDs
   const MODEL_API_IDS: Record<string, string> = {
     "veo2":                  "veo-2.0-generate-001",
-    "veo3.1-fast":           "veo-3.0-generate-001",
-    "veo3.1-fast-audio":     "veo-3.0-generate-001",
-    "veo3.1-standard":       "veo-3.0-generate-001",
-    "veo3.1-standard-audio": "veo-3.0-generate-001",
+    "veo3.1-fast":           "veo-3.1-fast-generate-001",
+    "veo3.1-fast-audio":     "veo-3.1-fast-generate-001",
+    "veo3.1-standard":       "veo-3.1-generate-001",
+    "veo3.1-standard-audio": "veo-3.1-generate-001",
     "veo3-standard-audio":   "veo-3.0-generate-001",
   };
   const apiModelId = MODEL_API_IDS[model] ?? "veo-2.0-generate-001";
