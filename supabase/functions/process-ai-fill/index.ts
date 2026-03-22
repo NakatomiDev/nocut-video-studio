@@ -186,10 +186,13 @@ Deno.serve(async (req) => {
 
       const generationTimeMs = Date.now() - generationStart;
 
-      // Insert ai_fills record
-      const { data: aiFillRow, error: fillInsertError } = await serviceClient
+      // Insert ai_fills record (generate ID client-side to avoid
+      // RETURNING being blocked by RLS SELECT policy on service client)
+      const aiFillId = crypto.randomUUID();
+      const { error: fillInsertError } = await serviceClient
         .from("ai_fills")
         .insert({
+          id: aiFillId,
           edit_decision_id: editDecision.id,
           gap_index: gap.gap_index,
           s3_key: fillResult.s3_key,
@@ -198,14 +201,12 @@ Deno.serve(async (req) => {
           quality_score: fillResult.quality_score,
           duration: gap.fill_duration,
           generation_time_ms: generationTimeMs,
-        })
-        .select("id")
-        .single();
+        });
 
       if (fillInsertError) {
         console.error(`Failed to insert ai_fill for gap ${gap.gap_index}:`, fillInsertError);
       } else {
-        aiFillResults.push({ gap_index: gap.gap_index, id: aiFillRow.id });
+        aiFillResults.push({ gap_index: gap.gap_index, id: aiFillId });
       }
     }
 
