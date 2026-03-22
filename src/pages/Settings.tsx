@@ -1,11 +1,14 @@
+import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LogOut } from "lucide-react";
+import { UpgradePaywall } from "@/components/UpgradePaywall";
 
 const SettingsPage = () => {
   const { user, signOut } = useAuth();
+  const [paywallOpen, setPaywallOpen] = useState(false);
 
   return (
     <div className="p-6 lg:p-8">
@@ -27,8 +30,8 @@ const SettingsPage = () => {
                 Free
               </Badge>
             </div>
-            <Button variant="outline" disabled className="w-full">
-              Manage Subscription
+            <Button variant="outline" className="w-full" onClick={() => setPaywallOpen(true)}>
+              Upgrade Plan
             </Button>
           </CardContent>
         </Card>
@@ -46,6 +49,8 @@ const SettingsPage = () => {
           </CardContent>
         </Card>
       </div>
+
+      <UpgradePaywall open={paywallOpen} onClose={() => setPaywallOpen(false)} currentTier="free" />
     </div>
   );
 };

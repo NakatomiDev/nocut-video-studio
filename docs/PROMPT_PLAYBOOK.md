@@ -1556,7 +1556,7 @@ POST-COMPLETION (mandatory):
 
 ## 4.3 — Payments UI
 
-### - [ ] Prompt 4.3.1 — Build credits page and paywall
+### - [x] Prompt 4.3.1 — Build credits page and paywall *(completed 2026-03-22)*
 
 **Tool: Lovable**
 
