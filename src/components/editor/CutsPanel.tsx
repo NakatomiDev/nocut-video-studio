@@ -38,6 +38,7 @@ const typeBadgeClass: Record<string, string> = {
 
 interface CutsPanelProps {
   thumbnailSpriteUrl?: string | null;
+  videoUrl?: string | null;
   duration: number;
 }
 
