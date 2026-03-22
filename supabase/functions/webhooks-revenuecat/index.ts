@@ -2,12 +2,28 @@ import { createServiceClient } from "../_shared/auth.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
 // RevenueCat product → tier mapping
+// Includes both RevenueCat product IDs (app stores) and Stripe price IDs (web).
+// Stripe price IDs are loaded from env vars since they differ between test/prod.
 const PRODUCT_TIER_MAP: Record<string, "pro" | "business"> = {
   nocut_pro_monthly: "pro",
   nocut_pro_annual: "pro",
   nocut_business_monthly: "business",
   nocut_business_annual: "business",
 };
+
+// Map Stripe price IDs → tiers from environment variables
+const stripePriceMappings: [string, "pro" | "business"][] = [
+  ["STRIPE_PRICE_PRO_MONTHLY", "pro"],
+  ["STRIPE_PRICE_PRO_ANNUAL", "pro"],
+  ["STRIPE_PRICE_BUSINESS_MONTHLY", "business"],
+  ["STRIPE_PRICE_BUSINESS_ANNUAL", "business"],
+];
+for (const [envVar, tier] of stripePriceMappings) {
+  const priceId = Deno.env.get(envVar);
+  if (priceId) {
+    PRODUCT_TIER_MAP[priceId] = tier;
+  }
+}
 
 // Monthly credit allocation per tier
 // Credits are model-weighted: 1 credit = 1 sec of Veo 3.1 Fast,
