@@ -28,7 +28,11 @@ const typeBadgeClass: Record<string, string> = {
   retake: 'bg-red-500/20 text-red-400 border-red-500/30',
 };
 
-const CutsPanel = () => {
+interface CutsPanelProps {
+  videoUrl?: string | null;
+}
+
+const CutsPanel = ({ videoUrl }: CutsPanelProps) => {
   const {
     cuts,
     activeCuts,
