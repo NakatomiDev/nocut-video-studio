@@ -32,14 +32,28 @@ const Dashboard = () => {
 
       const { data, error } = await supabase
         .from("projects")
-        .select("id, title, status, created_at")
+        .select("id, title, status, created_at, videos(thumbnail_sprite_s3_key)")
         .order("created_at", { ascending: false });
 
       if (error) {
         console.error("Dashboard: failed to fetch projects:", error.message, error.details);
       } else {
         console.log("Dashboard: fetched", data?.length ?? 0, "projects");
-        setProjects(data ?? []);
+        const enriched: Project[] = await Promise.all(
+          (data ?? []).map(async (p: any) => {
+            const video = Array.isArray(p.videos) ? p.videos[0] : p.videos;
+            const spriteKey = video?.thumbnail_sprite_s3_key;
+            let thumbnailUrl: string | null = null;
+            if (spriteKey) {
+              const result = await supabase.functions.invoke("get-signed-url", {
+                body: { s3_key: spriteKey },
+              });
+              thumbnailUrl = result.data?.url || result.data?.data?.url || null;
+            }
+            return { id: p.id, title: p.title, status: p.status, created_at: p.created_at, thumbnailUrl };
+          })
+        );
+        setProjects(enriched);
       }
       setLoading(false);
     };
