@@ -1472,7 +1472,7 @@ POST-COMPLETION (mandatory):
 
 ## 4.2 — RevenueCat + Stripe Webhooks
 
-### - [ ] Prompt 4.2.1 — Create webhook handlers
+### - [x] Prompt 4.2.1 — Create webhook handlers *(completed 2026-03-22)*
 
 **Tool: Claude Code**
 
