@@ -15,6 +15,7 @@ import Settings from "@/pages/Settings";
 import Upload from "@/pages/Upload";
 import ProjectEditor from "@/pages/ProjectEditor";
 import NotFound from "@/pages/NotFound";
+import CommercialDisclosure from "@/pages/CommercialDisclosure";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -54,6 +55,7 @@ const App = () => (
             <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
             <Route path="/project/:projectId" element={<ProtectedRoute><ProjectEditor /></ProtectedRoute>} />
             <Route path="/editor/:projectId" element={<ProtectedRoute><ProjectEditor /></ProtectedRoute>} />
+            <Route path="/commercial-disclosure" element={<CommercialDisclosure />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

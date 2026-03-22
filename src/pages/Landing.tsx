@@ -483,6 +483,7 @@ const Landing = () => {
           <div className="flex gap-6 text-sm text-muted-foreground">
             <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
             <a href="#" className="hover:text-foreground transition-colors">Terms</a>
+            <Link to="/commercial-disclosure" className="hover:text-foreground transition-colors">Commercial Disclosure</Link>
             <a href="#" className="hover:text-foreground transition-colors">Support</a>
           </div>
           <p className="text-xs text-muted-foreground">© 2026 NoCut. All rights reserved.</p>
