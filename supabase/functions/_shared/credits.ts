@@ -128,7 +128,7 @@ export const TOPUP_PRODUCTS: Record<string, { credits: number; price_cents: numb
  *   Model                  API $/sec   Credits/sec   Break-even $/credit
  *   ─────────────────────  ─────────   ───────────   ───────────────────
  *   Veo 3.1 Fast (silent)    $0.10         1              $0.10
- *   Veo 3.1 Fast (audio)     $0.15         1              $0.15
+ *   Veo 3.1 Fast (audio)     $0.15         2              $0.075
  *   Veo 2                    $0.35         2              $0.175
  *   Veo 3.1 Std (silent)     $0.27         3              $0.09
  *   Veo 3.1 Std (audio)      $0.40         4              $0.10
@@ -144,7 +144,7 @@ export type AiFillModel =
 
 export const MODEL_CREDITS_PER_SEC: Record<AiFillModel, number> = {
   "veo3.1-fast":           1,
-  "veo3.1-fast-audio":     1,
+  "veo3.1-fast-audio":     2,
   "veo2":                  2,
   "veo3.1-standard":       3,
   "veo3.1-standard-audio": 4,

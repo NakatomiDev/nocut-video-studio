@@ -13,8 +13,8 @@ const PRODUCT_TIER_MAP: Record<string, "pro" | "business"> = {
 // Credits are model-weighted: 1 credit = 1 sec of Veo 3.1 Fast,
 // 2 credits = 1 sec of Veo 2, 4 credits = 1 sec of Veo 3.1 Standard (audio), etc.
 const TIER_CREDITS: Record<string, number> = {
-  pro: 100,
-  business: 350,
+  pro: 40,
+  business: 120,
   free: 5,
 };
 
