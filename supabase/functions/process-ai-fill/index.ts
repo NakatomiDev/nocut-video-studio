@@ -427,11 +427,22 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
       // Download the generated video and upload to S3
       const s3Key = `ai-fills/${request.projectId}/${request.editDecisionId}/gap_${request.gapIndex}_${request.duration}s.mp4`;
       
-      // Fetch the video from Google's URI (includes API key for access)
-      const videoDownloadUrl = `${videoUri}?key=${apiKey}`;
-      const videoResponse = await fetch(videoDownloadUrl);
+      // Fetch the video from Google's URI — try query param first, then header auth
+      let videoResponse = await fetch(`${videoUri}?key=${apiKey}`);
       if (!videoResponse.ok) {
-        throw new Error(`Failed to download generated video (${videoResponse.status})`);
+        console.warn(`Video download with query key failed (${videoResponse.status}), retrying with header auth`);
+        videoResponse = await fetch(videoUri, {
+          headers: { "x-goog-api-key": apiKey },
+        });
+      }
+      if (!videoResponse.ok) {
+        console.warn(`Video download with header also failed (${videoResponse.status}), trying alt=media`);
+        videoResponse = await fetch(`${videoUri}?alt=media&key=${apiKey}`);
+      }
+      if (!videoResponse.ok) {
+        const errBody = await videoResponse.text().catch(() => "");
+        console.error("All video download attempts failed. URI:", videoUri, "Status:", videoResponse.status, "Body:", errBody);
+        throw new Error(`Failed to download generated video (${videoResponse.status}): ${errBody}`);
       }
       const videoBytes = new Uint8Array(await videoResponse.arrayBuffer());
 
