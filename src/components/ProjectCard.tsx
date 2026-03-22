@@ -45,9 +45,10 @@ interface ProjectCardProps {
   title: string;
   status: string;
   date: string;
+  thumbnailUrl?: string | null;
 }
 
-const ProjectCard = ({ id, title, status, date }: ProjectCardProps) => {
+const ProjectCard = ({ id, title, status, date, thumbnailUrl }: ProjectCardProps) => {
   const navigate = useNavigate();
   const [renameOpen, setRenameOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -79,8 +80,19 @@ const ProjectCard = ({ id, title, status, date }: ProjectCardProps) => {
         className="group cursor-pointer border-border transition-colors hover:border-primary/40"
         onClick={() => navigate(`/project/${id}`)}
       >
-        <div className="flex aspect-video items-center justify-center rounded-t-lg bg-muted">
-          <Video className="h-10 w-10 text-muted-foreground" />
+        <div className="relative aspect-video overflow-hidden rounded-t-lg bg-muted">
+          {thumbnailUrl ? (
+            <img
+              src={thumbnailUrl}
+              alt={title}
+              className="h-full w-full object-cover"
+              style={{ objectPosition: 'left center' }}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center">
+              <Video className="h-10 w-10 text-muted-foreground" />
+            </div>
+          )}
         </div>
         <CardContent className="flex items-start justify-between p-4">
           <div className="min-w-0 flex-1">
