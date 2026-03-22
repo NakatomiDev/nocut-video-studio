@@ -43,6 +43,8 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
     aiFills,
     showFills,
     toggleShowFills,
+    selectFill,
+    insertedFills,
   } = useEditorStore();
 
   const [waveformData, setWaveformData] = useState<number[]>([]);
@@ -423,6 +425,7 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
     hoveredCut, playheadPosition, timeToX,
     razorMode, razorStart, razorPreview,
     aiFills, showFills,
+    insertedFills,
   ]);
 
   // RAF loop
@@ -455,6 +458,20 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
       return null;
     },
     [cuts, xToTime]
+  );
+
+  const getFillAtX = useCallback(
+    (clientX: number) => {
+      if (!showFills || aiFills.length === 0) return null;
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (!rect) return null;
+      const time = xToTime(clientX - rect.left);
+      for (const fill of aiFills) {
+        if (time >= fill.startTime && time <= fill.startTime + fill.duration) return fill;
+      }
+      return null;
+    },
+    [aiFills, showFills, xToTime]
   );
 
   const handleMouseDown = useCallback(
@@ -509,10 +526,17 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
         return;
       }
 
+      // Check if clicking on an AI fill region
+      const fill = getFillAtX(e.clientX);
+      if (fill) {
+        selectFill(fill);
+        return;
+      }
+
       const cut = getCutAtX(e.clientX);
       if (cut) toggleCut(cut.id);
     },
-    [razorMode, razorStart, setRazorStart, addManualCut, getCutAtX, toggleCut, xToTime, snapTime]
+    [razorMode, razorStart, setRazorStart, addManualCut, getCutAtX, getFillAtX, selectFill, toggleCut, xToTime, snapTime]
   );
 
   // Attach wheel handler as non-passive so preventDefault works for Ctrl+Scroll
