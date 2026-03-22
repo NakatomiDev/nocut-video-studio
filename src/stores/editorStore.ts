@@ -18,6 +18,9 @@ export interface ManualCut {
   duration: number;
 }
 
+export const FILL_DURATION_OPTIONS = [1, 2, 3, 5] as const;
+export const BUSINESS_FILL_DURATION_OPTIONS = [1, 2, 3, 5, 10] as const;
+
 interface CreditBalance {
   total: number;
   monthly: number;
@@ -32,6 +35,8 @@ interface EditorState {
   activeCuts: Set<string>;
   manualCuts: ManualCut[];
   activeManualCuts: Set<string>;
+  /** Maps cutId → selected AI fill duration in seconds (0 = no fill, just cut) */
+  fillDurations: Map<string, number>;
   playheadPosition: number;
   isPlaying: boolean;
   zoomLevel: number;
@@ -48,6 +53,7 @@ interface EditorState {
   addManualCut: (start: number, end: number) => void;
   removeManualCut: (id: string) => void;
   toggleManualCut: (cutId: string) => void;
+  setFillDuration: (cutId: string, seconds: number) => void;
   setPlayhead: (time: number) => void;
   play: () => void;
   pause: () => void;
