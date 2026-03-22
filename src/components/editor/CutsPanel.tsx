@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useEditorStore, FILL_DURATION_OPTIONS, BUSINESS_FILL_DURATION_OPTIONS, type AiFill } from '@/stores/editorStore';
+import { useEditorStore, FILL_DURATION_OPTIONS, BUSINESS_FILL_DURATION_OPTIONS, AI_FILL_MODELS, MODEL_CREDITS_PER_SEC, DEFAULT_AI_FILL_MODEL, type AiFill, type AiFillModel } from '@/stores/editorStore';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -54,6 +54,8 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     removeManualCut,
     fillDurations,
     setFillDuration,
+    fillModels,
+    setFillModel,
     creditEstimate,
     creditBalance,
     setCreditBalance,
@@ -119,12 +121,14 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
           end: c.end,
           type: c.type,
           fill_duration: fillDurations.get(c.id) || 0,
+          model: fillModels.get(c.id) ?? DEFAULT_AI_FILL_MODEL,
         })),
         ...activeManualList.map((c) => ({
           start: c.start,
           end: c.end,
           type: 'manual',
           fill_duration: fillDurations.get(c.id) || 0,
+          model: fillModels.get(c.id) ?? DEFAULT_AI_FILL_MODEL,
         })),
       ].sort((a, b) => a.start - b.start);
 
@@ -176,13 +180,14 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     } finally {
       setExporting(false);
     }
-  }, [project, cuts, activeCuts, manualCuts, activeManualCuts, fillDurations, creditEstimate]);
+  }, [project, cuts, activeCuts, manualCuts, activeManualCuts, fillDurations, fillModels, creditEstimate]);
 
   const renderFillSelector = (cutId: string) => {
     const currentFill = fillDurations.get(cutId) || 0;
+    const currentModel = fillModels.get(cutId) ?? DEFAULT_AI_FILL_MODEL;
+    const creditsPerSec = MODEL_CREDITS_PER_SEC[currentModel];
     // Check if this cut already has a generated AI fill
     const generatedFill = aiFills.find((f) => {
-      // Match by approximate start time of the cut's end
       const allCuts = [...cuts, ...manualCuts.map((c) => ({ ...c, type: 'manual' }))];
       const cut = allCuts.find((c) => c.id === cutId);
       if (!cut) return false;
@@ -190,38 +195,66 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     });
 
     return (
-      <div className="flex items-center gap-2 pl-5 mt-1">
-        {generatedFill ? (
-          <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
-        ) : (
-          <Sparkles className="h-3 w-3 text-primary shrink-0" />
-        )}
-        <span className="text-[10px] text-muted-foreground whitespace-nowrap">AI Fill:</span>
-        <Select
-          value={currentFill > 0 ? String(currentFill) : 'none'}
-          onValueChange={(val) => {
-            setFillDuration(cutId, val === 'none' ? 0 : Number(val));
-          }}
-        >
-          <SelectTrigger
-            className="h-6 w-[100px] text-[10px] px-2"
-            onClick={(e) => e.stopPropagation()}
+      <div className="flex flex-col gap-1.5 pl-5 mt-1">
+        <div className="flex items-center gap-2">
+          {generatedFill ? (
+            <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
+          ) : (
+            <Sparkles className="h-3 w-3 text-primary shrink-0" />
+          )}
+          <span className="text-[10px] text-muted-foreground whitespace-nowrap">AI Fill:</span>
+          <Select
+            value={currentFill > 0 ? String(currentFill) : 'none'}
+            onValueChange={(val) => {
+              setFillDuration(cutId, val === 'none' ? 0 : Number(val));
+            }}
           >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">None (free)</SelectItem>
-            {fillOptions.map((sec) => (
-              <SelectItem key={sec} value={String(sec)}>
-                {sec}s ({sec} credit{sec > 1 ? 's' : ''})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {generatedFill && (
-          <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[9px] ml-1">
-            Generated
-          </Badge>
+            <SelectTrigger
+              className="h-6 w-[100px] text-[10px] px-2"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">None (free)</SelectItem>
+              {fillOptions.map((sec) => {
+                const credits = sec * creditsPerSec;
+                return (
+                  <SelectItem key={sec} value={String(sec)}>
+                    {sec}s ({credits} credit{credits > 1 ? 's' : ''})
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+          {generatedFill && (
+            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[9px] ml-1">
+              Generated
+            </Badge>
+          )}
+        </div>
+        {currentFill > 0 && (
+          <div className="flex items-center gap-2 pl-5">
+            <span className="text-[10px] text-muted-foreground whitespace-nowrap">Model:</span>
+            <Select
+              value={currentModel}
+              onValueChange={(val) => setFillModel(cutId, val as AiFillModel)}
+            >
+              <SelectTrigger
+                className="h-6 w-[150px] text-[10px] px-2"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {AI_FILL_MODELS.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.label} ({m.creditsPerSec}cr/s)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         )}
       </div>
     );
@@ -267,7 +300,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
           {cuts.length + manualCuts.length} total · {activeCuts.size + activeManualCuts.size} active
         </p>
         <p className="mt-0.5 text-[10px] text-muted-foreground">
-          Cuts are free · AI fills cost 1–6 credits/sec by model
+          Cuts are free · AI fill cost depends on model selected
         </p>
       </div>
 
