@@ -393,6 +393,18 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
       }
     }
 
+    // --- Inserted fill indicators (solid green bottom bar) ---
+    if (showFills && aiFills.length > 0) {
+      for (const fill of aiFills) {
+        if (!insertedFills.has(fill.id)) continue;
+        const fx1 = timeToX(fill.startTime) - scrollLeft;
+        const fx2 = timeToX(fill.startTime + fill.duration) - scrollLeft;
+        if (fx2 < 0 || fx1 > w) continue;
+        ctx.fillStyle = 'hsla(160, 70%, 45%, 0.8)';
+        ctx.fillRect(fx1, overlayY + overlayH - 3, fx2 - fx1, 3);
+      }
+    }
+
     // --- Playhead (full height) ---
     const playX = timeToX(playheadPosition) - scrollLeft;
     if (playX >= 0 && playX <= w) {
