@@ -355,19 +355,19 @@ authorization_url_path = "/oauth/consent"
 allow_dynamic_registration = false
 
 [functions.upload-initiate]
-verify_jwt = true
+verify_jwt = false
 
 [functions.upload-chunk-complete]
-verify_jwt = true
+verify_jwt = false
 
 [functions.upload-complete]
-verify_jwt = true
+verify_jwt = false
 
 [functions.get-signed-url]
-verify_jwt = true
+verify_jwt = false
 
 [functions.process-ai-fill]
-verify_jwt = true
+verify_jwt = false
 
 [edge_runtime]
 enabled = true
