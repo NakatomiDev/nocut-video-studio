@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useEditorStore } from '@/stores/editorStore';
 import type { AiFill } from '@/stores/editorStore';
@@ -7,16 +7,19 @@ import VideoPlayer from '@/components/editor/VideoPlayer';
 import WaveformTimeline from '@/components/editor/WaveformTimeline';
 import CutsPanel from '@/components/editor/CutsPanel';
 import FillPreviewPanel from '@/components/editor/FillPreviewPanel';
+import ExportProgress from '@/components/ExportProgress';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Loader2, AlertTriangle } from 'lucide-react';
 
 const ProjectEditor = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { project, video, setProject, setVideo, setCutMap, setAiFills, reset } = useEditorStore();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [processingStatus, setProcessingStatus] = useState<string | null>(null);
+  const [showExportProgress, setShowExportProgress] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [waveformUrl, setWaveformUrl] = useState<string | null>(null);
   const [thumbnailSpriteUrl, setThumbnailSpriteUrl] = useState<string | null>(null);
@@ -65,6 +68,13 @@ const ProjectEditor = () => {
       setProject(proj);
       setTitle(proj.title);
 
+      // If status is generating/exporting, show export progress
+      if (['generating', 'exporting'].includes(proj.status)) {
+        setShowExportProgress(true);
+        setLoading(false);
+        return;
+      }
+
       // Check status
       if (proj.status === 'failed') {
         setError(proj.error_message || 'Processing failed');
@@ -72,7 +82,7 @@ const ProjectEditor = () => {
         return;
       }
 
-      if (['uploading', 'transcoding', 'detecting', 'generating', 'exporting'].includes(proj.status)) {
+      if (['uploading', 'transcoding', 'detecting'].includes(proj.status)) {
         setProcessingStatus(proj.status);
         setLoading(false);
         return;
@@ -179,14 +189,18 @@ const ProjectEditor = () => {
           const updated = payload.new as any;
           setProject(updated);
           if (updated.status === 'ready' || updated.status === 'complete') {
-            if (processingStatus) {
+            if (processingStatus || showExportProgress) {
               setProcessingStatus(null);
+              setShowExportProgress(false);
               window.location.reload();
             }
           } else if (updated.status === 'failed') {
             setProcessingStatus(null);
             setError(updated.error_message || 'Processing failed');
-          } else if (['uploading', 'transcoding', 'detecting', 'generating', 'exporting'].includes(updated.status)) {
+          } else if (['generating', 'exporting'].includes(updated.status)) {
+            setShowExportProgress(true);
+            setProcessingStatus(null);
+          } else if (['uploading', 'transcoding', 'detecting'].includes(updated.status)) {
             setProcessingStatus(updated.status);
           }
         }
@@ -194,7 +208,7 @@ const ProjectEditor = () => {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [projectId, processingStatus, setProject]);
+  }, [projectId, processingStatus, showExportProgress, setProject]);
 
   const saveTitle = async () => {
     if (!projectId || !title.trim()) return;
@@ -202,12 +216,28 @@ const ProjectEditor = () => {
     await supabase.from('projects').update({ title: title.trim() }).eq('id', projectId);
   };
 
+  // Also show export progress if ?exporting=true query param
+  useEffect(() => {
+    if (searchParams.get('exporting') === 'true' && projectId) {
+      setShowExportProgress(true);
+    }
+  }, [searchParams, projectId]);
+
+  const handleExportComplete = (exportId: string) => {
+    if (projectId) {
+      navigate(`/project/${projectId}/export/${exportId}`);
+    }
+  };
+
+  const handleExportRetry = () => {
+    setShowExportProgress(false);
+    setError(null);
+  };
+
   const statusMessages: Record<string, { text: string; sub: string }> = {
     uploading: { text: 'Uploading...', sub: 'Your video is being uploaded' },
     transcoding: { text: 'Processing your video...', sub: 'Creating proxy and waveform' },
     detecting: { text: 'Analyzing audio...', sub: 'Detecting silences and pauses' },
-    generating: { text: 'Generating AI fills...', sub: 'Creating smooth transitions for your cuts' },
-    exporting: { text: 'Exporting...', sub: 'Rendering your final video' },
   };
 
   if (loading) {
@@ -215,6 +245,16 @@ const ProjectEditor = () => {
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
+    );
+  }
+
+  if (showExportProgress && projectId) {
+    return (
+      <ExportProgress
+        projectId={projectId}
+        onComplete={handleExportComplete}
+        onRetry={handleExportRetry}
+      />
     );
   }
 
