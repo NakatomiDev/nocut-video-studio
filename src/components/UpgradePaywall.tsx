@@ -66,13 +66,17 @@ const PRODUCT_TO_TIER: Record<string, string> = {
 
 function formatPrice(pkg: Package | undefined): string {
   if (!pkg?.webBillingProduct) return "—";
-  const product = pkg.webBillingProduct;
-  const price = product.normalPurchasePrice;
+  const product = pkg.webBillingProduct as any;
+  const price = product.normalPurchasePrice ?? product.defaultPurchasePrice ?? product.currentPrice;
   if (!price) return "—";
+  const currency = price.currencyCode ?? price.currency ?? "USD";
+  const amount = price.amountMicros != null
+    ? price.amountMicros / 1_000_000
+    : price.amount ?? 0;
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: price.currencyCode,
-  }).format(price.amountMicros / 1_000_000);
+    currency,
+  }).format(amount);
 }
 
 export const UpgradePaywall = ({
