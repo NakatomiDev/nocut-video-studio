@@ -21,9 +21,18 @@ export async function getAuthenticatedUser(
     { global: { headers: { Authorization: authHeader } } },
   );
 
+  // Try getClaims first (works with signing-keys JWTs), fall back to getUser
+  const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
+  if (!claimsError && claimsData?.claims?.sub) {
+    return {
+      user: { id: claimsData.claims.sub, email: claimsData.claims.email } as User,
+      supabaseClient,
+    };
+  }
+
   const { data, error } = await supabaseClient.auth.getUser(token);
   if (error || !data.user) {
-    throw new AuthError(error?.message ?? "Invalid token");
+    throw new AuthError(error?.message ?? claimsError?.message ?? "Invalid token");
   }
 
   return { user: data.user, supabaseClient };
