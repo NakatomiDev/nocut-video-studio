@@ -121,7 +121,12 @@ export function useCreditsTopup() {
       const result = data?.data ?? data;
       const checkoutUrl = result?.checkout_url;
       if (checkoutUrl) {
-        window.location.href = checkoutUrl;
+        // Open in new tab — Stripe Checkout blocks iframe embedding
+        const newWindow = window.open(checkoutUrl, "_blank");
+        if (!newWindow) {
+          // Fallback if popup blocked
+          window.location.href = checkoutUrl;
+        }
       }
     } catch (err) {
       console.error("Top-up error:", err);
