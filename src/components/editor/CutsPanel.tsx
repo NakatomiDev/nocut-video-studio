@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useEditorStore, FILL_DURATION_OPTIONS, BUSINESS_FILL_DURATION_OPTIONS } from '@/stores/editorStore';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { X, AlertTriangle, Sparkles } from 'lucide-react';
 import CutThumbnail from './CutThumbnail';
+import ExactVideoFrame from './ExactVideoFrame';
 import {
   Select,
   SelectContent,
@@ -210,12 +211,30 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   const renderPreview = (start: number, end: number) => (
     <div className="flex items-center gap-2 pl-5">
       <div className="flex flex-col items-center gap-0.5">
-        <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={start} duration={duration} width={72} height={40} />
+        {videoUrl ? (
+          <ExactVideoFrame
+            videoUrl={videoUrl}
+            time={start}
+            label={`Start frame ${formatTimestamp(start)}`}
+            className="h-10 w-[72px]"
+          />
+        ) : (
+          <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={start} duration={duration} width={72} height={40} />
+        )}
         <span className="text-[9px] text-muted-foreground font-mono">Start</span>
       </div>
       <div className="flex-1 border-t border-dashed border-muted-foreground/30" />
       <div className="flex flex-col items-center gap-0.5">
-        <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={end} duration={duration} width={72} height={40} />
+        {videoUrl ? (
+          <ExactVideoFrame
+            videoUrl={videoUrl}
+            time={end}
+            label={`End frame ${formatTimestamp(end)}`}
+            className="h-10 w-[72px]"
+          />
+        ) : (
+          <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={end} duration={duration} width={72} height={40} />
+        )}
         <span className="text-[9px] text-muted-foreground font-mono">End</span>
       </div>
     </div>
@@ -426,7 +445,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                         )}
                       </div>
 
-                      {isExpanded && thumbnailSpriteUrl && (
+                      {isExpanded && (videoUrl || thumbnailSpriteUrl) && (
                         <div className="px-3 pb-3 pt-1 border-t border-border/50">
                           <div className="flex items-stretch gap-3">
                             <div className="flex flex-col items-center gap-1 flex-1">
@@ -435,7 +454,16 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                                 className="rounded ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover:opacity-80 transition-opacity cursor-zoom-in"
                                 onClick={(e) => { e.stopPropagation(); setLightbox({ time: edit.start, label: `Before cut · ${formatTimestamp(edit.start)}` }); }}
                               >
-                                <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={edit.start} duration={duration} width={180} height={100} />
+                                {videoUrl ? (
+                                  <ExactVideoFrame
+                                    videoUrl={videoUrl}
+                                    time={edit.start}
+                                    label={`Before cut ${formatTimestamp(edit.start)}`}
+                                    className="h-[100px] w-[180px]"
+                                  />
+                                ) : (
+                                  <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={edit.start} duration={duration} width={180} height={100} />
+                                )}
                               </button>
                               <span className="text-[10px] font-mono text-muted-foreground">{formatTimestamp(edit.start)}</span>
                             </div>
@@ -452,7 +480,16 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                                 className="rounded ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover:opacity-80 transition-opacity cursor-zoom-in"
                                 onClick={(e) => { e.stopPropagation(); setLightbox({ time: edit.end, label: `After cut · ${formatTimestamp(edit.end)}` }); }}
                               >
-                                <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={edit.end} duration={duration} width={180} height={100} />
+                                {videoUrl ? (
+                                  <ExactVideoFrame
+                                    videoUrl={videoUrl}
+                                    time={edit.end}
+                                    label={`After cut ${formatTimestamp(edit.end)}`}
+                                    className="h-[100px] w-[180px]"
+                                  />
+                                ) : (
+                                  <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={edit.end} duration={duration} width={180} height={100} />
+                                )}
                               </button>
                               <span className="text-[10px] font-mono text-muted-foreground">{formatTimestamp(edit.end)}</span>
                             </div>
@@ -493,7 +530,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
         </DialogContent>
       </Dialog>
 
-      {/* Lightbox for zoomed frame — uses video seek for full-res */}
+      {/* Lightbox for zoomed frame */}
       <Dialog open={!!lightbox} onOpenChange={(open) => { if (!open) setLightbox(null); }}>
         <DialogContent className="max-w-2xl p-0 overflow-hidden bg-black/95 border-border">
           <DialogHeader className="p-4 pb-2">
@@ -501,75 +538,20 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
             <DialogDescription className="sr-only">Full resolution frame preview</DialogDescription>
           </DialogHeader>
           <div className="flex items-center justify-center p-4 pt-0">
-            {lightbox && <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={lightbox.time} duration={duration} width={560} height={315} />}
+            {lightbox && (videoUrl ? (
+              <ExactVideoFrame
+                videoUrl={videoUrl}
+                time={lightbox.time}
+                label={lightbox.label}
+                className="aspect-video w-full max-w-[min(80vw,960px)]"
+              />
+            ) : (
+              <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={lightbox.time} duration={duration} width={560} height={315} />
+            ))}
           </div>
         </DialogContent>
       </Dialog>
     </div>
-  );
-};
-
-/** Full-resolution frame preview by seeking a hidden video element */
-const LightboxFrame = ({ videoUrl, time }: { videoUrl?: string | null; time: number }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    if (!videoUrl) return;
-    setReady(false);
-    let cancelled = false;
-
-    const video = document.createElement('video');
-    video.crossOrigin = 'anonymous';
-    video.preload = 'auto';
-    video.muted = true;
-    video.src = videoUrl;
-
-    video.onloadeddata = () => {
-      if (cancelled) return;
-      video.currentTime = time;
-    };
-
-    video.onseeked = () => {
-      if (cancelled) return;
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-
-      const vw = video.videoWidth;
-      const vh = video.videoHeight;
-      const maxW = 560;
-      const scale = Math.min(1, maxW / vw);
-      const w = Math.round(vw * scale);
-      const h = Math.round(vh * scale);
-
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = w * dpr;
-      canvas.height = h * dpr;
-      canvas.style.width = `${w}px`;
-      canvas.style.height = `${h}px`;
-
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      ctx.scale(dpr, dpr);
-      ctx.drawImage(video, 0, 0, w, h);
-      setReady(true);
-    };
-
-    video.onerror = () => { if (!cancelled) setReady(false); };
-
-    return () => { cancelled = true; };
-  }, [videoUrl, time]);
-
-  if (!videoUrl) {
-    return <div className="w-[560px] h-[315px] bg-muted rounded-lg flex items-center justify-center text-muted-foreground text-sm">No video available</div>;
-  }
-
-  return (
-    <canvas
-      ref={canvasRef}
-      className={`rounded-lg ${ready ? '' : 'bg-muted'}`}
-      style={{ display: 'block', maxWidth: '100%' }}
-    />
   );
 };
 
