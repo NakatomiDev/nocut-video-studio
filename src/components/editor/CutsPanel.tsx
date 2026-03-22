@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { X, AlertTriangle } from 'lucide-react';
+import CutThumbnail from './CutThumbnail';
 import {
   Dialog,
   DialogContent,
@@ -27,7 +28,11 @@ const typeBadgeClass: Record<string, string> = {
   retake: 'bg-red-500/20 text-red-400 border-red-500/30',
 };
 
-const CutsPanel = () => {
+interface CutsPanelProps {
+  videoUrl?: string | null;
+}
+
+const CutsPanel = ({ videoUrl }: CutsPanelProps) => {
   const {
     cuts,
     activeCuts,
@@ -165,34 +170,49 @@ const CutsPanel = () => {
           {manualCuts.map((cut) => (
             <div
               key={cut.id}
-              className="flex items-center gap-3 rounded-md p-3 hover:bg-secondary/50 transition-colors cursor-pointer"
+              className="flex flex-col gap-2 rounded-md p-3 hover:bg-secondary/50 transition-colors cursor-pointer"
               onClick={() => setPlayhead(cut.start)}
             >
-              <div className="h-2 w-2 rounded-full bg-violet-500 shrink-0" />
-              <Switch
-                checked={activeManualCuts.has(cut.id)}
-                onCheckedChange={() => toggleManualCut(cut.id)}
-                onClick={(e) => e.stopPropagation()}
-              />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="border-violet-500/30 text-violet-400 bg-violet-500/20">
-                    manual
-                  </Badge>
-                  <span className="text-xs text-muted-foreground">{cut.duration.toFixed(1)}s</span>
+              <div className="flex items-center gap-3">
+                <div className="h-2 w-2 rounded-full bg-violet-500 shrink-0" />
+                <Switch
+                  checked={activeManualCuts.has(cut.id)}
+                  onCheckedChange={() => toggleManualCut(cut.id)}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="border-violet-500/30 text-violet-400 bg-violet-500/20">
+                      manual
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">{cut.duration.toFixed(1)}s</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1 font-mono">
+                    {formatTimestamp(cut.start)} → {formatTimestamp(cut.end)}
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1 font-mono">
-                  {formatTimestamp(cut.start)} → {formatTimestamp(cut.end)}
-                </p>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive"
+                  onClick={(e) => { e.stopPropagation(); removeManualCut(cut.id); }}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive"
-                onClick={(e) => { e.stopPropagation(); removeManualCut(cut.id); }}
-              >
-                <X className="h-3 w-3" />
-              </Button>
+              {activeManualCuts.has(cut.id) && videoUrl && (
+                <div className="flex items-center gap-2 pl-5">
+                  <div className="flex flex-col items-center gap-0.5">
+                    <CutThumbnail videoUrl={videoUrl} time={cut.start} width={72} height={40} />
+                    <span className="text-[9px] text-muted-foreground font-mono">Start</span>
+                  </div>
+                  <div className="flex-1 border-t border-dashed border-muted-foreground/30" />
+                  <div className="flex flex-col items-center gap-0.5">
+                    <CutThumbnail videoUrl={videoUrl} time={cut.end} width={72} height={40} />
+                    <span className="text-[9px] text-muted-foreground font-mono">End</span>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
