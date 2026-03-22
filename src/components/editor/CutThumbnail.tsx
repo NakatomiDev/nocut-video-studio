@@ -1,82 +1,81 @@
-import { useRef, useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface CutThumbnailProps {
-  videoUrl: string;
+  spriteUrl?: string | null;
   time: number;
+  duration: number;
   width?: number;
   height?: number;
   className?: string;
 }
 
-const CutThumbnail = ({ videoUrl, time, width = 80, height = 45, className = '' }: CutThumbnailProps) => {
+const CutThumbnail = ({
+  spriteUrl,
+  time,
+  duration,
+  width = 80,
+  height = 45,
+  className = '',
+}: CutThumbnailProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [captured, setCaptured] = useState(false);
-  const [error, setError] = useState(false);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!videoUrl || time < 0) return;
+    const canvas = canvasRef.current;
+    if (!canvas || !spriteUrl || duration <= 0) {
+      setReady(false);
+      return;
+    }
+
     let cancelled = false;
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
 
-    const capture = async () => {
-      const video = document.createElement('video');
-      video.crossOrigin = 'anonymous';
-      video.preload = 'auto';
-      video.muted = true;
-      video.playsInline = true;
-      video.src = videoUrl;
-
-      // Wait for enough data to seek
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('load timeout')), 10000);
-        video.oncanplay = () => { clearTimeout(timeout); resolve(); };
-        video.onerror = () => { clearTimeout(timeout); reject(new Error('video load error')); };
-        video.load();
-      });
-
+    image.onload = () => {
       if (cancelled) return;
-
-      // Seek to the target time
-      video.currentTime = Math.max(0, time);
-
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('seek timeout')), 5000);
-        video.onseeked = () => { clearTimeout(timeout); resolve(); };
-        video.onerror = () => { clearTimeout(timeout); reject(new Error('seek error')); };
-      });
-
-      if (cancelled) return;
-
-      const canvas = canvasRef.current;
-      if (!canvas) return;
 
       const dpr = window.devicePixelRatio || 1;
       canvas.width = width * dpr;
       canvas.height = height * dpr;
+
       const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+      if (!ctx) {
+        setReady(false);
+        return;
+      }
 
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      setCaptured(true);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.scale(dpr, dpr);
 
-      // Cleanup
-      video.src = '';
-      video.load();
+      const ratio = Math.max(0, Math.min(1, time / duration));
+      const sourceHeight = image.naturalHeight;
+      const sourceWidth = Math.min(
+        image.naturalWidth,
+        Math.max(sourceHeight * (width / height), sourceHeight)
+      );
+      const sourceX = Math.max(0, Math.min(image.naturalWidth - sourceWidth, ratio * image.naturalWidth - sourceWidth / 2));
+
+      ctx.drawImage(image, sourceX, 0, sourceWidth, sourceHeight, 0, 0, width, height);
+      setReady(true);
     };
 
-    setCaptured(false);
-    setError(false);
-    capture().catch((err) => {
-      console.warn('CutThumbnail capture failed:', err?.message, 'time:', time);
-      if (!cancelled) setError(true);
-    });
+    image.onerror = () => {
+      if (!cancelled) setReady(false);
+    };
 
-    return () => { cancelled = true; };
-  }, [videoUrl, time, width, height]);
+    setReady(false);
+    image.src = spriteUrl;
+
+    return () => {
+      cancelled = true;
+    };
+  }, [spriteUrl, time, duration, width, height]);
 
   return (
     <canvas
       ref={canvasRef}
-      className={`rounded border border-border ${!captured ? 'bg-muted' : ''} ${className}`}
+      className={`rounded border border-border ${ready ? '' : 'bg-muted'} ${className}`}
       style={{ width, height, display: 'block' }}
     />
   );
