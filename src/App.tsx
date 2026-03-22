@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AppLayout from "@/components/AppLayout";
+import Landing from "@/pages/Landing";
 import SignUp from "@/pages/SignUp";
 import SignIn from "@/pages/SignIn";
 import Dashboard from "@/pages/Dashboard";
@@ -15,7 +16,6 @@ import Upload from "@/pages/Upload";
 import ProjectEditor from "@/pages/ProjectEditor";
 import NotFound from "@/pages/NotFound";
 import { Loader2 } from "lucide-react";
-
 const queryClient = new QueryClient();
 
 const RootRedirect = () => {
