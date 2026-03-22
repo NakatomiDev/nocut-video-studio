@@ -159,7 +159,7 @@ const ProjectEditor = () => {
                 gapIndex: f.gap_index,
                 startTime: gapEntry?.end ?? 0,
                 duration: f.duration ?? gapEntry?.fill_duration ?? 0,
-                s3Key: f.provider === 'mock' ? (vid.proxy_s3_key || vid.s3_key) : f.s3_key,
+                s3Key: f.s3_key,
                 provider: f.provider,
                 qualityScore: f.quality_score,
                 method: f.method,

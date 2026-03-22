@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { Tables } from '@/integrations/supabase/types';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface AiFill {
   id: string;
@@ -160,6 +161,39 @@ const calcCredits = (fillDurations: Map<string, number>, fillModels: Map<string,
 
 let manualCutCounter = 0;
 
+/** Persist manual cuts alongside auto-detected cuts in the cut_maps row */
+function persistManualCuts(
+  cutMap: Tables<'cut_maps'> | null,
+  autoCuts: Cut[],
+  manualCuts: ManualCut[],
+) {
+  if (!cutMap) return;
+  const autoRaw = autoCuts.map((c) => ({
+    id: c.id,
+    start: c.start,
+    end: c.end,
+    type: c.type,
+    duration: c.duration,
+    confidence: c.confidence,
+    auto_accept: c.auto_accept,
+  }));
+  const manualRaw = manualCuts.map((c) => ({
+    id: c.id,
+    start: c.start,
+    end: c.end,
+    type: 'manual',
+    duration: c.duration,
+  }));
+  const combined = [...autoRaw, ...manualRaw];
+  supabase
+    .from('cut_maps')
+    .update({ cuts_json: combined as any })
+    .eq('id', cutMap.id)
+    .then(({ error }) => {
+      if (error) console.error('[editorStore] Failed to persist manual cuts:', error);
+    });
+}
+
 export const useEditorStore = create<EditorState>((set) => ({
   project: null,
   video: null,
@@ -189,7 +223,11 @@ export const useEditorStore = create<EditorState>((set) => ({
   setVideo: (video) => set({ video }),
   setCutMap: (cutMap) => {
     const rawCuts = (cutMap.cuts_json as any[]) || [];
-    const cuts: Cut[] = rawCuts.map((c, i) => ({
+    // Separate auto-detected cuts from manual cuts
+    const autoCuts = rawCuts.filter((c) => c.type !== 'manual');
+    const manualRaw = rawCuts.filter((c) => c.type === 'manual');
+    
+    const cuts: Cut[] = autoCuts.map((c, i) => ({
       id: c.id || `cut-${i}`,
       start: c.start ?? c.start_time ?? 0,
       end: c.end ?? c.end_time ?? 0,
@@ -198,11 +236,33 @@ export const useEditorStore = create<EditorState>((set) => ({
       confidence: c.confidence ?? 0,
       auto_accept: c.auto_accept ?? false,
     }));
+    
+    const manualCuts: ManualCut[] = manualRaw.map((c, i) => {
+      const id = c.id || `manual-${++manualCutCounter}`;
+      return {
+        id,
+        start: c.start ?? 0,
+        end: c.end ?? 0,
+        duration: (c.end ?? 0) - (c.start ?? 0),
+      };
+    });
+    // Update counter to avoid ID collisions
+    if (manualCuts.length > 0) {
+      const maxIdx = Math.max(...manualCuts.map(c => {
+        const match = c.id.match(/manual-(\d+)/);
+        return match ? parseInt(match[1], 10) : 0;
+      }));
+      if (maxIdx > manualCutCounter) manualCutCounter = maxIdx;
+    }
+    
     const activeCuts = new Set(cuts.filter((c) => c.auto_accept).map((c) => c.id));
+    const activeManualCuts = new Set(manualCuts.map((c) => c.id));
     set({
       cutMap,
       cuts,
       activeCuts,
+      manualCuts,
+      activeManualCuts,
       fillDurations: new Map(),
       fillModels: new Map(),
       creditEstimate: 0,
@@ -238,6 +298,8 @@ export const useEditorStore = create<EditorState>((set) => ({
       const manualCuts = [...state.manualCuts, cut];
       const activeManualCuts = new Set(state.activeManualCuts);
       activeManualCuts.add(id);
+      // Persist to DB
+      persistManualCuts(state.cutMap, state.cuts, manualCuts);
       return {
         manualCuts,
         activeManualCuts,
@@ -253,6 +315,8 @@ export const useEditorStore = create<EditorState>((set) => ({
       nextFills.delete(id);
       const nextModels = new Map(state.fillModels);
       nextModels.delete(id);
+      // Persist to DB
+      persistManualCuts(state.cutMap, state.cuts, manualCuts);
       return {
         manualCuts,
         activeManualCuts,
