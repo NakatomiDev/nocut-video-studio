@@ -1,4 +1,4 @@
-import { S3Client, CopyObjectCommand, PutObjectCommand } from "npm:@aws-sdk/client-s3";
+import { S3Client, CopyObjectCommand, PutObjectCommand, GetObjectCommand } from "npm:@aws-sdk/client-s3";
 import { handleCors } from "../_shared/cors.ts";
 import {
   getAuthenticatedUser,
@@ -195,16 +195,22 @@ Deno.serve(async (req) => {
 
       const generationStart = Date.now();
 
+      // Try to load boundary frames from S3 (extracted by transcoder service)
+      const firstFrameBase64 = await loadFrameBase64(project.id, gap.end);
+      const lastFrameBase64 = await loadFrameBase64(project.id, gap.end + gap.fill_duration);
+
       let fillResult: FillResponse;
       try {
         fillResult = await generateAiFill({
           projectId: project.id,
           editDecisionId: editDecision.id,
           gapIndex: gap.gap_index,
-          startTime: gap.end, // fill starts where the cut ends
+          startTime: gap.end,
           duration: gap.fill_duration,
           sourceVideoKey,
           model: gap.model ?? defaultModel,
+          firstFrameBase64,
+          lastFrameBase64,
         });
       } catch (fillErr) {
         const msg = `AI fill generation failed for gap ${gap.gap_index}: ${(fillErr as Error).message}`;
@@ -278,6 +284,38 @@ Deno.serve(async (req) => {
 });
 
 // ---------------------------------------------------------------------------
+// Load a boundary frame from S3 as base64 (if available)
+// ---------------------------------------------------------------------------
+
+async function loadFrameBase64(projectId: string, timestamp: number): Promise<string | null> {
+  const bucket = Deno.env.get("AWS_S3_BUCKET");
+  if (!bucket) return null;
+
+  const frameName = `frame_${timestamp.toFixed(3).replace(".", "_")}.png`;
+  const s3Key = `frames/${projectId}/${frameName}`;
+
+  try {
+    const response = await getS3Client().send(new GetObjectCommand({
+      Bucket: bucket,
+      Key: s3Key,
+    }));
+
+    if (!response.Body) return null;
+
+    const bytes = new Uint8Array(await response.Body.transformToByteArray());
+    // Convert to base64
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  } catch {
+    // Frame not available — will generate without conditioning
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // AI Fill Provider
 // ---------------------------------------------------------------------------
 
@@ -289,6 +327,8 @@ interface FillRequest {
   duration: number;
   sourceVideoKey?: string | null;
   model?: string | null;
+  firstFrameBase64?: string | null;
+  lastFrameBase64?: string | null;
 }
 
 interface FillResponse {
@@ -299,90 +339,93 @@ interface FillResponse {
 }
 
 async function generateAiFill(request: FillRequest): Promise<FillResponse> {
-  const provider = Deno.env.get("AI_FILL_PROVIDER");
   const model = request.model ?? "veo3.1-fast";
-
-  if (provider === "veo") {
-    // No fallback — let failures propagate so we can debug them
-    return await generateVeoFill(request, model);
-  }
-
-  throw new Error(`AI_FILL_PROVIDER "${provider || "(not set)"}" is not a supported provider. Set it to "veo" in Edge Function secrets.`);
-}
-
-async function generateMockFill(request: FillRequest, model: string): Promise<FillResponse> {
-  const simulatedMs = Math.max(500, request.duration * 500);
-  await new Promise((resolve) => setTimeout(resolve, simulatedMs));
-
-  const s3Key = `ai-fills/${request.projectId}/${request.editDecisionId}/gap_${request.gapIndex}_${request.duration}s.mp4`;
-  const bucket = Deno.env.get("AWS_S3_BUCKET");
-
-  if (bucket && request.sourceVideoKey) {
-    try {
-      await getS3Client().send(new CopyObjectCommand({
-        Bucket: bucket,
-        Key: s3Key,
-        CopySource: `${bucket}/${request.sourceVideoKey}`,
-        ContentType: "video/mp4",
-        MetadataDirective: "REPLACE",
-      }));
-    } catch (error) {
-      console.error("Mock fill S3 copy failed:", error);
-    }
-  } else {
-    console.warn("Mock fill source video missing; preview object will not exist", {
-      sourceVideoKey: request.sourceVideoKey,
-      hasBucket: Boolean(bucket),
-    });
-  }
-
-  return {
-    s3_key: s3Key,
-    provider: "mock",
-    model,
-    quality_score: 0.85,
-  };
+  return await generateVeoFill(request, model);
 }
 
 async function generateVeoFill(request: FillRequest, model: string): Promise<FillResponse> {
+  const gcpProjectId = Deno.env.get("GCP_PROJECT_ID");
+  const gcpRegion = Deno.env.get("GCP_REGION") || "us-central1";
   const apiKey = Deno.env.get("GOOGLE_AI_API_KEY");
+
   if (!apiKey) {
     throw new Error("GOOGLE_AI_API_KEY is not set — cannot call Veo API");
   }
 
-  // Map our model names to Gemini API model IDs (use -preview suffix for generativelanguage.googleapis.com)
+  // Map our model names to Vertex AI model IDs
   const MODEL_API_IDS: Record<string, string> = {
-    "veo2":                  "veo-2.0-generate-preview",
-    "veo3.1-fast":           "veo-3.1-fast-generate-preview",
-    "veo3.1-fast-audio":     "veo-3.1-fast-generate-preview",
-    "veo3.1-standard":       "veo-3.1-generate-preview",
-    "veo3.1-standard-audio": "veo-3.1-generate-preview",
-    "veo3-standard-audio":   "veo-3.0-generate-preview",
+    "veo2":                  "veo-2.0-generate-001",
+    "veo3.1-fast":           "veo-3.1-fast-generate",
+    "veo3.1-fast-audio":     "veo-3.1-fast-generate",
+    "veo3.1-standard":       "veo-3.1-generate",
+    "veo3.1-standard-audio": "veo-3.1-generate",
+    "veo3-standard-audio":   "veo-3.0-generate",
   };
-  const apiModelId = MODEL_API_IDS[model] ?? "veo-2.0-generate-preview";
+  const apiModelId = MODEL_API_IDS[model] ?? "veo-2.0-generate-001";
   const includeAudio = model.endsWith("-audio");
 
-  // Gemini API uses predictLongRunning endpoint
-  const generateResponse = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${apiModelId}:predictLongRunning`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        instances: [
-          {
-            prompt: `Smooth transition video clip, ${request.duration} seconds, seamless continuity`,
-          },
-        ],
-        parameters: {
-          sampleCount: 1,
-          durationSeconds: request.duration,
-          aspectRatio: "16:9",
-          ...(includeAudio ? { generateAudio: true } : {}),
-        },
-      }),
-    },
-  );
+  // Build the instance with optional first/last frame conditioning
+  const instance: Record<string, unknown> = {
+    prompt: `Smooth transition video clip, ${request.duration} seconds, seamless continuity, natural head movement`,
+  };
+
+  if (request.firstFrameBase64) {
+    instance.image = {
+      bytesBase64Encoded: request.firstFrameBase64,
+      mimeType: "image/png",
+    };
+    console.log("Using first frame conditioning for fill generation");
+  }
+
+  if (request.lastFrameBase64) {
+    instance.lastFrame = {
+      bytesBase64Encoded: request.lastFrameBase64,
+      mimeType: "image/png",
+    };
+    console.log("Using last frame conditioning for fill generation");
+  }
+
+  const parameters: Record<string, unknown> = {
+    sampleCount: 1,
+    durationSeconds: request.duration,
+    aspectRatio: "16:9",
+  };
+
+  if (includeAudio) {
+    parameters.generateAudio = true;
+  }
+
+  // Use Vertex AI endpoint if GCP project is configured, otherwise fall back to Gemini API
+  let generateUrl: string;
+  let authHeaders: Record<string, string>;
+
+  if (gcpProjectId) {
+    // Vertex AI endpoint — supports image conditioning natively
+    generateUrl = `https://${gcpRegion}-aiplatform.googleapis.com/v1/projects/${gcpProjectId}/locations/${gcpRegion}/publishers/google/models/${apiModelId}:predictLongRunning`;
+    authHeaders = {
+      "Content-Type": "application/json",
+      "x-goog-api-key": apiKey,
+    };
+    console.log(`Using Vertex AI endpoint: ${generateUrl}`);
+  } else {
+    // Gemini API fallback — add -preview suffix for model IDs
+    const geminiModelId = apiModelId.endsWith("-preview") ? apiModelId : `${apiModelId}-preview`;
+    generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModelId}:predictLongRunning`;
+    authHeaders = {
+      "Content-Type": "application/json",
+      "x-goog-api-key": apiKey,
+    };
+    console.log(`Using Gemini API endpoint: ${generateUrl}`);
+  }
+
+  const generateResponse = await fetch(generateUrl, {
+    method: "POST",
+    headers: authHeaders,
+    body: JSON.stringify({
+      instances: [instance],
+      parameters,
+    }),
+  });
 
   if (!generateResponse.ok) {
     const body = await generateResponse.text();
@@ -391,6 +434,11 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
 
   const operation = await generateResponse.json();
   const operationName = operation.name;
+
+  // Determine the poll base URL
+  const pollBaseUrl = gcpProjectId
+    ? `https://${gcpRegion}-aiplatform.googleapis.com/v1`
+    : `https://generativelanguage.googleapis.com/v1beta`;
 
   // Poll for completion (up to 5 minutes)
   const maxWaitMs = 300_000;
@@ -401,7 +449,7 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
     await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
 
     const pollResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/${operationName}`,
+      `${pollBaseUrl}/${operationName}`,
       { headers: { "x-goog-api-key": apiKey } },
     );
 
@@ -412,7 +460,6 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
 
     const pollResult = await pollResponse.json();
     if (pollResult.done) {
-      // predictLongRunning returns result in response.generateVideoResponse or result
       const response = pollResult.response ?? pollResult.result;
       const generatedSamples =
         response?.generateVideoResponse?.generatedSamples ??
@@ -427,7 +474,7 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
       // Download the generated video and upload to S3
       const s3Key = `ai-fills/${request.projectId}/${request.editDecisionId}/gap_${request.gapIndex}_${request.duration}s.mp4`;
       
-      // Fetch the video from Google's URI — try query param first, then header auth
+      // Try multiple download approaches
       let videoResponse = await fetch(`${videoUri}?key=${apiKey}`);
       if (!videoResponse.ok) {
         console.warn(`Video download with query key failed (${videoResponse.status}), retrying with header auth`);
@@ -461,7 +508,7 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
         s3_key: s3Key,
         provider: "veo",
         model,
-        quality_score: 0.90,
+        quality_score: request.firstFrameBase64 ? 0.95 : 0.90,
       };
     }
   }
@@ -494,7 +541,6 @@ async function failJob(
     .update({ status: "failed" })
     .eq("id", editDecisionId);
 
-  // Skip project status update for preview jobs
   if (!preview) {
     const { data: ed } = await serviceClient
       .from("edit_decisions")
