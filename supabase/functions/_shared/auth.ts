@@ -13,26 +13,15 @@ export async function getAuthenticatedUser(
     throw new AuthError("Missing or invalid Authorization header");
   }
 
-  const token = authHeader.replace("Bearer ", "");
-
   const supabaseClient = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_ANON_KEY")!,
     { global: { headers: { Authorization: authHeader } } },
   );
 
-  // Try getClaims first (works with signing-keys JWTs), fall back to getUser
-  const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
-  if (!claimsError && claimsData?.claims?.sub) {
-    return {
-      user: { id: claimsData.claims.sub, email: claimsData.claims.email } as User,
-      supabaseClient,
-    };
-  }
-
-  const { data, error } = await supabaseClient.auth.getUser(token);
+  const { data, error } = await supabaseClient.auth.getUser();
   if (error || !data.user) {
-    throw new AuthError(error?.message ?? claimsError?.message ?? "Invalid token");
+    throw new AuthError(error?.message ?? "Invalid token");
   }
 
   return { user: data.user, supabaseClient };
