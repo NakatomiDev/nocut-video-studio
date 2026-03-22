@@ -34,6 +34,29 @@ export interface ManualCut {
 export const FILL_DURATION_OPTIONS = [1, 2, 3, 5] as const;
 export const BUSINESS_FILL_DURATION_OPTIONS = [1, 2, 3, 5, 10] as const;
 
+export type AiFillModel =
+  | "veo3.1-fast"
+  | "veo3.1-fast-audio"
+  | "veo2"
+  | "veo3.1-standard"
+  | "veo3.1-standard-audio"
+  | "veo3-standard-audio";
+
+export const AI_FILL_MODELS: { id: AiFillModel; label: string; creditsPerSec: number; badge?: string }[] = [
+  { id: "veo3.1-fast", label: "Fast", creditsPerSec: 1 },
+  { id: "veo3.1-fast-audio", label: "Fast + Audio", creditsPerSec: 2 },
+  { id: "veo2", label: "Veo 2", creditsPerSec: 2 },
+  { id: "veo3.1-standard", label: "Standard", creditsPerSec: 3 },
+  { id: "veo3.1-standard-audio", label: "Standard + Audio", creditsPerSec: 4, badge: "Best" },
+  { id: "veo3-standard-audio", label: "Premium Audio", creditsPerSec: 6 },
+];
+
+export const MODEL_CREDITS_PER_SEC: Record<AiFillModel, number> = Object.fromEntries(
+  AI_FILL_MODELS.map((m) => [m.id, m.creditsPerSec]),
+) as Record<AiFillModel, number>;
+
+export const DEFAULT_AI_FILL_MODEL: AiFillModel = "veo3.1-fast";
+
 interface CreditBalance {
   total: number;
   monthly: number;
@@ -60,6 +83,8 @@ interface EditorState {
   selectedFill: AiFill | null;
   /** Maps cutId → selected AI fill duration in seconds (0 = no fill, just cut) */
   fillDurations: Map<string, number>;
+  /** Maps cutId → selected AI fill model */
+  fillModels: Map<string, AiFillModel>;
   playheadPosition: number;
   isPlaying: boolean;
   zoomLevel: number;
@@ -77,6 +102,7 @@ interface EditorState {
   removeManualCut: (id: string) => void;
   toggleManualCut: (cutId: string) => void;
   setFillDuration: (cutId: string, seconds: number) => void;
+  setFillModel: (cutId: string, model: AiFillModel) => void;
   setPlayhead: (time: number) => void;
   play: () => void;
   pause: () => void;
@@ -93,10 +119,13 @@ interface EditorState {
   reset: () => void;
 }
 
-/** Credits = sum of AI fill durations selected (cuts themselves are free) */
-const calcCredits = (fillDurations: Map<string, number>) => {
+/** Credits = sum of (fill duration × model credits/sec) for each cut */
+const calcCredits = (fillDurations: Map<string, number>, fillModels: Map<string, AiFillModel>) => {
   let total = 0;
-  fillDurations.forEach((sec) => { total += sec; });
+  fillDurations.forEach((sec, cutId) => {
+    const model = fillModels.get(cutId) ?? DEFAULT_AI_FILL_MODEL;
+    total += sec * MODEL_CREDITS_PER_SEC[model];
+  });
   return total;
 };
 
@@ -116,6 +145,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   fillVideoUrls: new Map<string, string>(),
   selectedFill: null,
   fillDurations: new Map<string, number>(),
+  fillModels: new Map<string, AiFillModel>(),
   playheadPosition: 0,
   isPlaying: false,
   zoomLevel: 1,
@@ -143,6 +173,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       cuts,
       activeCuts,
       fillDurations: new Map(),
+      fillModels: new Map(),
       creditEstimate: 0,
     });
   },
@@ -151,16 +182,19 @@ export const useEditorStore = create<EditorState>((set) => ({
     set((state) => {
       const next = new Set(state.activeCuts);
       const nextFills = new Map(state.fillDurations);
+      const nextModels = new Map(state.fillModels);
       if (next.has(cutId)) {
         next.delete(cutId);
         nextFills.delete(cutId);
+        nextModels.delete(cutId);
       } else {
         next.add(cutId);
       }
       return {
         activeCuts: next,
         fillDurations: nextFills,
-        creditEstimate: calcCredits(nextFills),
+        fillModels: nextModels,
+        creditEstimate: calcCredits(nextFills, nextModels),
       };
     }),
   addManualCut: (start, end) =>
@@ -176,7 +210,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       return {
         manualCuts,
         activeManualCuts,
-        creditEstimate: calcCredits(state.fillDurations),
+        creditEstimate: calcCredits(state.fillDurations, state.fillModels),
       };
     }),
   removeManualCut: (id) =>
@@ -186,27 +220,33 @@ export const useEditorStore = create<EditorState>((set) => ({
       activeManualCuts.delete(id);
       const nextFills = new Map(state.fillDurations);
       nextFills.delete(id);
+      const nextModels = new Map(state.fillModels);
+      nextModels.delete(id);
       return {
         manualCuts,
         activeManualCuts,
         fillDurations: nextFills,
-        creditEstimate: calcCredits(nextFills),
+        fillModels: nextModels,
+        creditEstimate: calcCredits(nextFills, nextModels),
       };
     }),
   toggleManualCut: (cutId) =>
     set((state) => {
       const next = new Set(state.activeManualCuts);
       const nextFills = new Map(state.fillDurations);
+      const nextModels = new Map(state.fillModels);
       if (next.has(cutId)) {
         next.delete(cutId);
         nextFills.delete(cutId);
+        nextModels.delete(cutId);
       } else {
         next.add(cutId);
       }
       return {
         activeManualCuts: next,
         fillDurations: nextFills,
-        creditEstimate: calcCredits(nextFills),
+        fillModels: nextModels,
+        creditEstimate: calcCredits(nextFills, nextModels),
       };
     }),
   setFillDuration: (cutId, seconds) =>
@@ -219,7 +259,16 @@ export const useEditorStore = create<EditorState>((set) => ({
       }
       return {
         fillDurations: nextFills,
-        creditEstimate: calcCredits(nextFills),
+        creditEstimate: calcCredits(nextFills, state.fillModels),
+      };
+    }),
+  setFillModel: (cutId, model) =>
+    set((state) => {
+      const nextModels = new Map(state.fillModels);
+      nextModels.set(cutId, model);
+      return {
+        fillModels: nextModels,
+        creditEstimate: calcCredits(state.fillDurations, nextModels),
       };
     }),
   setPlayhead: (time) => set({ playheadPosition: time }),
@@ -265,6 +314,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       fillVideoUrls: new Map(),
       selectedFill: null,
       fillDurations: new Map(),
+      fillModels: new Map(),
       playheadPosition: 0,
       isPlaying: false,
       zoomLevel: 1,
