@@ -161,6 +161,8 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
       if (jobError) throw jobError;
 
       setShowExportDialog(false);
+      // Navigate to export progress view
+      navigate(`/project/${project.id}?exporting=true`);
       toast.success(
         totalFill > 0
           ? `Export submitted — generating ${totalFill}s of AI fill`
