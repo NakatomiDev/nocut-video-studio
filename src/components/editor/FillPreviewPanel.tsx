@@ -109,7 +109,7 @@ const FillPreviewPanel = () => {
           <Sparkles className="h-3.5 w-3.5 text-primary" />
           <span className="text-xs font-semibold text-foreground">AI Fill Preview</span>
           <Badge variant="outline" className="text-[9px]">
-            {fill.provider === 'mock' ? 'Preview' : 'AI Generated'} · {fill.duration}s
+            AI Fill · {fill.duration}s
           </Badge>
         </div>
         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => selectFill(null)}>
