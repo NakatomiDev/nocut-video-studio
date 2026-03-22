@@ -161,6 +161,39 @@ const calcCredits = (fillDurations: Map<string, number>, fillModels: Map<string,
 
 let manualCutCounter = 0;
 
+/** Persist manual cuts alongside auto-detected cuts in the cut_maps row */
+function persistManualCuts(
+  cutMap: Tables<'cut_maps'> | null,
+  autoCuts: Cut[],
+  manualCuts: ManualCut[],
+) {
+  if (!cutMap) return;
+  const autoRaw = autoCuts.map((c) => ({
+    id: c.id,
+    start: c.start,
+    end: c.end,
+    type: c.type,
+    duration: c.duration,
+    confidence: c.confidence,
+    auto_accept: c.auto_accept,
+  }));
+  const manualRaw = manualCuts.map((c) => ({
+    id: c.id,
+    start: c.start,
+    end: c.end,
+    type: 'manual',
+    duration: c.duration,
+  }));
+  const combined = [...autoRaw, ...manualRaw];
+  supabase
+    .from('cut_maps')
+    .update({ cuts_json: combined as any })
+    .eq('id', cutMap.id)
+    .then(({ error }) => {
+      if (error) console.error('[editorStore] Failed to persist manual cuts:', error);
+    });
+}
+
 export const useEditorStore = create<EditorState>((set) => ({
   project: null,
   video: null,
