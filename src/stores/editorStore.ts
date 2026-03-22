@@ -265,6 +265,8 @@ export const useEditorStore = create<EditorState>((set) => ({
       const manualCuts = [...state.manualCuts, cut];
       const activeManualCuts = new Set(state.activeManualCuts);
       activeManualCuts.add(id);
+      // Persist to DB
+      persistManualCuts(state.cutMap, state.cuts, manualCuts);
       return {
         manualCuts,
         activeManualCuts,
