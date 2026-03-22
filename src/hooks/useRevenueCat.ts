@@ -15,8 +15,9 @@ import { configureRevenueCat, resetRevenueCat } from "@/lib/revenuecat";
 // Product / entitlement constants
 // ---------------------------------------------------------------------------
 
-/** RevenueCat entitlement identifier for Pro access */
-export const ENTITLEMENT_PRO = "NoCut Pro";
+/** RevenueCat entitlement identifiers (must match dashboard lookup_key) */
+export const ENTITLEMENT_PRO = "pro";
+export const ENTITLEMENT_BUSINESS = "business";
 
 /** Product identifiers used across offerings */
 export const PRODUCTS = {
@@ -90,7 +91,8 @@ export function useRevenueCatCustomer() {
     [customerInfo],
   );
 
-  const hasProAccess = isEntitledTo(ENTITLEMENT_PRO);
+  const hasProAccess = isEntitledTo(ENTITLEMENT_PRO) || isEntitledTo(ENTITLEMENT_BUSINESS);
+  const hasBusinessAccess = isEntitledTo(ENTITLEMENT_BUSINESS);
 
   const activeEntitlements = customerInfo
     ? Object.keys(customerInfo.entitlements.active)
@@ -103,6 +105,7 @@ export function useRevenueCatCustomer() {
     refetch: fetchCustomerInfo,
     isEntitledTo,
     hasProAccess,
+    hasBusinessAccess,
     activeEntitlements,
   };
 }

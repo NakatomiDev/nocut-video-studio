@@ -1,4 +1,4 @@
-import { useRevenueCatCustomer, ENTITLEMENT_PRO } from "@/hooks/useRevenueCat";
+import { useRevenueCatCustomer, ENTITLEMENT_PRO, ENTITLEMENT_BUSINESS } from "@/hooks/useRevenueCat";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,16 +46,17 @@ export const CustomerCenter = ({ onManageSubscription }: CustomerCenterProps) =>
     );
   }
 
-  // Derive active subscription details
+  // Derive active subscription details — check business first, then pro
+  const businessEntitlement = customerInfo?.entitlements.active[ENTITLEMENT_BUSINESS];
   const proEntitlement = customerInfo?.entitlements.active[ENTITLEMENT_PRO];
-  const expiresDate = proEntitlement?.expirationDate;
-  const productId = proEntitlement?.productIdentifier;
+  const activeEntitlement = businessEntitlement ?? proEntitlement;
+  const expiresDate = activeEntitlement?.expirationDate;
+  const productId = activeEntitlement?.productIdentifier;
   const isAnnual = productId?.includes("annual");
-  const isBusiness = productId?.includes("business");
 
-  const planLabel = isBusiness
+  const planLabel = businessEntitlement
     ? "Business"
-    : hasProAccess
+    : proEntitlement
       ? "Pro"
       : "Free";
 
