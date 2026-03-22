@@ -493,23 +493,15 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
         </DialogContent>
       </Dialog>
 
-      {/* Lightbox for zoomed thumbnail */}
+      {/* Lightbox for zoomed frame — uses video seek for full-res */}
       <Dialog open={!!lightbox} onOpenChange={(open) => { if (!open) setLightbox(null); }}>
         <DialogContent className="max-w-2xl p-0 overflow-hidden bg-black/95 border-border">
           <DialogHeader className="p-4 pb-2">
             <DialogTitle className="text-sm text-foreground">{lightbox?.label}</DialogTitle>
+            <DialogDescription className="sr-only">Full resolution frame preview</DialogDescription>
           </DialogHeader>
           <div className="flex items-center justify-center p-4 pt-0">
-            {lightbox && thumbnailSpriteUrl && (
-              <CutThumbnail
-                spriteUrl={thumbnailSpriteUrl}
-                time={lightbox.time}
-                duration={duration}
-                width={560}
-                height={315}
-                className="rounded-lg"
-              />
-            )}
+            {lightbox && <LightboxFrame videoUrl={videoUrl} time={lightbox.time} />}
           </div>
         </DialogContent>
       </Dialog>
