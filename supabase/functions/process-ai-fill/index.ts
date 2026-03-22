@@ -299,10 +299,10 @@ async function generateVeoFill(request: FillRequest): Promise<FillResponse> {
   // Veo video generation via Gemini API
   // Start generation
   const generateResponse = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/veo-2.0-generate-001:predictLongRunning?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/veo-2.0-generate-001:predictLongRunning`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
         instances: [
           {
@@ -336,7 +336,8 @@ async function generateVeoFill(request: FillRequest): Promise<FillResponse> {
     await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
 
     const pollResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/${operationName}?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/${operationName}`,
+      { headers: { "x-goog-api-key": apiKey } },
     );
 
     if (!pollResponse.ok) {
