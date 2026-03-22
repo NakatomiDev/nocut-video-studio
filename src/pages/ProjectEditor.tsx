@@ -6,6 +6,7 @@ import type { AiFill } from '@/stores/editorStore';
 import VideoPlayer from '@/components/editor/VideoPlayer';
 import WaveformTimeline from '@/components/editor/WaveformTimeline';
 import CutsPanel from '@/components/editor/CutsPanel';
+import FillPreviewPanel from '@/components/editor/FillPreviewPanel';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Loader2, AlertTriangle } from 'lucide-react';
 
@@ -282,14 +283,15 @@ const ProjectEditor = () => {
             <VideoPlayer videoUrl={videoUrl} />
           </div>
 
-          {/* Waveform timeline — 40% */}
-          <div className="h-[40%]">
+          {/* Waveform timeline — 40% (relative for fill preview popover) */}
+          <div className="h-[40%] relative">
             <WaveformTimeline
               waveformUrl={waveformUrl}
               videoUrl={videoUrl}
               thumbnailSpriteUrl={thumbnailSpriteUrl}
               duration={video?.duration || 0}
             />
+            <FillPreviewPanel />
           </div>
         </div>
 
