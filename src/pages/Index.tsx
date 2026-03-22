@@ -238,7 +238,7 @@ const Index = () => {
       {/* Footer */}
       <footer className="border-t border-border py-8">
         <div className="mx-auto max-w-6xl px-6 flex items-center justify-between text-sm text-muted-foreground">
-          <span>NoCut Studio</span>
+          <span>NoCut Studio by Nakatomi K.K.</span>
           <div className="flex gap-4">
             <Link to="/sign-in" className="hover:text-foreground">Sign in</Link>
             <Link to="/sign-up" className="hover:text-foreground">Sign up</Link>
