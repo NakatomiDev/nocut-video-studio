@@ -49,11 +49,10 @@ const CutThumbnail = ({
       ctx.scale(dpr, dpr);
 
       // The sprite is a horizontal strip of equally-spaced frames.
-      // Each frame has the full height and a width equal to height * (16/9).
+      // Frame count matches the generation logic: ceil(duration/2) clamped to [5, 60].
+      const totalFrames = Math.min(Math.max(Math.ceil(duration / 2), 5), 60);
+      const frameWidth = image.naturalWidth / totalFrames;
       const frameHeight = image.naturalHeight;
-      const frameAspect = 16 / 9;
-      const frameWidth = Math.round(frameHeight * frameAspect);
-      const totalFrames = Math.max(1, Math.round(image.naturalWidth / frameWidth));
 
       // Find the frame index closest to the requested time
       const ratio = Math.max(0, Math.min(1, time / duration));
