@@ -42,7 +42,7 @@ interface CutsPanelProps {
   duration: number;
 }
 
-const CutsPanel = ({ thumbnailSpriteUrl, duration }: CutsPanelProps) => {
+const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) => {
   const {
     cuts,
     activeCuts,
