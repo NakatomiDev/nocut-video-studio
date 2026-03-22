@@ -62,6 +62,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, duration }: CutsPanelProps) => {
   const [exporting, setExporting] = useState(false);
   const [userTier, setUserTier] = useState<string>('free');
   const [expandedReviewId, setExpandedReviewId] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<{ time: number; label: string } | null>(null);
 
   useEffect(() => {
     const fetchBalance = async () => {
