@@ -175,19 +175,24 @@ Deno.serve(async (req) => {
       // Generate AI fill for this gap
       const generationStart = Date.now();
 
-      // Call the AI fill provider
-      const fillResult = await generateAiFill({
-        projectId: project.id,
-        editDecisionId: editDecision.id,
-        gapIndex: gap.gap_index,
-        startTime: gap.end, // fill starts where the cut ends
-        duration: gap.fill_duration,
-      });
+      let fillResult: FillResponse;
+      try {
+        fillResult = await generateAiFill({
+          projectId: project.id,
+          editDecisionId: editDecision.id,
+          gapIndex: gap.gap_index,
+          startTime: gap.end, // fill starts where the cut ends
+          duration: gap.fill_duration,
+        });
+      } catch (fillErr) {
+        const msg = `AI fill generation failed for gap ${gap.gap_index}: ${(fillErr as Error).message}`;
+        console.error(msg);
+        await failJob(serviceClient, job.id, editDecision.id, msg);
+        return errorResponse("ai_generation_failed", msg, 502);
+      }
 
       const generationTimeMs = Date.now() - generationStart;
 
-      // Insert ai_fills record (generate ID client-side to avoid
-      // RETURNING being blocked by RLS SELECT policy on service client)
       const aiFillId = crypto.randomUUID();
       const { error: fillInsertError } = await serviceClient
         .from("ai_fills")
@@ -204,10 +209,13 @@ Deno.serve(async (req) => {
         });
 
       if (fillInsertError) {
-        console.error(`Failed to insert ai_fill for gap ${gap.gap_index}:`, fillInsertError);
-      } else {
-        aiFillResults.push({ gap_index: gap.gap_index, id: aiFillId });
+        const msg = `Failed to persist ai_fill for gap ${gap.gap_index}: ${fillInsertError.message}`;
+        console.error(msg);
+        await failJob(serviceClient, job.id, editDecision.id, msg);
+        return errorResponse("internal_error", msg, 500);
       }
+
+      aiFillResults.push({ gap_index: gap.gap_index, id: aiFillId });
     }
 
     // 10. Mark complete
@@ -264,41 +272,24 @@ interface FillResponse {
 }
 
 async function generateAiFill(request: FillRequest): Promise<FillResponse> {
-  // Check if a real provider is configured
-  const provider = Deno.env.get("AI_FILL_PROVIDER"); // 'veo', 'did', 'heygen', or unset for mock
+  const provider = Deno.env.get("AI_FILL_PROVIDER");
 
   if (provider === "veo") {
     return await generateVeoFill(request);
   }
 
-  // Default: mock provider for testing
-  return await generateMockFill(request);
-}
-
-async function generateMockFill(request: FillRequest): Promise<FillResponse> {
-  // Simulate generation time (~500ms per second of fill)
-  const simulatedMs = Math.max(500, request.duration * 500);
-  await new Promise((resolve) => setTimeout(resolve, simulatedMs));
-
-  // Return a placeholder S3 key — in production this would be an actual generated video
-  const s3Key = `ai-fills/${request.projectId}/${request.editDecisionId}/gap_${request.gapIndex}_${request.duration}s.mp4`;
-
-  return {
-    s3_key: s3Key,
-    provider: "mock",
-    quality_score: 0.85,
-  };
+  throw new Error(
+    `AI_FILL_PROVIDER is "${provider ?? "unset"}" — no valid provider configured. ` +
+    `Set AI_FILL_PROVIDER to "veo" and ensure GOOGLE_AI_API_KEY is set.`,
+  );
 }
 
 async function generateVeoFill(request: FillRequest): Promise<FillResponse> {
   const apiKey = Deno.env.get("GOOGLE_AI_API_KEY");
   if (!apiKey) {
-    console.warn("GOOGLE_AI_API_KEY not set, falling back to mock");
-    return generateMockFill(request);
+    throw new Error("GOOGLE_AI_API_KEY is not set — cannot call Veo API");
   }
 
-  // Veo video generation via Gemini API
-  // Start generation
   const generateResponse = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/veo-2.0-generate-001:predictLongRunning`,
     {
@@ -320,9 +311,8 @@ async function generateVeoFill(request: FillRequest): Promise<FillResponse> {
   );
 
   if (!generateResponse.ok) {
-    console.error("Veo generation failed:", await generateResponse.text());
-    console.warn("Falling back to mock provider");
-    return generateMockFill(request);
+    const body = await generateResponse.text();
+    throw new Error(`Veo generation request failed (${generateResponse.status}): ${body}`);
   }
 
   const operation = await generateResponse.json();
@@ -342,30 +332,27 @@ async function generateVeoFill(request: FillRequest): Promise<FillResponse> {
     );
 
     if (!pollResponse.ok) {
-      console.error("Veo poll failed:", await pollResponse.text());
-      continue;
+      const body = await pollResponse.text();
+      throw new Error(`Veo poll failed (${pollResponse.status}): ${body}`);
     }
 
     const pollResult = await pollResponse.json();
     if (pollResult.done) {
-      // Extract video URL from response
       const videoUri = pollResult.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri;
-      if (videoUri) {
-        // In production, download and upload to S3. For now, store the URI.
-        const s3Key = `ai-fills/${request.projectId}/${request.editDecisionId}/gap_${request.gapIndex}_${request.duration}s.mp4`;
-        return {
-          s3_key: s3Key,
-          provider: "veo",
-          quality_score: 0.90,
-        };
+      if (!videoUri) {
+        throw new Error("Veo completed but returned no video URI");
       }
-      break;
+
+      const s3Key = `ai-fills/${request.projectId}/${request.editDecisionId}/gap_${request.gapIndex}_${request.duration}s.mp4`;
+      return {
+        s3_key: s3Key,
+        provider: "veo",
+        quality_score: 0.90,
+      };
     }
   }
 
-  // Timeout or no result — fall back to mock
-  console.warn("Veo generation timed out, falling back to mock");
-  return generateMockFill(request);
+  throw new Error(`Veo generation timed out after ${maxWaitMs / 1000}s`);
 }
 
 // ---------------------------------------------------------------------------
