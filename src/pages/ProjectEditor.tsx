@@ -70,7 +70,7 @@ const ProjectEditor = () => {
         return;
       }
 
-      if (['uploading', 'transcoding', 'detecting'].includes(proj.status)) {
+      if (['uploading', 'transcoding', 'detecting', 'generating', 'exporting'].includes(proj.status)) {
         setProcessingStatus(proj.status);
         setLoading(false);
         return;
@@ -128,9 +128,9 @@ const ProjectEditor = () => {
     load();
   }, [projectId, setProject, setVideo, setCutMap]);
 
-  // Realtime subscription for processing projects
+  // Realtime subscription for project status changes (processing, generating, etc.)
   useEffect(() => {
-    if (!projectId || !processingStatus) return;
+    if (!projectId) return;
 
     const channel = supabase
       .channel(`project-${projectId}`)
@@ -140,14 +140,15 @@ const ProjectEditor = () => {
         (payload) => {
           const updated = payload.new as any;
           setProject(updated);
-          if (updated.status === 'ready') {
-            setProcessingStatus(null);
-            // Re-trigger data load
-            window.location.reload();
+          if (updated.status === 'ready' || updated.status === 'complete') {
+            if (processingStatus) {
+              setProcessingStatus(null);
+              window.location.reload();
+            }
           } else if (updated.status === 'failed') {
             setProcessingStatus(null);
             setError(updated.error_message || 'Processing failed');
-          } else {
+          } else if (['uploading', 'transcoding', 'detecting', 'generating', 'exporting'].includes(updated.status)) {
             setProcessingStatus(updated.status);
           }
         }
@@ -167,6 +168,8 @@ const ProjectEditor = () => {
     uploading: { text: 'Uploading...', sub: 'Your video is being uploaded' },
     transcoding: { text: 'Processing your video...', sub: 'Creating proxy and waveform' },
     detecting: { text: 'Analyzing audio...', sub: 'Detecting silences and pauses' },
+    generating: { text: 'Generating AI fills...', sub: 'Creating smooth transitions for your cuts' },
+    exporting: { text: 'Exporting...', sub: 'Rendering your final video' },
   };
 
   if (loading) {

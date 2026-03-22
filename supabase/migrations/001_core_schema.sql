@@ -98,7 +98,7 @@ CREATE TABLE ai_fills (
     s3_key            TEXT,
     method            TEXT NOT NULL
                       CHECK (method IN ('ai_fill', 'crossfade', 'hard_cut')),
-    provider          TEXT CHECK (provider IN ('did', 'heygen', 'veo', 'custom')),
+    provider          TEXT CHECK (provider IN ('did', 'heygen', 'veo', 'custom', 'mock')),
     quality_score     FLOAT,
     duration          FLOAT,
     generation_time_ms INTEGER,

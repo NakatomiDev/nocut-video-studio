@@ -30,6 +30,11 @@ Deno.serve(async (req: Request) => {
       return errorResponse("bad_request", "s3_key is required", 400);
     }
 
+    // Reject path traversal attempts and normalize the key
+    if (s3_key.includes("..") || s3_key.includes("//") || s3_key.includes("\\")) {
+      return errorResponse("bad_request", "Invalid s3_key", 400);
+    }
+
     // Verify the key belongs to this user (keys start with uploads/{user_id}/)
     if (!s3_key.startsWith(`uploads/${user.id}/`)) {
       return errorResponse("unauthorized", "Unauthorized", 403);

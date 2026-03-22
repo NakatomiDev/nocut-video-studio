@@ -22,6 +22,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 const formatTimestamp = (s: number) => {
   const m = Math.floor(s / 60);
@@ -126,18 +127,49 @@ const CutsPanel = ({ thumbnailSpriteUrl, duration }: CutsPanelProps) => {
 
       const totalFill = allCuts.reduce((s, c) => s + c.fill_duration, 0);
 
-      const { error } = await supabase.from('edit_decisions').insert({
+      const { data: editDecision, error } = await supabase.from('edit_decisions').insert({
         project_id: project.id,
         edl_json: allCuts,
         total_fill_seconds: totalFill,
         credits_charged: creditEstimate,
         status: 'pending',
-      });
+      }).select('id').single();
 
       if (error) throw error;
+
+      // Enqueue the AI fill job so the backend picks it up
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { data: jobRow, error: jobError } = await supabase.from('job_queue').insert({
+        project_id: project.id,
+        user_id: user.id,
+        type: totalFill > 0 ? 'ai.fill' : 'video.export',
+        payload: { edit_decision_id: editDecision.id },
+        priority: 10,
+      }).select('id').single();
+
+      if (jobError) throw jobError;
+
       setShowExportDialog(false);
+      toast.success(
+        totalFill > 0
+          ? `Export submitted — generating ${totalFill}s of AI fill`
+          : 'Export submitted — processing your edits'
+      );
+
+      // Invoke the edge function to start processing
+      supabase.functions.invoke('process-ai-fill', {
+        body: { job_id: jobRow.id },
+      }).then(({ error: invokeError }) => {
+        if (invokeError) {
+          console.error('Failed to invoke process-ai-fill:', invokeError);
+          toast.error('AI fill processing failed to start');
+        }
+      });
     } catch (err: any) {
       console.error('Export failed:', err);
+      toast.error('Export failed — please try again');
     } finally {
       setExporting(false);
     }
