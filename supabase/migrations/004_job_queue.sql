@@ -38,6 +38,9 @@ ALTER TABLE job_queue ENABLE ROW LEVEL SECURITY;
 CREATE POLICY job_queue_select_own ON job_queue
     FOR SELECT USING (auth.uid() = user_id);
 
+CREATE POLICY job_queue_insert_own ON job_queue
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
 -- =============================================================================
 -- 4. Supabase Realtime
 -- =============================================================================
