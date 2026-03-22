@@ -297,7 +297,12 @@ async function generateAiFill(request: FillRequest): Promise<FillResponse> {
   const model = request.model ?? "veo3.1-fast";
 
   if (provider === "veo") {
-    return await generateVeoFill(request, model);
+    try {
+      return await generateVeoFill(request, model);
+    } catch (err) {
+      console.warn(`Veo generation failed, falling back to mock: ${(err as Error).message}`);
+      return await generateMockFill(request, model);
+    }
   }
 
   return await generateMockFill(request, model);
