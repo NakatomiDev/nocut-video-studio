@@ -196,7 +196,7 @@ async function handlePreviewComplete(
         gapIndex: f.gap_index,
         startTime: cutEndTime,
         duration: f.duration ?? duration,
-        s3Key: f.provider === 'mock' ? (video?.proxy_s3_key || video?.s3_key || f.s3_key) : f.s3_key,
+        s3Key: f.s3_key,
         provider: f.provider,
         qualityScore: f.quality_score,
         method: f.method,

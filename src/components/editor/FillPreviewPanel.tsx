@@ -35,12 +35,6 @@ const FillPreviewPanel = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const fill = selectedFill;
-  const isMock = fill?.provider === 'mock';
-  const startSec = isMock ? (fill?.startTime ?? 0) : 0;
-  const endSec = isMock ? (fill?.startTime ?? 0) + (fill?.duration ?? 0) : undefined;
-
-  // Display model name instead of "mock"
-  const displayLabel = fill?.duration ? `${fill.duration}s` : '';
 
   useEffect(() => {
     if (!fill?.s3Key) {
@@ -69,10 +63,8 @@ const FillPreviewPanel = () => {
           return;
         }
         const url = data?.url || data?.data?.url;
-        console.log('[FillPreview] Got URL:', url ? 'yes' : 'no');
         if (url) {
-          // For mock: append media fragment to hint browser at segment
-          setVideoUrl(isMock ? `${url}#t=${startSec},${endSec}` : url);
+          setVideoUrl(url);
         } else {
           setError('Fill video not available yet');
         }
@@ -82,7 +74,7 @@ const FillPreviewPanel = () => {
     return () => {
       cancelled = true;
     };
-  }, [fill?.id, fill?.s3Key, fill?.provider, fill?.startTime, fill?.duration]);
+  }, [fill?.id, fill?.s3Key]);
 
   if (!fill) return null;
 
@@ -102,9 +94,8 @@ const FillPreviewPanel = () => {
     if (isPlaying) {
       videoRef.current.pause();
     } else {
-      // If at end of segment, restart
-      if (isMock && endSec !== undefined && videoRef.current.currentTime >= endSec - 0.1) {
-        videoRef.current.currentTime = startSec;
+      if (videoRef.current.ended) {
+        videoRef.current.currentTime = 0;
       }
       videoRef.current.play();
     }
@@ -118,7 +109,7 @@ const FillPreviewPanel = () => {
           <Sparkles className="h-3.5 w-3.5 text-primary" />
           <span className="text-xs font-semibold text-foreground">AI Fill Preview</span>
           <Badge variant="outline" className="text-[9px]">
-            {isMock ? 'Preview' : 'AI Generated'} · {displayLabel}
+            {fill.provider === 'mock' ? 'Preview' : 'AI Generated'} · {fill.duration}s
           </Badge>
         </div>
         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => selectFill(null)}>
@@ -126,7 +117,7 @@ const FillPreviewPanel = () => {
         </Button>
       </div>
 
-      {/* Video preview — no native controls, custom play/pause */}
+      {/* Video preview */}
       <div className="bg-black aspect-video flex items-center justify-center relative group">
         {loading && <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
         {error && <span className="text-xs text-muted-foreground px-4 text-center">{error}</span>}
@@ -139,31 +130,10 @@ const FillPreviewPanel = () => {
               className="w-full h-full object-contain"
               preload="auto"
               crossOrigin="anonymous"
-              onLoadedMetadata={() => {
-                if (videoRef.current && isMock) {
-                  videoRef.current.currentTime = startSec;
-                }
-              }}
               onTimeUpdate={() => {
                 if (!videoRef.current) return;
-                const ct = videoRef.current.currentTime;
-                if (isMock) {
-                  if (endSec !== undefined && ct >= endSec) {
-                    videoRef.current.pause();
-                    videoRef.current.currentTime = startSec;
-                    setIsPlaying(false);
-                    setPlayProgress(100);
-                    return;
-                  }
-                  if (ct < startSec) {
-                    videoRef.current.currentTime = startSec;
-                  }
-                  const segDur = (endSec ?? startSec + (fill?.duration ?? 1)) - startSec;
-                  setPlayProgress(segDur > 0 ? ((ct - startSec) / segDur) * 100 : 0);
-                } else {
-                  const dur = videoRef.current.duration || 1;
-                  setPlayProgress((ct / dur) * 100);
-                }
+                const dur = videoRef.current.duration || 1;
+                setPlayProgress((videoRef.current.currentTime / dur) * 100);
               }}
               onPlay={() => setIsPlaying(true)}
               onPause={() => setIsPlaying(false)}
@@ -173,7 +143,7 @@ const FillPreviewPanel = () => {
                 setError('Failed to load video file');
               }}
             />
-            {/* Custom play/pause overlay */}
+            {/* Play/pause overlay */}
             <button
               className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
               onClick={togglePlay}
@@ -184,7 +154,7 @@ const FillPreviewPanel = () => {
                 <Play className="h-10 w-10 text-white drop-shadow-lg" />
               )}
             </button>
-            {/* Segment progress bar */}
+            {/* Progress bar */}
             <div className="absolute bottom-0 left-0 right-0 h-1">
               <Progress value={playProgress} className="h-1 rounded-none bg-black/40 [&>div]:bg-primary" />
             </div>
