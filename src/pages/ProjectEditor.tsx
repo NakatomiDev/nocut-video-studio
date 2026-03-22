@@ -255,7 +255,7 @@ const ProjectEditor = () => {
 
         {/* Right sidebar — cuts panel */}
         <div className="w-[280px] shrink-0">
-          <CutsPanel />
+          <CutsPanel videoUrl={videoUrl} />
         </div>
       </div>
     </div>
