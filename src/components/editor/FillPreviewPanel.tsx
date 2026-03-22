@@ -12,25 +12,23 @@ const formatTimestamp = (s: number) => {
 };
 
 const FillPreviewPanel = () => {
-  const {
-    selectedFill,
-    selectFill,
-    insertedFills,
-    insertFill,
-    removeFill,
-    fillVideoUrls,
-    setFillVideoUrl,
-    setPlayhead,
-    pause,
-  } = useEditorStore();
+  const selectedFill = useEditorStore((s) => s.selectedFill);
+  const selectFill = useEditorStore((s) => s.selectFill);
+  const insertedFills = useEditorStore((s) => s.insertedFills);
+  const insertFill = useEditorStore((s) => s.insertFill);
+  const removeFill = useEditorStore((s) => s.removeFill);
+  const setPlayhead = useEditorStore((s) => s.setPlayhead);
+  const pause = useEditorStore((s) => s.pause);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
   const fill = selectedFill;
 
   useEffect(() => {
-    if (!fill?.s3Key || fillVideoUrls.has(fill.id)) {
+    if (!fill?.s3Key) {
+      setVideoUrl(null);
       setLoading(false);
       return;
     }
@@ -38,19 +36,24 @@ const FillPreviewPanel = () => {
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setVideoUrl(null);
+
+    console.log('[FillPreview] Fetching signed URL for:', fill.s3Key);
 
     supabase.functions
       .invoke('get-signed-url', { body: { s3_key: fill.s3Key } })
       .then(({ data, error: fnErr }) => {
         if (cancelled) return;
         if (fnErr) {
+          console.error('[FillPreview] Function error:', fnErr);
           setError('Could not load fill video');
           setLoading(false);
           return;
         }
         const url = data?.url || data?.data?.url;
+        console.log('[FillPreview] Got URL:', url ? 'yes' : 'no');
         if (url) {
-          setFillVideoUrl(fill.id, url);
+          setVideoUrl(url);
         } else {
           setError('Fill video not available yet');
         }
@@ -65,7 +68,6 @@ const FillPreviewPanel = () => {
   if (!fill) return null;
 
   const isInserted = insertedFills.has(fill.id);
-  const videoUrl = fillVideoUrls.get(fill.id) || null;
 
   const handleJumpTo = () => {
     pause();
@@ -94,15 +96,20 @@ const FillPreviewPanel = () => {
         {error && <span className="text-xs text-muted-foreground px-4 text-center">{error}</span>}
         {!loading && !error && videoUrl && (
           <video
+            key={videoUrl}
             src={videoUrl}
             className="w-full h-full object-contain"
             controls
-            preload="metadata"
-            muted
+            preload="auto"
+            crossOrigin="anonymous"
+            onError={(e) => {
+              console.error('[FillPreview] Video load error:', e);
+              setError('Failed to load video file');
+            }}
           />
         )}
         {!loading && !error && !videoUrl && (
-          <span className="text-xs text-muted-foreground">No video file generated yet (mock provider)</span>
+          <span className="text-xs text-muted-foreground">No video file available</span>
         )}
       </div>
 
