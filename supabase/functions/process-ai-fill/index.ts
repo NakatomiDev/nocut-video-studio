@@ -352,16 +352,16 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
     throw new Error("GOOGLE_AI_API_KEY is not set — cannot call Veo API");
   }
 
-  // Map our model names to Vertex AI model IDs
+  // Map our model names to Gemini API model IDs (use -preview suffix)
   const MODEL_API_IDS: Record<string, string> = {
-    "veo2":                  "veo-2.0-generate-001",
-    "veo3.1-fast":           "veo-3.1-fast-generate",
-    "veo3.1-fast-audio":     "veo-3.1-fast-generate",
-    "veo3.1-standard":       "veo-3.1-generate",
-    "veo3.1-standard-audio": "veo-3.1-generate",
-    "veo3-standard-audio":   "veo-3.0-generate",
+    "veo2":                  "veo-2.0-generate-preview",
+    "veo3.1-fast":           "veo-3.1-fast-generate-preview",
+    "veo3.1-fast-audio":     "veo-3.1-fast-generate-preview",
+    "veo3.1-standard":       "veo-3.1-generate-preview",
+    "veo3.1-standard-audio": "veo-3.1-generate-preview",
+    "veo3-standard-audio":   "veo-3.0-generate-preview",
   };
-  const apiModelId = MODEL_API_IDS[model] ?? "veo-2.0-generate-001";
+  const apiModelId = MODEL_API_IDS[model] ?? "veo-2.0-generate-preview";
   const includeAudio = model.endsWith("-audio");
 
   // Build the instance with optional first/last frame conditioning
@@ -395,32 +395,16 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
     parameters.generateAudio = true;
   }
 
-  // Use Vertex AI endpoint if GCP project is configured, otherwise fall back to Gemini API
-  let generateUrl: string;
-  let authHeaders: Record<string, string>;
-
-  if (gcpProjectId) {
-    // Vertex AI endpoint — supports image conditioning natively
-    generateUrl = `https://${gcpRegion}-aiplatform.googleapis.com/v1/projects/${gcpProjectId}/locations/${gcpRegion}/publishers/google/models/${apiModelId}:predictLongRunning`;
-    authHeaders = {
-      "Content-Type": "application/json",
-      "x-goog-api-key": apiKey,
-    };
-    console.log(`Using Vertex AI endpoint: ${generateUrl}`);
-  } else {
-    // Gemini API fallback — add -preview suffix for model IDs
-    const geminiModelId = apiModelId.endsWith("-preview") ? apiModelId : `${apiModelId}-preview`;
-    generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModelId}:predictLongRunning`;
-    authHeaders = {
-      "Content-Type": "application/json",
-      "x-goog-api-key": apiKey,
-    };
-    console.log(`Using Gemini API endpoint: ${generateUrl}`);
-  }
+  // Always use Gemini API — it supports API keys and image conditioning
+  const generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/${apiModelId}:predictLongRunning`;
+  console.log(`Using Gemini API endpoint: ${generateUrl}`);
 
   const generateResponse = await fetch(generateUrl, {
     method: "POST",
-    headers: authHeaders,
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": apiKey,
+    },
     body: JSON.stringify({
       instances: [instance],
       parameters,
@@ -435,9 +419,7 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
   const operation = await generateResponse.json();
   const operationName = operation.name;
 
-  // Determine the poll base URL
-  const pollBaseUrl = gcpProjectId
-    ? `https://${gcpRegion}-aiplatform.googleapis.com/v1`
+  const pollBaseUrl = `https://generativelanguage.googleapis.com/v1beta`;
     : `https://generativelanguage.googleapis.com/v1beta`;
 
   // Poll for completion (up to 5 minutes)
