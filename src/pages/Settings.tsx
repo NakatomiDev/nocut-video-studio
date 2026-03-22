@@ -10,15 +10,9 @@ import { useRevenueCatCustomer } from "@/hooks/useRevenueCat";
 const SettingsPage = () => {
   const { user, signOut } = useAuth();
   const [paywallOpen, setPaywallOpen] = useState(false);
-  const { hasProAccess, customerInfo } = useRevenueCatCustomer();
+  const { hasProAccess, hasBusinessAccess } = useRevenueCatCustomer();
 
-  // Derive current tier from entitlements
-  const productId = customerInfo?.entitlements.active["NoCut Pro"]?.productIdentifier;
-  const currentTier = productId?.includes("business")
-    ? "business"
-    : hasProAccess
-      ? "pro"
-      : "free";
+  const currentTier = hasBusinessAccess ? "business" : hasProAccess ? "pro" : "free";
 
   return (
     <div className="p-6 lg:p-8">
