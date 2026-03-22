@@ -89,7 +89,7 @@ export function useCreditsBalance() {
         session.access_token,
         { method: "GET" },
       );
-      setBalance(result.balance ?? (result as CreditBalance));
+      setBalance(result.balance);
     } catch (err: unknown) {
       if (isUnauthorizedError(err)) {
         await signOut();
