@@ -198,7 +198,10 @@ const ProjectEditor = () => {
             setProcessingStatus(null);
             setError(updated.error_message || 'Processing failed');
           } else if (['generating', 'exporting'].includes(updated.status)) {
-            setShowExportProgress(true);
+            // Don't switch to export progress if we're just doing a preview generation
+            if (!useEditorStore.getState().previewGeneratingCutId) {
+              setShowExportProgress(true);
+            }
             setProcessingStatus(null);
           } else if (['uploading', 'transcoding', 'detecting'].includes(updated.status)) {
             setProcessingStatus(updated.status);
