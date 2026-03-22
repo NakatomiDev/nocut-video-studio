@@ -10,6 +10,7 @@ interface Project {
   title: string;
   status: string;
   created_at: string;
+  thumbnailUrl?: string | null;
 }
 
 const Dashboard = () => {
