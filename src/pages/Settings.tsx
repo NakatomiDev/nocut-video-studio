@@ -1,14 +1,24 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LogOut } from "lucide-react";
 import { UpgradePaywall } from "@/components/UpgradePaywall";
+import { CustomerCenter } from "@/components/CustomerCenter";
+import { useRevenueCatCustomer } from "@/hooks/useRevenueCat";
 
 const SettingsPage = () => {
   const { user, signOut } = useAuth();
   const [paywallOpen, setPaywallOpen] = useState(false);
+  const { hasProAccess, customerInfo } = useRevenueCatCustomer();
+
+  // Derive current tier from entitlements
+  const productId = customerInfo?.entitlements.active["NoCut Pro"]?.productIdentifier;
+  const currentTier = productId?.includes("business")
+    ? "business"
+    : hasProAccess
+      ? "pro"
+      : "free";
 
   return (
     <div className="p-6 lg:p-8">
@@ -24,17 +34,18 @@ const SettingsPage = () => {
               <p className="text-sm text-muted-foreground">Email</p>
               <p className="text-sm font-medium text-foreground">{user?.email}</p>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Plan</p>
-              <Badge variant="outline" className="mt-1 border-primary/30 text-primary">
-                Free
-              </Badge>
-            </div>
-            <Button variant="outline" className="w-full" onClick={() => setPaywallOpen(true)}>
-              Upgrade Plan
-            </Button>
           </CardContent>
         </Card>
+
+        <CustomerCenter onManageSubscription={
+          hasProAccess ? undefined : () => setPaywallOpen(true)
+        } />
+
+        {!hasProAccess && (
+          <Button variant="outline" className="w-full" onClick={() => setPaywallOpen(true)}>
+            Upgrade Plan
+          </Button>
+        )}
 
         <Card className="border-border">
           <CardContent className="pt-6">
@@ -50,7 +61,7 @@ const SettingsPage = () => {
         </Card>
       </div>
 
-      <UpgradePaywall open={paywallOpen} onClose={() => setPaywallOpen(false)} currentTier="free" />
+      <UpgradePaywall open={paywallOpen} onClose={() => setPaywallOpen(false)} currentTier={currentTier} />
     </div>
   );
 };
