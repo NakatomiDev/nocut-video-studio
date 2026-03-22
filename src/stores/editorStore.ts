@@ -1,6 +1,19 @@
 import { create } from 'zustand';
 import type { Tables } from '@/integrations/supabase/types';
 
+export interface AiFill {
+  id: string;
+  editDecisionId: string;
+  gapIndex: number;
+  /** Time in the original video where the fill starts (= cut end) */
+  startTime: number;
+  duration: number;
+  s3Key: string | null;
+  provider: string | null;
+  qualityScore: number | null;
+  method: string;
+}
+
 export interface Cut {
   id: string;
   start: number;
@@ -35,6 +48,10 @@ interface EditorState {
   activeCuts: Set<string>;
   manualCuts: ManualCut[];
   activeManualCuts: Set<string>;
+  /** AI fills from completed edit decisions */
+  aiFills: AiFill[];
+  /** Whether to show AI fill overlays on timeline */
+  showFills: boolean;
   /** Maps cutId → selected AI fill duration in seconds (0 = no fill, just cut) */
   fillDurations: Map<string, number>;
   playheadPosition: number;
@@ -61,6 +78,8 @@ interface EditorState {
   setCreditBalance: (balance: CreditBalance) => void;
   setRazorMode: (active: boolean) => void;
   setRazorStart: (time: number | null) => void;
+  setAiFills: (fills: AiFill[]) => void;
+  toggleShowFills: () => void;
   reset: () => void;
 }
 
@@ -81,6 +100,8 @@ export const useEditorStore = create<EditorState>((set) => ({
   activeCuts: new Set<string>(),
   manualCuts: [],
   activeManualCuts: new Set<string>(),
+  aiFills: [],
+  showFills: true,
   fillDurations: new Map<string, number>(),
   playheadPosition: 0,
   isPlaying: false,
@@ -195,6 +216,8 @@ export const useEditorStore = create<EditorState>((set) => ({
   setCreditBalance: (creditBalance) => set({ creditBalance }),
   setRazorMode: (razorMode) => set({ razorMode, razorStart: null }),
   setRazorStart: (razorStart) => set({ razorStart }),
+  setAiFills: (aiFills) => set({ aiFills }),
+  toggleShowFills: () => set((state) => ({ showFills: !state.showFills })),
   reset: () =>
     set({
       project: null,
@@ -204,6 +227,8 @@ export const useEditorStore = create<EditorState>((set) => ({
       activeCuts: new Set(),
       manualCuts: [],
       activeManualCuts: new Set(),
+      aiFills: [],
+      showFills: true,
       fillDurations: new Map(),
       playheadPosition: 0,
       isPlaying: false,

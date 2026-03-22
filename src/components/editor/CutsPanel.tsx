@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useEditorStore, FILL_DURATION_OPTIONS, BUSINESS_FILL_DURATION_OPTIONS } from '@/stores/editorStore';
+import { useEditorStore, FILL_DURATION_OPTIONS, BUSINESS_FILL_DURATION_OPTIONS, type AiFill } from '@/stores/editorStore';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { X, AlertTriangle, Sparkles } from 'lucide-react';
+import { X, AlertTriangle, Sparkles, CheckCircle2 } from 'lucide-react';
 import CutThumbnail from './CutThumbnail';
 import ExactVideoFrame from './ExactVideoFrame';
 import {
@@ -59,6 +59,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     setCreditBalance,
     setPlayhead,
     project,
+    aiFills,
   } = useEditorStore();
 
   const [showExportDialog, setShowExportDialog] = useState(false);
@@ -179,9 +180,22 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
 
   const renderFillSelector = (cutId: string) => {
     const currentFill = fillDurations.get(cutId) || 0;
+    // Check if this cut already has a generated AI fill
+    const generatedFill = aiFills.find((f) => {
+      // Match by approximate start time of the cut's end
+      const allCuts = [...cuts, ...manualCuts.map((c) => ({ ...c, type: 'manual' }))];
+      const cut = allCuts.find((c) => c.id === cutId);
+      if (!cut) return false;
+      return Math.abs(f.startTime - cut.end) < 0.5;
+    });
+
     return (
       <div className="flex items-center gap-2 pl-5 mt-1">
-        <Sparkles className="h-3 w-3 text-primary shrink-0" />
+        {generatedFill ? (
+          <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
+        ) : (
+          <Sparkles className="h-3 w-3 text-primary shrink-0" />
+        )}
         <span className="text-[10px] text-muted-foreground whitespace-nowrap">AI Fill:</span>
         <Select
           value={currentFill > 0 ? String(currentFill) : 'none'}
@@ -204,6 +218,11 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
             ))}
           </SelectContent>
         </Select>
+        {generatedFill && (
+          <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[9px] ml-1">
+            Generated
+          </Badge>
+        )}
       </div>
     );
   };

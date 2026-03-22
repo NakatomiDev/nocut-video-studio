@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useEditorStore } from '@/stores/editorStore';
+import type { AiFill } from '@/stores/editorStore';
 import VideoPlayer from '@/components/editor/VideoPlayer';
 import WaveformTimeline from '@/components/editor/WaveformTimeline';
 import CutsPanel from '@/components/editor/CutsPanel';
@@ -11,7 +12,7 @@ import { ArrowLeft, Loader2, AlertTriangle } from 'lucide-react';
 const ProjectEditor = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const { project, video, setProject, setVideo, setCutMap, reset } = useEditorStore();
+  const { project, video, setProject, setVideo, setCutMap, setAiFills, reset } = useEditorStore();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [processingStatus, setProcessingStatus] = useState<string | null>(null);
@@ -120,13 +121,49 @@ const ProjectEditor = () => {
           .single();
 
         if (cm) setCutMap(cm);
+
+        // Fetch completed edit decisions and their AI fills
+        const { data: editDecisions } = await supabase
+          .from('edit_decisions')
+          .select('id, edl_json, status')
+          .eq('project_id', projectId)
+          .eq('status', 'complete')
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (editDecisions && editDecisions.length > 0) {
+          const latestEd = editDecisions[0];
+          const { data: fills } = await supabase
+            .from('ai_fills')
+            .select('*')
+            .eq('edit_decision_id', latestEd.id);
+
+          if (fills && fills.length > 0) {
+            const edlJson = latestEd.edl_json as Array<{ start: number; end: number; fill_duration: number }>;
+            const mappedFills: AiFill[] = fills.map((f) => {
+              const gapEntry = edlJson[f.gap_index];
+              return {
+                id: f.id,
+                editDecisionId: f.edit_decision_id,
+                gapIndex: f.gap_index,
+                startTime: gapEntry?.end ?? 0,
+                duration: f.duration ?? gapEntry?.fill_duration ?? 0,
+                s3Key: f.s3_key,
+                provider: f.provider,
+                qualityScore: f.quality_score,
+                method: f.method,
+              };
+            });
+            setAiFills(mappedFills);
+          }
+        }
       }
 
       setLoading(false);
     };
 
     load();
-  }, [projectId, setProject, setVideo, setCutMap]);
+  }, [projectId, setProject, setVideo, setCutMap, setAiFills]);
 
   // Realtime subscription for project status changes (processing, generating, etc.)
   useEffect(() => {
