@@ -12,6 +12,7 @@ interface EdlEntry {
   end: number;
   type: string;
   fill_duration: number;
+  model?: string;
 }
 
 let _s3Client: S3Client | null = null;
@@ -115,7 +116,7 @@ Deno.serve(async (req) => {
     const edlJson = editDecision.edl_json as EdlEntry[];
     const totalFillSeconds = editDecision.total_fill_seconds as number;
     const creditsCharged = editDecision.credits_charged as number;
-    const fillModel = (editDecision.model as string) ?? "veo3.1-fast";
+    const defaultModel = (editDecision.model as string) ?? "veo3.1-fast";
 
     const { data: projectVideo } = await serviceClient
       .from("videos")
@@ -200,7 +201,7 @@ Deno.serve(async (req) => {
           startTime: gap.end, // fill starts where the cut ends
           duration: gap.fill_duration,
           sourceVideoKey,
-          model: fillModel,
+          model: gap.model ?? defaultModel,
         });
       } catch (fillErr) {
         const msg = `AI fill generation failed for gap ${gap.gap_index}: ${(fillErr as Error).message}`;
@@ -348,13 +349,13 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
     throw new Error("GOOGLE_AI_API_KEY is not set — cannot call Veo API");
   }
 
-  // Map our model names to Gemini API model IDs
+  // Map our model names to Google Veo GA model IDs
   const MODEL_API_IDS: Record<string, string> = {
     "veo2":                  "veo-2.0-generate-001",
-    "veo3.1-fast":           "veo-3.0-generate-001",
-    "veo3.1-fast-audio":     "veo-3.0-generate-001",
-    "veo3.1-standard":       "veo-3.0-generate-001",
-    "veo3.1-standard-audio": "veo-3.0-generate-001",
+    "veo3.1-fast":           "veo-3.1-fast-generate-001",
+    "veo3.1-fast-audio":     "veo-3.1-fast-generate-001",
+    "veo3.1-standard":       "veo-3.1-generate-001",
+    "veo3.1-standard-audio": "veo-3.1-generate-001",
     "veo3-standard-audio":   "veo-3.0-generate-001",
   };
   const apiModelId = MODEL_API_IDS[model] ?? "veo-2.0-generate-001";
@@ -375,7 +376,7 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
           sampleCount: 1,
           durationSeconds: request.duration,
           aspectRatio: "16:9",
-          ...(includeAudio ? { includeAudio: true } : {}),
+          ...(includeAudio ? { generateAudio: true } : {}),
         },
       }),
     },

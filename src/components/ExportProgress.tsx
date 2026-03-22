@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Progress } from '@/components/ui/progress';
@@ -12,6 +12,14 @@ interface ExportProgressProps {
 }
 
 type Stage = 'generating' | 'exporting' | 'finalizing' | 'complete' | 'failed';
+
+const STAGE_ORDER: Record<Stage, number> = {
+  generating: 0,
+  exporting: 1,
+  finalizing: 2,
+  complete: 3,
+  failed: 3,
+};
 
 const stageConfig: Record<Stage, { label: string; sub: string; icon: React.ReactNode }> = {
   generating: {
@@ -46,7 +54,103 @@ const ExportProgress = ({ projectId, onComplete, onRetry }: ExportProgressProps)
   const [stage, setStage] = useState<Stage>('generating');
   const [progress, setProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const stageRef = useRef<Stage>('generating');
+  const progressRef = useRef(0);
 
+  // Only advance stage forward (never regress), unless it's 'failed'
+  const advanceStage = useCallback((newStage: Stage, newProgress: number, error?: string) => {
+    const current = stageRef.current;
+    if (STAGE_ORDER[newStage] >= STAGE_ORDER[current] || newStage === 'failed') {
+      // For same stage, only advance progress forward
+      if (newStage === current && newProgress < progressRef.current && newStage !== 'failed') {
+        return;
+      }
+      stageRef.current = newStage;
+      progressRef.current = newProgress;
+      setStage(newStage);
+      setProgress(newProgress);
+      if (error) setErrorMessage(error);
+    }
+  }, []);
+
+  const applyJobState = useCallback((job: Record<string, unknown>) => {
+    if (!job) return;
+    const jobType = job.type as string;
+    const status = job.status as string;
+    const progressPct = (job.progress_percent as number) ?? 0;
+
+    if (jobType === 'ai.fill') {
+      if (status === 'processing') {
+        advanceStage('generating', Math.min(progressPct * 0.6, 60));
+      } else if (status === 'complete') {
+        advanceStage('exporting', 60);
+      } else if (status === 'failed') {
+        advanceStage('failed', 0, (job.error_message as string) || 'AI fill generation failed');
+      }
+    } else if (jobType === 'video.export') {
+      if (status === 'processing') {
+        const s = progressPct >= 90 ? 'finalizing' as const : 'exporting' as const;
+        advanceStage(s, 60 + Math.min(progressPct * 0.4, 40));
+      } else if (status === 'complete') {
+        advanceStage('complete', 100);
+      } else if (status === 'failed') {
+        advanceStage('failed', 0, (job.error_message as string) || 'Video export failed');
+      }
+    }
+  }, [advanceStage]);
+
+  const applyProjectState = useCallback((proj: Record<string, unknown>) => {
+    if (!proj) return;
+    const status = proj.status as string;
+
+    if (status === 'complete' || status === 'ready') {
+      advanceStage('complete', 100);
+      supabase
+        .from('exports')
+        .select('id')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+        .then(({ data }) => {
+          if (data) onComplete(data.id);
+        });
+    } else if (status === 'failed') {
+      advanceStage('failed', 0, (proj.error_message as string) || 'Processing failed');
+    } else if (status === 'generating') {
+      advanceStage('generating', 0);
+    } else if (status === 'exporting') {
+      advanceStage('exporting', 60);
+    }
+  }, [advanceStage, projectId, onComplete]);
+
+  const fetchCurrentState = useCallback(async () => {
+    const { data: jobs } = await supabase
+      .from('job_queue')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false })
+      .limit(2);
+
+    if (jobs) {
+      // Apply oldest first so the most recent state wins
+      for (const job of [...jobs].reverse()) {
+        applyJobState(job as Record<string, unknown>);
+      }
+    }
+
+    const { data: proj } = await supabase
+      .from('projects')
+      .select('id, status, error_message')
+      .eq('id', projectId)
+      .single();
+
+    if (proj) {
+      applyProjectState(proj as Record<string, unknown>);
+    }
+  }, [projectId, applyJobState, applyProjectState]);
+
+  // Realtime subscriptions + initial fetch
   useEffect(() => {
     const jobChannel = supabase
       .channel(`export-jobs-${projectId}`)
@@ -59,36 +163,7 @@ const ExportProgress = ({ projectId, onComplete, onRetry }: ExportProgressProps)
           filter: `project_id=eq.${projectId}`,
         },
         (payload) => {
-          const job = payload.new as Record<string, unknown>;
-          if (!job) return;
-
-          const jobType = job.type as string;
-          const status = job.status as string;
-          const progressPct = (job.progress_percent as number) ?? 0;
-
-          if (jobType === 'ai.fill') {
-            if (status === 'processing') {
-              setStage('generating');
-              setProgress(Math.min(progressPct * 0.6, 60));
-            } else if (status === 'complete') {
-              setStage('exporting');
-              setProgress(60);
-            } else if (status === 'failed') {
-              setStage('failed');
-              setErrorMessage((job.error_message as string) || 'AI fill generation failed');
-            }
-          } else if (jobType === 'video.export') {
-            if (status === 'processing') {
-              setStage(progressPct >= 90 ? 'finalizing' : 'exporting');
-              setProgress(60 + Math.min(progressPct * 0.4, 40));
-            } else if (status === 'complete') {
-              setStage('complete');
-              setProgress(100);
-            } else if (status === 'failed') {
-              setStage('failed');
-              setErrorMessage((job.error_message as string) || 'Video export failed');
-            }
-          }
+          applyJobState(payload.new as Record<string, unknown>);
         }
       )
       .subscribe();
@@ -104,37 +179,30 @@ const ExportProgress = ({ projectId, onComplete, onRetry }: ExportProgressProps)
           filter: `id=eq.${projectId}`,
         },
         (payload) => {
-          const proj = payload.new as Record<string, unknown>;
-          if (proj.status === 'complete') {
-            setStage('complete');
-            setProgress(100);
-            supabase
-              .from('exports')
-              .select('id')
-              .eq('project_id', projectId)
-              .order('created_at', { ascending: false })
-              .limit(1)
-              .single()
-              .then(({ data }) => {
-                if (data) onComplete(data.id);
-              });
-          } else if (proj.status === 'failed') {
-            setStage('failed');
-            setErrorMessage((proj.error_message as string) || 'Processing failed');
-          } else if (proj.status === 'generating') {
-            setStage('generating');
-          } else if (proj.status === 'exporting') {
-            setStage('exporting');
-          }
+          applyProjectState(payload.new as Record<string, unknown>);
         }
       )
       .subscribe();
+
+    // Fetch current state to catch up on anything missed before subscriptions were ready
+    fetchCurrentState();
 
     return () => {
       supabase.removeChannel(jobChannel);
       supabase.removeChannel(projChannel);
     };
-  }, [projectId, onComplete]);
+  }, [projectId, applyJobState, applyProjectState, fetchCurrentState]);
+
+  // Polling safety net — re-fetch every 10s while still in progress
+  useEffect(() => {
+    if (stage === 'complete' || stage === 'failed') return;
+
+    const interval = setInterval(() => {
+      fetchCurrentState();
+    }, 10_000);
+
+    return () => clearInterval(interval);
+  }, [stage, fetchCurrentState]);
 
   const config = stageConfig[stage];
 
