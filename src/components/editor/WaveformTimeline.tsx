@@ -42,7 +42,7 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
     addManualCut,
   } = useEditorStore();
 
-  const [_waveformData, setWaveformData] = useState<number[]>([]);
+  const [waveformData, setWaveformData] = useState<number[]>([]);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [hoveredCut, setHoveredCut] = useState<string | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -215,30 +215,106 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
     canvas.height = h * dpr;
     ctx.scale(dpr, dpr);
 
+    // Layout: ruler (20px) | thumbnail track | 1px divider | waveform track
+    const rulerH = 20;
+    const dividerH = 1;
+    const trackArea = h - rulerH - dividerH;
+    const thumbH = Math.round(trackArea * 0.55);
+    const waveH = trackArea - thumbH;
+    const thumbY = rulerH;
+    const waveY = thumbY + thumbH + dividerH;
+
+    // Background
     ctx.fillStyle = 'hsl(230, 50%, 10%)';
     ctx.fillRect(0, 0, w, h);
 
-    // Video thumbnail filmstrip
-    if (thumbnailSprite && duration > 0) {
-      const spriteAspect = thumbnailSprite.naturalWidth / thumbnailSprite.naturalHeight;
-      const drawH = h;
-      const drawW = drawH * spriteAspect;
-
-      // If the sprite is narrower than totalWidth, tile it; otherwise stretch proportionally
-      if (drawW >= totalWidth) {
-        // Single draw covers the timeline
-        ctx.drawImage(thumbnailSprite, -scrollLeft, 0, drawW, drawH);
-      } else {
-        // Tile the sprite to fill the visible area
-        const scaleRatio = totalWidth / drawW;
-        const scaledW = totalWidth;
-        const scaledH = drawH * scaleRatio;
-        const yOffset = (h - scaledH) / 2;
-        ctx.drawImage(thumbnailSprite, -scrollLeft, yOffset, scaledW, scaledH);
+    // --- Time ruler ---
+    if (duration > 0) {
+      ctx.fillStyle = 'hsl(230, 40%, 14%)';
+      ctx.fillRect(0, 0, w, rulerH);
+      const pixelsPerSecond = totalWidth / duration;
+      let tickInterval = 1;
+      if (pixelsPerSecond < 5) tickInterval = 30;
+      else if (pixelsPerSecond < 15) tickInterval = 10;
+      else if (pixelsPerSecond < 40) tickInterval = 5;
+      ctx.fillStyle = 'hsl(230, 30%, 50%)';
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'center';
+      const startT = Math.floor((scrollLeft / totalWidth) * duration / tickInterval) * tickInterval;
+      const endT = Math.ceil(((scrollLeft + w) / totalWidth) * duration / tickInterval) * tickInterval;
+      for (let t = startT; t <= endT; t += tickInterval) {
+        const x = timeToX(t) - scrollLeft;
+        if (x < 0 || x > w) continue;
+        ctx.fillRect(x, rulerH - 5, 1, 5);
+        const m = Math.floor(t / 60);
+        const s = Math.floor(t % 60);
+        ctx.fillText(`${m}:${s.toString().padStart(2, '0')}`, x, rulerH - 7);
       }
     }
 
-    // Auto-detected cut overlays
+    // --- Thumbnail filmstrip (frame-by-frame, proper aspect ratio) ---
+    if (thumbnailSprite && duration > 0) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, thumbY, w, thumbH);
+      ctx.clip();
+
+      const spriteNatW = thumbnailSprite.naturalWidth;
+      const spriteNatH = thumbnailSprite.naturalHeight;
+      const frameAspect = 16 / 9;
+      const frameNatW = spriteNatH * frameAspect;
+      const frameCount = Math.max(1, Math.round(spriteNatW / frameNatW));
+      const singleFrameW = spriteNatW / frameCount;
+
+      // Each frame occupies (totalWidth / frameCount) pixels on the timeline
+      const frameW = totalWidth / frameCount;
+
+      for (let i = 0; i < frameCount; i++) {
+        const drawX = i * frameW - scrollLeft;
+        if (drawX + frameW < 0 || drawX > w) continue;
+        ctx.drawImage(
+          thumbnailSprite,
+          i * singleFrameW, 0, singleFrameW, spriteNatH,
+          drawX, thumbY, frameW, thumbH,
+        );
+      }
+      ctx.restore();
+    }
+
+    // --- Divider ---
+    ctx.fillStyle = 'hsl(230, 30%, 20%)';
+    ctx.fillRect(0, thumbY + thumbH, w, dividerH);
+
+    // --- Waveform ---
+    if (waveformData.length > 0 && duration > 0) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, waveY, w, waveH);
+      ctx.clip();
+
+      const samplesPerPixel = waveformData.length / totalWidth;
+      const startSample = Math.max(0, Math.floor(scrollLeft * samplesPerPixel));
+      const endSample = Math.min(waveformData.length, Math.ceil((scrollLeft + w) * samplesPerPixel));
+
+      const barWidth = Math.max(1, 1 / samplesPerPixel);
+      const midY = waveY + waveH / 2;
+
+      for (let i = startSample; i < endSample; i++) {
+        const x = (i / samplesPerPixel) - scrollLeft;
+        const amplitude = waveformData[i] || 0;
+        const barH = amplitude * (waveH * 0.45);
+
+        const alpha = 0.35 + amplitude * 0.65;
+        ctx.fillStyle = `hsla(210, 60%, 55%, ${alpha})`;
+        ctx.fillRect(x, midY - barH, barWidth, barH * 2);
+      }
+      ctx.restore();
+    }
+
+    // --- Cut overlays (span both tracks) ---
+    const overlayY = thumbY;
+    const overlayH = thumbH + dividerH + waveH;
+
     for (const cut of cuts) {
       const isActive = activeCuts.has(cut.id);
       const isHovered = hoveredCut === cut.id;
@@ -249,13 +325,12 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
       ctx.fillStyle = isActive
         ? isHovered ? 'hsla(252, 75%, 65%, 0.45)' : 'hsla(252, 75%, 65%, 0.3)'
         : 'hsla(220, 13%, 36%, 0.15)';
-      ctx.fillRect(x1, 0, x2 - x1, h);
+      ctx.fillRect(x1, overlayY, x2 - x1, overlayH);
       ctx.strokeStyle = isActive ? 'hsla(252, 75%, 65%, 0.6)' : 'hsla(220, 13%, 36%, 0.3)';
       ctx.lineWidth = 1;
-      ctx.strokeRect(x1, 0, x2 - x1, h);
+      ctx.strokeRect(x1, overlayY, x2 - x1, overlayH);
     }
 
-    // Manual cut overlays (purple/violet)
     for (const cut of manualCuts) {
       const isActive = activeManualCuts.has(cut.id);
       if (!isActive) continue;
@@ -263,21 +338,21 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
       const x2 = timeToX(cut.end) - scrollLeft;
       if (x2 < 0 || x1 > w) continue;
       ctx.fillStyle = 'hsla(270, 70%, 60%, 0.35)';
-      ctx.fillRect(x1, 0, x2 - x1, h);
+      ctx.fillRect(x1, overlayY, x2 - x1, overlayH);
       ctx.strokeStyle = 'hsla(270, 70%, 60%, 0.7)';
       ctx.lineWidth = 1.5;
-      ctx.strokeRect(x1, 0, x2 - x1, h);
+      ctx.strokeRect(x1, overlayY, x2 - x1, overlayH);
     }
 
-    // Razor start line + preview region
+    // Razor
     if (razorMode && razorStart !== null) {
       const sx = timeToX(razorStart) - scrollLeft;
       ctx.strokeStyle = 'hsla(270, 90%, 70%, 0.9)';
       ctx.lineWidth = 2;
       ctx.setLineDash([4, 4]);
       ctx.beginPath();
-      ctx.moveTo(sx, 0);
-      ctx.lineTo(sx, h);
+      ctx.moveTo(sx, overlayY);
+      ctx.lineTo(sx, overlayY + overlayH);
       ctx.stroke();
       ctx.setLineDash([]);
 
@@ -286,31 +361,11 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
         const left = Math.min(sx, px);
         const right = Math.max(sx, px);
         ctx.fillStyle = 'hsla(270, 70%, 60%, 0.2)';
-        ctx.fillRect(left, 0, right - left, h);
+        ctx.fillRect(left, overlayY, right - left, overlayH);
       }
     }
 
-    // Time markers
-    const pixelsPerSecond = totalWidth / duration;
-    let tickInterval = 1;
-    if (pixelsPerSecond < 5) tickInterval = 30;
-    else if (pixelsPerSecond < 15) tickInterval = 10;
-    else if (pixelsPerSecond < 40) tickInterval = 5;
-    ctx.fillStyle = 'hsl(230, 30%, 40%)';
-    ctx.font = '10px monospace';
-    ctx.textAlign = 'center';
-    const startT = Math.floor((scrollLeft / totalWidth) * duration / tickInterval) * tickInterval;
-    const endT = Math.ceil(((scrollLeft + w) / totalWidth) * duration / tickInterval) * tickInterval;
-    for (let t = startT; t <= endT; t += tickInterval) {
-      const x = timeToX(t) - scrollLeft;
-      if (x < 0 || x > w) continue;
-      ctx.fillRect(x, 0, 1, 8);
-      const m = Math.floor(t / 60);
-      const s = Math.floor(t % 60);
-      ctx.fillText(`${m}:${s.toString().padStart(2, '0')}`, x, 18);
-    }
-
-    // Playhead
+    // --- Playhead (full height) ---
     const playX = timeToX(playheadPosition) - scrollLeft;
     if (playX >= 0 && playX <= w) {
       ctx.fillStyle = 'hsl(0, 84%, 60%)';
@@ -323,7 +378,7 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
       ctx.fill();
     }
   }, [
-    thumbnailSprite, containerWidth, totalWidth, scrollLeft, duration,
+    thumbnailSprite, waveformData, containerWidth, totalWidth, scrollLeft, duration,
     cuts, activeCuts, manualCuts, activeManualCuts,
     hoveredCut, playheadPosition, timeToX,
     razorMode, razorStart, razorPreview,
