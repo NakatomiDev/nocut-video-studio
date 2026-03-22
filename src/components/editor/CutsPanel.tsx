@@ -61,6 +61,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, duration }: CutsPanelProps) => {
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [userTier, setUserTier] = useState<string>('free');
+  const [expandedReviewId, setExpandedReviewId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchBalance = async () => {
