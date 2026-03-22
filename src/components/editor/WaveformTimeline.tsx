@@ -261,9 +261,8 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
 
       const spriteNatW = thumbnailSprite.naturalWidth;
       const spriteNatH = thumbnailSprite.naturalHeight;
-      const frameAspect = 16 / 9;
-      const frameNatW = spriteNatH * frameAspect;
-      const frameCount = Math.max(1, Math.round(spriteNatW / frameNatW));
+      // Frame count matches generation logic: ceil(duration/2) clamped to [5, 60]
+      const frameCount = Math.min(Math.max(Math.ceil(duration / 2), 5), 60);
       const singleFrameW = spriteNatW / frameCount;
 
       // Each frame occupies (totalWidth / frameCount) pixels on the timeline
