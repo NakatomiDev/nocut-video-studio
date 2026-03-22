@@ -18,7 +18,7 @@ import NotFound from "@/pages/NotFound";
 import { Loader2 } from "lucide-react";
 const queryClient = new QueryClient();
 
-const RootRedirect = () => {
+const AuthRedirect = () => {
   const { session, loading } = useAuth();
   if (loading) {
     return (
@@ -27,7 +27,7 @@ const RootRedirect = () => {
       </div>
     );
   }
-  return <Navigate to={session ? "/dashboard" : "/sign-in"} replace />;
+  return session ? <Navigate to="/dashboard" replace /> : <Landing />;
 };
 
 const ProtectedWithLayout = ({ children }: { children: React.ReactNode }) => (
