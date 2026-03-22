@@ -81,6 +81,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   activeCuts: new Set<string>(),
   manualCuts: [],
   activeManualCuts: new Set<string>(),
+  fillDurations: new Map<string, number>(),
   playheadPosition: 0,
   isPlaying: false,
   zoomLevel: 1,
@@ -103,22 +104,29 @@ export const useEditorStore = create<EditorState>((set) => ({
       auto_accept: c.auto_accept ?? false,
     }));
     const activeCuts = new Set(cuts.filter((c) => c.auto_accept).map((c) => c.id));
-    set((state) => ({
+    set({
       cutMap,
       cuts,
       activeCuts,
-      creditEstimate: calcCredits(cuts, activeCuts, state.manualCuts, state.activeManualCuts),
-    }));
+      fillDurations: new Map(),
+      creditEstimate: 0,
+    });
   },
   setCuts: (cuts) => set({ cuts }),
   toggleCut: (cutId) =>
     set((state) => {
       const next = new Set(state.activeCuts);
-      if (next.has(cutId)) next.delete(cutId);
-      else next.add(cutId);
+      const nextFills = new Map(state.fillDurations);
+      if (next.has(cutId)) {
+        next.delete(cutId);
+        nextFills.delete(cutId);
+      } else {
+        next.add(cutId);
+      }
       return {
         activeCuts: next,
-        creditEstimate: calcCredits(state.cuts, next, state.manualCuts, state.activeManualCuts),
+        fillDurations: nextFills,
+        creditEstimate: calcCredits(nextFills),
       };
     }),
   addManualCut: (start, end) =>
@@ -134,7 +142,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       return {
         manualCuts,
         activeManualCuts,
-        creditEstimate: calcCredits(state.cuts, state.activeCuts, manualCuts, activeManualCuts),
+        creditEstimate: calcCredits(state.fillDurations),
       };
     }),
   removeManualCut: (id) =>
@@ -142,20 +150,42 @@ export const useEditorStore = create<EditorState>((set) => ({
       const manualCuts = state.manualCuts.filter((c) => c.id !== id);
       const activeManualCuts = new Set(state.activeManualCuts);
       activeManualCuts.delete(id);
+      const nextFills = new Map(state.fillDurations);
+      nextFills.delete(id);
       return {
         manualCuts,
         activeManualCuts,
-        creditEstimate: calcCredits(state.cuts, state.activeCuts, manualCuts, activeManualCuts),
+        fillDurations: nextFills,
+        creditEstimate: calcCredits(nextFills),
       };
     }),
   toggleManualCut: (cutId) =>
     set((state) => {
       const next = new Set(state.activeManualCuts);
-      if (next.has(cutId)) next.delete(cutId);
-      else next.add(cutId);
+      const nextFills = new Map(state.fillDurations);
+      if (next.has(cutId)) {
+        next.delete(cutId);
+        nextFills.delete(cutId);
+      } else {
+        next.add(cutId);
+      }
       return {
         activeManualCuts: next,
-        creditEstimate: calcCredits(state.cuts, state.activeCuts, state.manualCuts, next),
+        fillDurations: nextFills,
+        creditEstimate: calcCredits(nextFills),
+      };
+    }),
+  setFillDuration: (cutId, seconds) =>
+    set((state) => {
+      const nextFills = new Map(state.fillDurations);
+      if (seconds <= 0) {
+        nextFills.delete(cutId);
+      } else {
+        nextFills.set(cutId, seconds);
+      }
+      return {
+        fillDurations: nextFills,
+        creditEstimate: calcCredits(nextFills),
       };
     }),
   setPlayhead: (time) => set({ playheadPosition: time }),
@@ -174,6 +204,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       activeCuts: new Set(),
       manualCuts: [],
       activeManualCuts: new Set(),
+      fillDurations: new Map(),
       playheadPosition: 0,
       isPlaying: false,
       zoomLevel: 1,
