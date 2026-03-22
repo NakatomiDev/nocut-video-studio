@@ -3,8 +3,9 @@ import { useEditorStore } from '@/stores/editorStore';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { X, Play, Plus, Trash2, Loader2, Sparkles, RefreshCw } from 'lucide-react';
+import { X, Play, Pause, Plus, Trash2, Loader2, Sparkles, RefreshCw } from 'lucide-react';
 import { usePreviewFill } from '@/hooks/usePreviewFill';
+import { Progress } from '@/components/ui/progress';
 
 const formatTimestamp = (s: number) => {
   const m = Math.floor(s / 60);
@@ -29,12 +30,17 @@ const FillPreviewPanel = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playProgress, setPlayProgress] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const fill = selectedFill;
   const isMock = fill?.provider === 'mock';
   const startSec = isMock ? (fill?.startTime ?? 0) : 0;
-  const endSec = isMock ? (fill?.startTime ?? 0) + (fill?.duration ?? 0) : Infinity;
+  const endSec = isMock ? (fill?.startTime ?? 0) + (fill?.duration ?? 0) : undefined;
+
+  // Display model name instead of "mock"
+  const displayLabel = fill?.duration ? `${fill.duration}s` : '';
 
   useEffect(() => {
     if (!fill?.s3Key) {
@@ -47,6 +53,8 @@ const FillPreviewPanel = () => {
     setLoading(true);
     setError(null);
     setVideoUrl(null);
+    setPlayProgress(0);
+    setIsPlaying(false);
 
     console.log('[FillPreview] Fetching signed URL for:', fill.s3Key);
 
@@ -63,6 +71,7 @@ const FillPreviewPanel = () => {
         const url = data?.url || data?.data?.url;
         console.log('[FillPreview] Got URL:', url ? 'yes' : 'no');
         if (url) {
+          // For mock: append media fragment to hint browser at segment
           setVideoUrl(isMock ? `${url}#t=${startSec},${endSec}` : url);
         } else {
           setError('Fill video not available yet');
@@ -79,7 +88,6 @@ const FillPreviewPanel = () => {
 
   const isInserted = insertedFills.has(fill.id);
 
-  // Reverse-lookup: find the cut ID that matches this fill's startTime
   const matchingCut = [...cuts, ...manualCuts].find(
     (c) => Math.abs(c.end - fill.startTime) < 0.5,
   );
@@ -87,6 +95,19 @@ const FillPreviewPanel = () => {
   const handleJumpTo = () => {
     pause();
     setPlayhead(fill.startTime);
+  };
+
+  const togglePlay = () => {
+    if (!videoRef.current) return;
+    if (isPlaying) {
+      videoRef.current.pause();
+    } else {
+      // If at end of segment, restart
+      if (isMock && endSec !== undefined && videoRef.current.currentTime >= endSec - 0.1) {
+        videoRef.current.currentTime = startSec;
+      }
+      videoRef.current.play();
+    }
   };
 
   return (
@@ -97,7 +118,7 @@ const FillPreviewPanel = () => {
           <Sparkles className="h-3.5 w-3.5 text-primary" />
           <span className="text-xs font-semibold text-foreground">AI Fill Preview</span>
           <Badge variant="outline" className="text-[9px]">
-            {fill.provider || 'mock'} · {fill.duration}s
+            {isMock ? 'Preview' : 'AI Generated'} · {displayLabel}
           </Badge>
         </div>
         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => selectFill(null)}>
@@ -105,39 +126,69 @@ const FillPreviewPanel = () => {
         </Button>
       </div>
 
-      {/* Video preview */}
-      <div className="bg-black aspect-video flex items-center justify-center">
+      {/* Video preview — no native controls, custom play/pause */}
+      <div className="bg-black aspect-video flex items-center justify-center relative group">
         {loading && <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
         {error && <span className="text-xs text-muted-foreground px-4 text-center">{error}</span>}
         {!loading && !error && videoUrl && (
-          <video
-            ref={videoRef}
-            key={videoUrl}
-            src={videoUrl}
-            className="w-full h-full object-contain"
-            controls
-            preload="auto"
-            crossOrigin="anonymous"
-            onLoadedMetadata={() => {
-              if (videoRef.current && isMock) {
-                videoRef.current.currentTime = startSec;
-              }
-            }}
-            onTimeUpdate={() => {
-              if (videoRef.current && isMock) {
-                if (videoRef.current.currentTime >= endSec) {
-                  videoRef.current.pause();
-                  videoRef.current.currentTime = startSec;
-                } else if (videoRef.current.currentTime < startSec) {
+          <>
+            <video
+              ref={videoRef}
+              key={videoUrl}
+              src={videoUrl}
+              className="w-full h-full object-contain"
+              preload="auto"
+              crossOrigin="anonymous"
+              onLoadedMetadata={() => {
+                if (videoRef.current && isMock) {
                   videoRef.current.currentTime = startSec;
                 }
-              }
-            }}
-            onError={(e) => {
-              console.error('[FillPreview] Video load error:', e);
-              setError('Failed to load video file');
-            }}
-          />
+              }}
+              onTimeUpdate={() => {
+                if (!videoRef.current) return;
+                const ct = videoRef.current.currentTime;
+                if (isMock) {
+                  if (endSec !== undefined && ct >= endSec) {
+                    videoRef.current.pause();
+                    videoRef.current.currentTime = startSec;
+                    setIsPlaying(false);
+                    setPlayProgress(100);
+                    return;
+                  }
+                  if (ct < startSec) {
+                    videoRef.current.currentTime = startSec;
+                  }
+                  const segDur = (endSec ?? startSec + (fill?.duration ?? 1)) - startSec;
+                  setPlayProgress(segDur > 0 ? ((ct - startSec) / segDur) * 100 : 0);
+                } else {
+                  const dur = videoRef.current.duration || 1;
+                  setPlayProgress((ct / dur) * 100);
+                }
+              }}
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
+              onEnded={() => { setIsPlaying(false); setPlayProgress(100); }}
+              onError={(e) => {
+                console.error('[FillPreview] Video load error:', e);
+                setError('Failed to load video file');
+              }}
+            />
+            {/* Custom play/pause overlay */}
+            <button
+              className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+              onClick={togglePlay}
+            >
+              {isPlaying ? (
+                <Pause className="h-10 w-10 text-white drop-shadow-lg" />
+              ) : (
+                <Play className="h-10 w-10 text-white drop-shadow-lg" />
+              )}
+            </button>
+            {/* Segment progress bar */}
+            <div className="absolute bottom-0 left-0 right-0 h-1">
+              <Progress value={playProgress} className="h-1 rounded-none bg-black/40 [&>div]:bg-primary" />
+            </div>
+          </>
         )}
         {!loading && !error && !videoUrl && (
           <span className="text-xs text-muted-foreground">No video file available</span>
