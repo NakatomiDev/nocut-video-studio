@@ -190,7 +190,11 @@ export const useEditorStore = create<EditorState>((set) => ({
   setVideo: (video) => set({ video }),
   setCutMap: (cutMap) => {
     const rawCuts = (cutMap.cuts_json as any[]) || [];
-    const cuts: Cut[] = rawCuts.map((c, i) => ({
+    // Separate auto-detected cuts from manual cuts
+    const autoCuts = rawCuts.filter((c) => c.type !== 'manual');
+    const manualRaw = rawCuts.filter((c) => c.type === 'manual');
+    
+    const cuts: Cut[] = autoCuts.map((c, i) => ({
       id: c.id || `cut-${i}`,
       start: c.start ?? c.start_time ?? 0,
       end: c.end ?? c.end_time ?? 0,
@@ -199,11 +203,33 @@ export const useEditorStore = create<EditorState>((set) => ({
       confidence: c.confidence ?? 0,
       auto_accept: c.auto_accept ?? false,
     }));
+    
+    const manualCuts: ManualCut[] = manualRaw.map((c, i) => {
+      const id = c.id || `manual-${++manualCutCounter}`;
+      return {
+        id,
+        start: c.start ?? 0,
+        end: c.end ?? 0,
+        duration: (c.end ?? 0) - (c.start ?? 0),
+      };
+    });
+    // Update counter to avoid ID collisions
+    if (manualCuts.length > 0) {
+      const maxIdx = Math.max(...manualCuts.map(c => {
+        const match = c.id.match(/manual-(\d+)/);
+        return match ? parseInt(match[1], 10) : 0;
+      }));
+      if (maxIdx > manualCutCounter) manualCutCounter = maxIdx;
+    }
+    
     const activeCuts = new Set(cuts.filter((c) => c.auto_accept).map((c) => c.id));
+    const activeManualCuts = new Set(manualCuts.map((c) => c.id));
     set({
       cutMap,
       cuts,
       activeCuts,
+      manualCuts,
+      activeManualCuts,
       fillDurations: new Map(),
       fillModels: new Map(),
       creditEstimate: 0,
