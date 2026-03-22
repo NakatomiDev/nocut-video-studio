@@ -115,6 +115,10 @@ interface EditorState {
   creditBalance: CreditBalance;
   razorMode: boolean;
   razorStart: number | null;
+  /** Cut ID currently being preview-generated (null = idle). Enforces one-at-a-time. */
+  previewGeneratingCutId: string | null;
+  /** job_queue.id for the in-flight preview job */
+  previewJobId: string | null;
 
   setProject: (project: Tables<'projects'>) => void;
   setVideo: (video: Tables<'videos'>) => void;
@@ -139,6 +143,8 @@ interface EditorState {
   insertFill: (fillId: string) => void;
   removeFill: (fillId: string) => void;
   setFillVideoUrl: (fillId: string, url: string) => void;
+  startPreviewGeneration: (cutId: string, jobId: string) => void;
+  clearPreviewGeneration: () => void;
   reset: () => void;
 }
 
@@ -176,6 +182,8 @@ export const useEditorStore = create<EditorState>((set) => ({
   creditBalance: { total: 0, monthly: 0, topup: 0 },
   razorMode: false,
   razorStart: null,
+  previewGeneratingCutId: null,
+  previewJobId: null,
 
   setProject: (project) => set({ project }),
   setVideo: (video) => set({ video }),
@@ -322,6 +330,10 @@ export const useEditorStore = create<EditorState>((set) => ({
       next.set(fillId, url);
       return { fillVideoUrls: next };
     }),
+  startPreviewGeneration: (cutId, jobId) =>
+    set({ previewGeneratingCutId: cutId, previewJobId: jobId }),
+  clearPreviewGeneration: () =>
+    set({ previewGeneratingCutId: null, previewJobId: null }),
   reset: () =>
     set({
       project: null,
@@ -345,5 +357,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       creditBalance: { total: 0, monthly: 0, topup: 0 },
       razorMode: false,
       razorStart: null,
+      previewGeneratingCutId: null,
+      previewJobId: null,
     }),
 }));

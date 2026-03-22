@@ -3,7 +3,8 @@ import { useEditorStore } from '@/stores/editorStore';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { X, Play, Plus, Trash2, Loader2, Sparkles } from 'lucide-react';
+import { X, Play, Plus, Trash2, Loader2, Sparkles, RefreshCw } from 'lucide-react';
+import { usePreviewFill } from '@/hooks/usePreviewFill';
 
 const formatTimestamp = (s: number) => {
   const m = Math.floor(s / 60);
@@ -19,6 +20,11 @@ const FillPreviewPanel = () => {
   const removeFill = useEditorStore((s) => s.removeFill);
   const setPlayhead = useEditorStore((s) => s.setPlayhead);
   const pause = useEditorStore((s) => s.pause);
+
+  const cuts = useEditorStore((s) => s.cuts);
+  const manualCuts = useEditorStore((s) => s.manualCuts);
+  const previewGeneratingCutId = useEditorStore((s) => s.previewGeneratingCutId);
+  const { generatePreview } = usePreviewFill();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +74,11 @@ const FillPreviewPanel = () => {
   if (!fill) return null;
 
   const isInserted = insertedFills.has(fill.id);
+
+  // Reverse-lookup: find the cut ID that matches this fill's startTime
+  const matchingCut = [...cuts, ...manualCuts].find(
+    (c) => Math.abs(c.end - fill.startTime) < 0.5,
+  );
 
   const handleJumpTo = () => {
     pause();
@@ -130,6 +141,20 @@ const FillPreviewPanel = () => {
           )}
         </div>
         <div className="flex items-center gap-2">
+          {matchingCut && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              disabled={!!previewGeneratingCutId}
+              onClick={() => {
+                generatePreview(matchingCut.id);
+                selectFill(null);
+              }}
+            >
+              <RefreshCw className="h-3 w-3 mr-1" /> Regenerate
+            </Button>
+          )}
           {isInserted ? (
             <Button
               variant="ghost"

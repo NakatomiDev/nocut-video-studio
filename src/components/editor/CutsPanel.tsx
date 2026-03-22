@@ -5,9 +5,10 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { X, AlertTriangle, Sparkles, CheckCircle2 } from 'lucide-react';
+import { X, AlertTriangle, Sparkles, CheckCircle2, Eye, RefreshCw, Loader2 } from 'lucide-react';
 import CutThumbnail from './CutThumbnail';
 import ExactVideoFrame from './ExactVideoFrame';
+import { usePreviewFill } from '@/hooks/usePreviewFill';
 import {
   Select,
   SelectContent,
@@ -64,8 +65,11 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     setPlayhead,
     project,
     aiFills,
+    selectFill,
+    previewGeneratingCutId,
   } = useEditorStore();
 
+  const { generatePreview } = usePreviewFill();
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [userTier, setUserTier] = useState<string>('free');
@@ -271,6 +275,46 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
             <span className="text-[9px] text-muted-foreground">Silent</span>
           )}
         </div>
+        {/* Preview fill button */}
+        {currentFill > 0 && (
+          <div className="flex items-center gap-2 pl-5">
+            {generatedFill ? (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 text-[10px]"
+                  onClick={(e) => { e.stopPropagation(); selectFill(generatedFill); }}
+                >
+                  <Eye className="h-3 w-3 mr-1" /> View Fill
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-[10px]"
+                  disabled={!!previewGeneratingCutId}
+                  onClick={(e) => { e.stopPropagation(); generatePreview(cutId); }}
+                >
+                  <RefreshCw className="h-3 w-3 mr-1" /> Redo
+                </Button>
+              </>
+            ) : previewGeneratingCutId === cutId ? (
+              <Button variant="outline" size="sm" className="h-6 text-[10px]" disabled>
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" /> Generating...
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 text-[10px]"
+                disabled={!!previewGeneratingCutId}
+                onClick={(e) => { e.stopPropagation(); generatePreview(cutId); }}
+              >
+                <Eye className="h-3 w-3 mr-1" /> Preview Fill
+              </Button>
+            )}
+          </div>
+        )}
       </div>
     );
   };
@@ -446,7 +490,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
         )}
         <Button
           className="w-full"
-          disabled={!hasActiveCuts || insufficientCredits}
+          disabled={!hasActiveCuts || insufficientCredits || !!previewGeneratingCutId}
           onClick={() => setShowExportDialog(true)}
         >
           {creditEstimate > 0 ? `Export (${creditEstimate} credits)` : 'Export (free)'}

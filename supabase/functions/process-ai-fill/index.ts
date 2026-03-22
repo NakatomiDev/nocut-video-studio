@@ -96,10 +96,11 @@ Deno.serve(async (req) => {
       return errorResponse("conflict", `Job already ${job.status}`, 409);
     }
 
-    const payload = job.payload as { edit_decision_id: string };
+    const payload = job.payload as { edit_decision_id: string; preview?: boolean };
     if (!payload?.edit_decision_id) {
       return errorResponse("invalid_request", "Job payload missing edit_decision_id", 400);
     }
+    const isPreview = !!payload.preview;
 
     // 5. Load edit decision
     const { data: editDecision, error: edError } = await serviceClient
@@ -144,13 +145,13 @@ Deno.serve(async (req) => {
 
       if (creditError) {
         console.error("Credit deduction RPC error:", creditError);
-        await failJob(serviceClient, job.id, editDecision.id, "Credit deduction failed");
+        await failJob(serviceClient, job.id, editDecision.id, "Credit deduction failed", isPreview);
         return errorResponse("internal_error", "Credit deduction failed", 500);
       }
 
       const result = creditResult?.[0] ?? creditResult;
       if (!result?.out_success) {
-        await failJob(serviceClient, job.id, editDecision.id, result?.out_message || "Insufficient credits");
+        await failJob(serviceClient, job.id, editDecision.id, result?.out_message || "Insufficient credits", isPreview);
         return errorResponse("payment_required", result?.out_message || "Insufficient credits", 402);
       }
 
@@ -169,10 +170,12 @@ Deno.serve(async (req) => {
       .update({ status: "generating" })
       .eq("id", editDecision.id);
 
-    await serviceClient
-      .from("projects")
-      .update({ status: "generating" })
-      .eq("id", project.id);
+    if (!isPreview) {
+      await serviceClient
+        .from("projects")
+        .update({ status: "generating" })
+        .eq("id", project.id);
+    }
 
     const fillGaps = edlJson
       .map((entry, index) => ({ ...entry, gap_index: index }))
@@ -206,7 +209,7 @@ Deno.serve(async (req) => {
       } catch (fillErr) {
         const msg = `AI fill generation failed for gap ${gap.gap_index}: ${(fillErr as Error).message}`;
         console.error(msg);
-        await failJob(serviceClient, job.id, editDecision.id, msg);
+        await failJob(serviceClient, job.id, editDecision.id, msg, isPreview);
         return errorResponse("ai_generation_failed", msg, 502);
       }
 
@@ -231,7 +234,7 @@ Deno.serve(async (req) => {
       if (fillInsertError) {
         const msg = `Failed to persist ai_fill for gap ${gap.gap_index}: ${fillInsertError.message}`;
         console.error(msg);
-        await failJob(serviceClient, job.id, editDecision.id, msg);
+        await failJob(serviceClient, job.id, editDecision.id, msg, isPreview);
         return errorResponse("internal_error", msg, 500);
       }
 
@@ -252,10 +255,12 @@ Deno.serve(async (req) => {
       .update({ status: "complete" })
       .eq("id", editDecision.id);
 
-    await serviceClient
-      .from("projects")
-      .update({ status: "ready" })
-      .eq("id", project.id);
+    if (!isPreview) {
+      await serviceClient
+        .from("projects")
+        .update({ status: "ready" })
+        .eq("id", project.id);
+    }
 
     return successResponse({
       job_id: job.id,
@@ -437,6 +442,7 @@ async function failJob(
   jobId: string,
   editDecisionId: string,
   message: string,
+  preview = false,
 ) {
   await serviceClient
     .from("job_queue")
@@ -452,17 +458,19 @@ async function failJob(
     .update({ status: "failed" })
     .eq("id", editDecisionId);
 
-  // Also update project status so realtime subscribers see the failure
-  const { data: ed } = await serviceClient
-    .from("edit_decisions")
-    .select("project_id")
-    .eq("id", editDecisionId)
-    .single();
+  // Skip project status update for preview jobs
+  if (!preview) {
+    const { data: ed } = await serviceClient
+      .from("edit_decisions")
+      .select("project_id")
+      .eq("id", editDecisionId)
+      .single();
 
-  if (ed?.project_id) {
-    await serviceClient
-      .from("projects")
-      .update({ status: "failed", error_message: message })
-      .eq("id", ed.project_id);
+    if (ed?.project_id) {
+      await serviceClient
+        .from("projects")
+        .update({ status: "failed", error_message: message })
+        .eq("id", ed.project_id);
+    }
   }
 }
