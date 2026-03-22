@@ -351,17 +351,17 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
   // Map our model names to Gemini API model IDs
   const MODEL_API_IDS: Record<string, string> = {
     "veo2":                  "veo-2.0-generate-001",
-    "veo3.1-fast":           "veo-3.1-fast-generate-001",
-    "veo3.1-fast-audio":     "veo-3.1-fast-generate-001",
-    "veo3.1-standard":       "veo-3.1-generate-001",
-    "veo3.1-standard-audio": "veo-3.1-generate-001",
+    "veo3.1-fast":           "veo-3.0-generate-001",
+    "veo3.1-fast-audio":     "veo-3.0-generate-001",
+    "veo3.1-standard":       "veo-3.0-generate-001",
+    "veo3.1-standard-audio": "veo-3.0-generate-001",
     "veo3-standard-audio":   "veo-3.0-generate-001",
   };
-  const apiModelId = MODEL_API_IDS[model] ?? "veo-3.1-fast-generate-001";
+  const apiModelId = MODEL_API_IDS[model] ?? "veo-2.0-generate-001";
   const includeAudio = model.endsWith("-audio");
 
   const generateResponse = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${apiModelId}:predictLongRunning`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${apiModelId}:generateVideos`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
