@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { Tables } from '@/integrations/supabase/types';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface AiFill {
   id: string;
