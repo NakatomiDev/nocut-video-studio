@@ -354,6 +354,9 @@ authorization_url_path = "/oauth/consent"
 # Allow dynamic client registration
 allow_dynamic_registration = false
 
+# verify_jwt = false because Supabase's signing-keys system uses a different
+# JWT format that the relay layer cannot validate. Auth is handled in-code
+# via getClaims() in _shared/auth.ts instead.
 [functions.upload-initiate]
 verify_jwt = false
 
