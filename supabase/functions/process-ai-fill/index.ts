@@ -412,12 +412,40 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
 
     const pollResult = await pollResponse.json();
     if (pollResult.done) {
-      const videoUri = pollResult.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri;
+      // predictLongRunning returns result in response.generateVideoResponse or result
+      const response = pollResult.response ?? pollResult.result;
+      const generatedSamples =
+        response?.generateVideoResponse?.generatedSamples ??
+        response?.generatedSamples ??
+        [];
+      const videoUri = generatedSamples[0]?.video?.uri;
       if (!videoUri) {
+        console.error("Veo completed but no video URI found. Full response:", JSON.stringify(pollResult));
         throw new Error("Veo completed but returned no video URI");
       }
 
+      // Download the generated video and upload to S3
       const s3Key = `ai-fills/${request.projectId}/${request.editDecisionId}/gap_${request.gapIndex}_${request.duration}s.mp4`;
+      
+      // Fetch the video from Google's URI (includes API key for access)
+      const videoDownloadUrl = `${videoUri}?key=${apiKey}`;
+      const videoResponse = await fetch(videoDownloadUrl);
+      if (!videoResponse.ok) {
+        throw new Error(`Failed to download generated video (${videoResponse.status})`);
+      }
+      const videoBytes = new Uint8Array(await videoResponse.arrayBuffer());
+
+      // Upload to S3
+      const bucket = Deno.env.get("AWS_S3_BUCKET");
+      if (bucket) {
+        await getS3Client().send(new PutObjectCommand({
+          Bucket: bucket,
+          Key: s3Key,
+          Body: videoBytes,
+          ContentType: "video/mp4",
+        }));
+      }
+
       return {
         s3_key: s3Key,
         provider: "veo",
