@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useEditorStore, FILL_DURATION_OPTIONS, BUSINESS_FILL_DURATION_OPTIONS, AI_FILL_MODELS, MODEL_CREDITS_PER_SEC, DEFAULT_AI_FILL_MODEL, type AiFill, type AiFillModel } from '@/stores/editorStore';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
@@ -44,6 +45,7 @@ interface CutsPanelProps {
 }
 
 const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) => {
+  const navigate = useNavigate();
   const {
     cuts,
     activeCuts,
@@ -159,6 +161,8 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
       if (jobError) throw jobError;
 
       setShowExportDialog(false);
+      // Navigate to export progress view
+      navigate(`/project/${project.id}?exporting=true`);
       toast.success(
         totalFill > 0
           ? `Export submitted — generating ${totalFill}s of AI fill`

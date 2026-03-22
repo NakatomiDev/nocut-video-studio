@@ -14,6 +14,7 @@ import Credits from "@/pages/Credits";
 import Settings from "@/pages/Settings";
 import Upload from "@/pages/Upload";
 import ProjectEditor from "@/pages/ProjectEditor";
+import ExportComplete from "@/pages/ExportComplete";
 import NotFound from "@/pages/NotFound";
 import CommercialDisclosure from "@/pages/CommercialDisclosure";
 import { Loader2 } from "lucide-react";
@@ -54,6 +55,7 @@ const App = () => (
             <Route path="/settings" element={<ProtectedWithLayout><Settings /></ProtectedWithLayout>} />
             <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
             <Route path="/project/:projectId" element={<ProtectedRoute><ProjectEditor /></ProtectedRoute>} />
+            <Route path="/project/:projectId/export/:exportId" element={<ProtectedRoute><ExportComplete /></ProtectedRoute>} />
             <Route path="/editor/:projectId" element={<ProtectedRoute><ProjectEditor /></ProtectedRoute>} />
             <Route path="/commercial-disclosure" element={<CommercialDisclosure />} />
             <Route path="*" element={<NotFound />} />
