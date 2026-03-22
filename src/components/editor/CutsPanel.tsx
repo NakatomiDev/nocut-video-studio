@@ -501,7 +501,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
             <DialogDescription className="sr-only">Full resolution frame preview</DialogDescription>
           </DialogHeader>
           <div className="flex items-center justify-center p-4 pt-0">
-            {lightbox && <LightboxFrame videoUrl={videoUrl} time={lightbox.time} />}
+            {lightbox && <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={lightbox.time} duration={duration} width={560} height={315} />}
           </div>
         </DialogContent>
       </Dialog>
