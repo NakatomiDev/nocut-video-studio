@@ -1,11 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useEditorStore } from '@/stores/editorStore';
+import { useEditorStore, FILL_DURATION_OPTIONS, BUSINESS_FILL_DURATION_OPTIONS } from '@/stores/editorStore';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { X, AlertTriangle } from 'lucide-react';
+import { X, AlertTriangle, Sparkles } from 'lucide-react';
 import CutThumbnail from './CutThumbnail';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -42,6 +49,8 @@ const CutsPanel = ({ thumbnailSpriteUrl, duration }: CutsPanelProps) => {
     activeManualCuts,
     toggleManualCut,
     removeManualCut,
+    fillDurations,
+    setFillDuration,
     creditEstimate,
     creditBalance,
     setCreditBalance,
@@ -51,11 +60,20 @@ const CutsPanel = ({ thumbnailSpriteUrl, duration }: CutsPanelProps) => {
 
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [userTier, setUserTier] = useState<string>('free');
 
   useEffect(() => {
     const fetchBalance = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+
+      const { data: userData } = await supabase
+        .from('users')
+        .select('tier')
+        .eq('id', user.id)
+        .single();
+      if (userData) setUserTier(userData.tier);
+
       const { data } = await supabase
         .from('credit_ledger')
         .select('credits_remaining, type')
@@ -74,9 +92,14 @@ const CutsPanel = ({ thumbnailSpriteUrl, duration }: CutsPanelProps) => {
     fetchBalance();
   }, [setCreditBalance]);
 
+  const fillOptions = userTier === 'business'
+    ? BUSINESS_FILL_DURATION_OPTIONS
+    : FILL_DURATION_OPTIONS;
+
   const hasActiveCuts = activeCuts.size > 0 || activeManualCuts.size > 0;
   const insufficientCredits = creditEstimate > creditBalance.total;
   const creditsAfterExport = creditBalance.total - creditEstimate;
+  const cutsWithFills = fillDurations.size;
 
   const handleExport = useCallback(async () => {
     if (!project) return;
@@ -85,14 +108,26 @@ const CutsPanel = ({ thumbnailSpriteUrl, duration }: CutsPanelProps) => {
       const activeCutsList = cuts.filter((c) => activeCuts.has(c.id));
       const activeManualList = manualCuts.filter((c) => activeManualCuts.has(c.id));
       const allCuts = [
-        ...activeCutsList.map((c) => ({ start: c.start, end: c.end, type: c.type })),
-        ...activeManualList.map((c) => ({ start: c.start, end: c.end, type: 'manual' })),
+        ...activeCutsList.map((c) => ({
+          start: c.start,
+          end: c.end,
+          type: c.type,
+          fill_duration: fillDurations.get(c.id) || 0,
+        })),
+        ...activeManualList.map((c) => ({
+          start: c.start,
+          end: c.end,
+          type: 'manual',
+          fill_duration: fillDurations.get(c.id) || 0,
+        })),
       ].sort((a, b) => a.start - b.start);
+
+      const totalFill = allCuts.reduce((s, c) => s + c.fill_duration, 0);
 
       const { error } = await supabase.from('edit_decisions').insert({
         project_id: project.id,
         edl_json: allCuts,
-        total_fill_seconds: allCuts.reduce((s, c) => s + (c.end - c.start), 0),
+        total_fill_seconds: totalFill,
         credits_charged: creditEstimate,
         status: 'pending',
       });
@@ -104,7 +139,38 @@ const CutsPanel = ({ thumbnailSpriteUrl, duration }: CutsPanelProps) => {
     } finally {
       setExporting(false);
     }
-  }, [project, cuts, activeCuts, manualCuts, activeManualCuts, creditEstimate]);
+  }, [project, cuts, activeCuts, manualCuts, activeManualCuts, fillDurations, creditEstimate]);
+
+  const renderFillSelector = (cutId: string) => {
+    const currentFill = fillDurations.get(cutId) || 0;
+    return (
+      <div className="flex items-center gap-2 pl-5 mt-1">
+        <Sparkles className="h-3 w-3 text-primary shrink-0" />
+        <span className="text-[10px] text-muted-foreground whitespace-nowrap">AI Fill:</span>
+        <Select
+          value={currentFill > 0 ? String(currentFill) : 'none'}
+          onValueChange={(val) => {
+            setFillDuration(cutId, val === 'none' ? 0 : Number(val));
+          }}
+        >
+          <SelectTrigger
+            className="h-6 w-[100px] text-[10px] px-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">None (free)</SelectItem>
+            {fillOptions.map((sec) => (
+              <SelectItem key={sec} value={String(sec)}>
+                {sec}s ({sec} credit{sec > 1 ? 's' : ''})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    );
+  };
 
   const renderPreview = (start: number, end: number) => (
     <div className="flex items-center gap-2 pl-5">
@@ -126,6 +192,9 @@ const CutsPanel = ({ thumbnailSpriteUrl, duration }: CutsPanelProps) => {
         <h3 className="text-sm font-semibold text-foreground">Cuts</h3>
         <p className="mt-1 text-xs text-muted-foreground">
           {cuts.length + manualCuts.length} total · {activeCuts.size + activeManualCuts.size} active
+        </p>
+        <p className="mt-0.5 text-[10px] text-muted-foreground">
+          Cuts are free · AI fills cost 1 credit/sec
         </p>
       </div>
 
@@ -149,10 +218,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, duration }: CutsPanelProps) => {
                 <div className="h-2 w-2 shrink-0 rounded-full bg-primary" />
                 <Switch
                   checked={activeCuts.has(cut.id)}
-                  onCheckedChange={(e) => {
-                    e;
-                    toggleCut(cut.id);
-                  }}
+                  onCheckedChange={() => toggleCut(cut.id)}
                   onClick={(e) => e.stopPropagation()}
                 />
                 <div className="min-w-0 flex-1">
@@ -170,7 +236,12 @@ const CutsPanel = ({ thumbnailSpriteUrl, duration }: CutsPanelProps) => {
                   </p>
                 </div>
               </div>
-              {activeCuts.has(cut.id) && thumbnailSpriteUrl && renderPreview(cut.start, cut.end)}
+              {activeCuts.has(cut.id) && (
+                <>
+                  {thumbnailSpriteUrl && renderPreview(cut.start, cut.end)}
+                  {renderFillSelector(cut.id)}
+                </>
+              )}
             </div>
           ))}
 
@@ -218,7 +289,12 @@ const CutsPanel = ({ thumbnailSpriteUrl, duration }: CutsPanelProps) => {
                   <X className="h-3 w-3" />
                 </Button>
               </div>
-              {activeManualCuts.has(cut.id) && thumbnailSpriteUrl && renderPreview(cut.start, cut.end)}
+              {activeManualCuts.has(cut.id) && (
+                <>
+                  {thumbnailSpriteUrl && renderPreview(cut.start, cut.end)}
+                  {renderFillSelector(cut.id)}
+                </>
+              )}
             </div>
           ))}
         </div>
@@ -226,8 +302,16 @@ const CutsPanel = ({ thumbnailSpriteUrl, duration }: CutsPanelProps) => {
 
       <div className="space-y-3 border-t border-border p-4">
         <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">Estimated credits</span>
-          <span className="text-sm font-semibold text-foreground">{creditEstimate}</span>
+          <span className="text-xs text-muted-foreground">Active cuts</span>
+          <span className="text-sm font-semibold text-foreground">
+            {activeCuts.size + activeManualCuts.size} (free)
+          </span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">AI fills</span>
+          <span className="text-sm font-semibold text-foreground">
+            {cutsWithFills > 0 ? `${creditEstimate} credit${creditEstimate !== 1 ? 's' : ''}` : 'None'}
+          </span>
         </div>
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground">Your balance</span>
@@ -236,11 +320,15 @@ const CutsPanel = ({ thumbnailSpriteUrl, duration }: CutsPanelProps) => {
         {insufficientCredits && (
           <div className="flex items-center gap-1.5 text-destructive">
             <AlertTriangle className="h-3.5 w-3.5" />
-            <span className="text-xs font-medium">Insufficient credits</span>
+            <span className="text-xs font-medium">Insufficient credits for AI fills</span>
           </div>
         )}
-        <Button className="w-full" disabled={!hasActiveCuts || insufficientCredits} onClick={() => setShowExportDialog(true)}>
-          Export ({creditEstimate} credits)
+        <Button
+          className="w-full"
+          disabled={!hasActiveCuts || insufficientCredits}
+          onClick={() => setShowExportDialog(true)}
+        >
+          {creditEstimate > 0 ? `Export (${creditEstimate} credits)` : 'Export (free)'}
         </Button>
       </div>
 
@@ -249,14 +337,28 @@ const CutsPanel = ({ thumbnailSpriteUrl, duration }: CutsPanelProps) => {
           <DialogHeader>
             <DialogTitle>Confirm Export</DialogTitle>
             <DialogDescription>
-              This will use {creditEstimate} credits to generate AI fills for your cuts.
+              {creditEstimate > 0
+                ? `This will use ${creditEstimate} credit${creditEstimate !== 1 ? 's' : ''} for AI fill transitions.`
+                : 'This export uses cuts only — no credits will be charged.'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Credits remaining after export</span>
-              <span className="font-semibold">{creditsAfterExport}</span>
+              <span className="text-muted-foreground">Cuts (removal)</span>
+              <span className="font-semibold">{activeCuts.size + activeManualCuts.size} — Free</span>
             </div>
+            {creditEstimate > 0 && (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">AI fill transitions</span>
+                  <span className="font-semibold">{creditEstimate} credits</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Balance after export</span>
+                  <span className="font-semibold">{creditsAfterExport}</span>
+                </div>
+              </>
+            )}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Format</span>
               <span className="font-semibold">MP4, 1080p</span>
