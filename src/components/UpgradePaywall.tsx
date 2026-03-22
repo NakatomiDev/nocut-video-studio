@@ -65,14 +65,23 @@ const PRODUCT_TO_TIER: Record<string, string> = {
 };
 
 function formatPrice(pkg: Package | undefined): string {
-  if (!pkg?.webBillingProduct) return "—";
+  if (!pkg) return "—";
   const product = pkg.webBillingProduct as any;
-  const price = product.normalPurchasePrice ?? product.defaultPurchasePrice ?? product.currentPrice;
+  if (!product) return "—";
+
+  // RevenueCat JS SDK: currentPrice has { amountMicros, currencyCode, formattedPrice }
+  const price = product.currentPrice ?? product.defaultPrice ?? product.normalPurchasePrice ?? product.defaultPurchasePrice;
+  
+  // If the SDK provides a pre-formatted string, use it
+  if (price?.formattedPrice) return price.formattedPrice;
+  if (product.priceString) return product.priceString;
+
   if (!price) return "—";
   const currency = price.currencyCode ?? price.currency ?? "USD";
   const amount = price.amountMicros != null
     ? price.amountMicros / 1_000_000
     : price.amount ?? 0;
+  if (amount === 0) return "—";
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency,
@@ -93,11 +102,24 @@ export const UpgradePaywall = ({
   const currentOffering = offerings?.current;
   const allPackages = currentOffering?.availablePackages ?? [];
 
-  // Build a lookup: productId → Package
+  // Debug: log available packages to help diagnose matching issues
+  useEffect(() => {
+    if (allPackages.length > 0) {
+      console.log("RevenueCat packages:", allPackages.map(p => ({
+        id: p.identifier,
+        productId: p.webBillingProduct?.identifier,
+        product: p.webBillingProduct,
+      })));
+    }
+  }, [allPackages]);
+
+  // Build a lookup: productId → Package (try both product identifier and package identifier)
   const packagesByProduct = new Map<string, Package>();
   for (const pkg of allPackages) {
-    const id = pkg.webBillingProduct?.identifier;
-    if (id) packagesByProduct.set(id, pkg);
+    const productId = pkg.webBillingProduct?.identifier;
+    if (productId) packagesByProduct.set(productId, pkg);
+    // Also index by package identifier (RC sometimes uses this)
+    if (pkg.identifier) packagesByProduct.set(pkg.identifier, pkg);
   }
 
   // Helper: get the right package for a tier + billing period
@@ -105,7 +127,10 @@ export const UpgradePaywall = ({
     if (tier === "free") return undefined;
     const suffix = isAnnual ? "_annual" : "_monthly";
     const productId = `nocut_${tier}${suffix}`;
-    return packagesByProduct.get(productId);
+    // Try exact match first, then common RC package identifiers
+    return packagesByProduct.get(productId) 
+      ?? packagesByProduct.get(`$rc_${isAnnual ? "annual" : "monthly"}`)
+      ?? undefined;
   };
 
   const handleUpgrade = async (tier: string) => {
