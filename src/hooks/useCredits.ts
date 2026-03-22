@@ -27,29 +27,79 @@ export interface CreditTransaction {
   created_at: string;
 }
 
+type CreditsFunctionError = Error & {
+  status?: number;
+  code?: string;
+};
+
+const creditsFunctionsBaseUrl = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1`;
+
+function isUnauthorizedError(err: unknown) {
+  return err instanceof Error && ((err as CreditsFunctionError).status === 401 || (err as CreditsFunctionError).code === "unauthorized");
+}
+
+async function invokeCreditsFunction<T>(
+  path: string,
+  accessToken: string,
+  init?: RequestInit,
+): Promise<T> {
+  const res = await fetch(`${creditsFunctionsBaseUrl}/${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...(init?.headers ?? {}),
+    },
+  });
+
+  const json = await res.json().catch(() => null);
+
+  if (!res.ok) {
+    const error = new Error(
+      json?.error?.message ?? `Failed to call ${path}`,
+    ) as CreditsFunctionError;
+    error.status = res.status;
+    error.code = json?.error?.code;
+    throw error;
+  }
+
+  return (json?.data ?? json) as T;
+}
+
 export function useCreditsBalance() {
-  const { session } = useAuth();
+  const { session, signOut } = useAuth();
   const [balance, setBalance] = useState<CreditBalance | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchBalance = useCallback(async () => {
-    if (!session) return;
+    if (!session) {
+      setBalance(null);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
+
     try {
-      const { data, error: fnError } = await supabase.functions.invoke("credits-balance", {
-        method: "GET",
-      });
-      if (fnError) throw fnError;
-      const result = data?.data ?? data;
-      setBalance(result?.balance ?? result);
+      const result = await invokeCreditsFunction<{ balance: CreditBalance }>(
+        "credits-balance",
+        session.access_token,
+        { method: "GET" },
+      );
+      setBalance(result.balance ?? (result as CreditBalance));
     } catch (err: unknown) {
+      if (isUnauthorizedError(err)) {
+        await signOut();
+        return;
+      }
       setError(err instanceof Error ? err.message : "Failed to fetch balance");
     } finally {
       setLoading(false);
     }
-  }, [session]);
+  }, [session, signOut]);
 
   useEffect(() => {
     fetchBalance();
@@ -59,7 +109,7 @@ export function useCreditsBalance() {
 }
 
 export function useCreditsHistory() {
-  const { session } = useAuth();
+  const { session, signOut } = useAuth();
   const [transactions, setTransactions] = useState<CreditTransaction[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -68,33 +118,42 @@ export function useCreditsHistory() {
   const limit = 20;
 
   const fetchHistory = useCallback(async (newOffset = 0) => {
-    if (!session) return;
+    if (!session) {
+      setTransactions([]);
+      setTotalCount(0);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
+
     try {
-      const url = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1/credits-history?limit=${limit}&offset=${newOffset}`;
-      const res = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        },
+      const result = await invokeCreditsFunction<{
+        transactions: CreditTransaction[];
+        total_count: number;
+      }>(`credits-history?limit=${limit}&offset=${newOffset}`, session.access_token, {
+        method: "GET",
       });
-      const json = await res.json();
-      const result = json?.data ?? json;
-      const items = result?.transactions ?? [];
+
+      const items = result.transactions ?? [];
       if (newOffset === 0) {
         setTransactions(items);
       } else {
         setTransactions((prev) => [...prev, ...items]);
       }
-      setTotalCount(result?.total_count ?? 0);
+      setTotalCount(result.total_count ?? 0);
       setOffset(newOffset);
     } catch (err: unknown) {
+      if (isUnauthorizedError(err)) {
+        await signOut();
+        return;
+      }
       setError(err instanceof Error ? err.message : "Failed to fetch history");
     } finally {
       setLoading(false);
     }
-  }, [session]);
+  }, [session, signOut]);
 
   useEffect(() => {
     fetchHistory(0);
