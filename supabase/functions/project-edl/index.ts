@@ -10,6 +10,9 @@ import {
   estimateGaps,
   MAX_FILL_DURATION,
   TOPUP_PRODUCTS,
+  MODEL_CREDITS_PER_SEC,
+  DEFAULT_AI_FILL_MODEL,
+  type AiFillModel,
 } from "../_shared/credits.ts";
 import { Tier } from "../_shared/tier-limits.ts";
 
@@ -35,12 +38,18 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { project_id, gaps, output_format, output_resolution } = body as {
+    const { project_id, gaps, output_format, output_resolution, model: requestedModel } = body as {
       project_id: string;
       gaps: Array<{ pre_cut_timestamp: number; post_cut_timestamp: number }>;
       output_format?: string;
       output_resolution?: string;
+      model?: string;
     };
+
+    // Validate model selection
+    const model: AiFillModel = (requestedModel && requestedModel in MODEL_CREDITS_PER_SEC)
+      ? requestedModel as AiFillModel
+      : DEFAULT_AI_FILL_MODEL;
 
     if (!project_id) {
       return errorResponse("invalid_request", "project_id is required", 400);
@@ -89,8 +98,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 4. Calculate required credits
-    const { estimates, total_credits } = estimateGaps(gaps, maxFill);
+    // 4. Calculate required credits (model-aware)
+    const { estimates, total_credits, credits_per_sec } = estimateGaps(gaps, maxFill, model);
 
     // 5. Deduct credits atomically via Postgres function
     const { data: creditResult, error: creditError } = await serviceClient
@@ -142,6 +151,8 @@ Deno.serve(async (req) => {
         edl_json: edlJson,
         total_fill_seconds: totalFillSeconds,
         credits_charged: total_credits,
+        model,
+        credits_per_sec,
         status: "pending",
         credit_transaction_id: creditTransactionId,
       })
@@ -190,6 +201,8 @@ Deno.serve(async (req) => {
 
     return successResponse({
       edit_decision_id: editDecision.id,
+      model,
+      credits_per_sec,
       credits_charged: total_credits,
       credits_remaining: creditsRemaining,
       estimated_processing_seconds: estimatedProcessingSeconds,

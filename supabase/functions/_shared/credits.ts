@@ -71,12 +71,14 @@ export interface GapEstimate {
 /**
  * Estimate fill duration and credits for a set of gaps.
  * Heuristic: fill_duration = min(gap_duration * 0.5, 3.0), rounded up to whole seconds.
- * Each whole second of fill = 1 credit.
+ * Credits per second depend on the selected model (defaults to veo3.1-fast = 1 credit/sec).
  */
 export function estimateGaps(
   gaps: Array<{ pre_cut_timestamp: number; post_cut_timestamp: number }>,
   maxFillDuration?: number,
-): { estimates: GapEstimate[]; total_credits: number } {
+  model: AiFillModel = DEFAULT_AI_FILL_MODEL,
+): { estimates: GapEstimate[]; total_credits: number; credits_per_sec: number } {
+  const creditsPerSec = MODEL_CREDITS_PER_SEC[model] ?? 1;
   const estimates: GapEstimate[] = [];
   let totalCredits = 0;
 
@@ -94,7 +96,7 @@ export function estimateGaps(
       fillDuration = 1;
     }
 
-    const credits = fillDuration; // 1 credit per second of fill
+    const credits = fillDuration * creditsPerSec;
 
     estimates.push({
       pre_cut_timestamp: gap.pre_cut_timestamp,
@@ -106,13 +108,48 @@ export function estimateGaps(
     totalCredits += credits;
   }
 
-  return { estimates, total_credits: totalCredits };
+  return { estimates, total_credits: totalCredits, credits_per_sec: creditsPerSec };
 }
 
 /** Stripe top-up product configuration. */
 export const TOPUP_PRODUCTS: Record<string, { credits: number; price_cents: number; name: string }> = {
   nocut_credits_10:  { credits: 10,  price_cents: 499,  name: "Starter – 10 credits" },
-  nocut_credits_30:  { credits: 30,  price_cents: 1199, name: "Standard – 30 credits" },
-  nocut_credits_75:  { credits: 75,  price_cents: 2499, name: "Value – 75 credits" },
-  nocut_credits_200: { credits: 200, price_cents: 5499, name: "Bulk – 200 credits" },
+  nocut_credits_40:  { credits: 40,  price_cents: 1499, name: "Standard – 40 credits" },
+  nocut_credits_100: { credits: 100, price_cents: 3499, name: "Pro – 100 credits" },
+  nocut_credits_250: { credits: 250, price_cents: 7999, name: "Studio – 250 credits" },
 };
+
+/**
+ * Credit cost per second of AI fill, keyed by model.
+ *
+ * Costs are tuned so our cheapest top-up ($0.499/credit) stays profitable
+ * against the Gemini API rates (March 2026):
+ *
+ *   Model                  API $/sec   Credits/sec   Break-even $/credit
+ *   ─────────────────────  ─────────   ───────────   ───────────────────
+ *   Veo 3.1 Fast (silent)    $0.10         1              $0.10
+ *   Veo 3.1 Fast (audio)     $0.15         1              $0.15
+ *   Veo 2                    $0.35         2              $0.175
+ *   Veo 3.1 Std (silent)     $0.27         3              $0.09
+ *   Veo 3.1 Std (audio)      $0.40         4              $0.10
+ *   Veo 3 Std (audio)        $0.75         6              $0.125
+ */
+export type AiFillModel =
+  | "veo3.1-fast"
+  | "veo3.1-fast-audio"
+  | "veo2"
+  | "veo3.1-standard"
+  | "veo3.1-standard-audio"
+  | "veo3-standard-audio";
+
+export const MODEL_CREDITS_PER_SEC: Record<AiFillModel, number> = {
+  "veo3.1-fast":           1,
+  "veo3.1-fast-audio":     1,
+  "veo2":                  2,
+  "veo3.1-standard":       3,
+  "veo3.1-standard-audio": 4,
+  "veo3-standard-audio":   6,
+};
+
+/** Default model for new projects. */
+export const DEFAULT_AI_FILL_MODEL: AiFillModel = "veo3.1-fast";

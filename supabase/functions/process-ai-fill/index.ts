@@ -115,6 +115,7 @@ Deno.serve(async (req) => {
     const edlJson = editDecision.edl_json as EdlEntry[];
     const totalFillSeconds = editDecision.total_fill_seconds as number;
     const creditsCharged = editDecision.credits_charged as number;
+    const fillModel = (editDecision.model as string) ?? "veo3.1-fast";
 
     const { data: projectVideo } = await serviceClient
       .from("videos")
@@ -199,6 +200,7 @@ Deno.serve(async (req) => {
           startTime: gap.end, // fill starts where the cut ends
           duration: gap.fill_duration,
           sourceVideoKey,
+          model: fillModel,
         });
       } catch (fillErr) {
         const msg = `AI fill generation failed for gap ${gap.gap_index}: ${(fillErr as Error).message}`;
@@ -219,6 +221,7 @@ Deno.serve(async (req) => {
           s3_key: fillResult.s3_key,
           method: "ai_fill",
           provider: fillResult.provider,
+          model: fillResult.model,
           quality_score: fillResult.quality_score,
           duration: gap.fill_duration,
           generation_time_ms: generationTimeMs,
@@ -279,25 +282,28 @@ interface FillRequest {
   startTime: number;
   duration: number;
   sourceVideoKey?: string | null;
+  model?: string | null;
 }
 
 interface FillResponse {
   s3_key: string;
   provider: string;
+  model: string;
   quality_score: number;
 }
 
 async function generateAiFill(request: FillRequest): Promise<FillResponse> {
   const provider = Deno.env.get("AI_FILL_PROVIDER");
+  const model = request.model ?? "veo3.1-fast";
 
   if (provider === "veo") {
-    return await generateVeoFill(request);
+    return await generateVeoFill(request, model);
   }
 
-  return await generateMockFill(request);
+  return await generateMockFill(request, model);
 }
 
-async function generateMockFill(request: FillRequest): Promise<FillResponse> {
+async function generateMockFill(request: FillRequest, model: string): Promise<FillResponse> {
   const simulatedMs = Math.max(500, request.duration * 500);
   await new Promise((resolve) => setTimeout(resolve, simulatedMs));
 
@@ -326,18 +332,31 @@ async function generateMockFill(request: FillRequest): Promise<FillResponse> {
   return {
     s3_key: s3Key,
     provider: "mock",
+    model,
     quality_score: 0.85,
   };
 }
 
-async function generateVeoFill(request: FillRequest): Promise<FillResponse> {
+async function generateVeoFill(request: FillRequest, model: string): Promise<FillResponse> {
   const apiKey = Deno.env.get("GOOGLE_AI_API_KEY");
   if (!apiKey) {
     throw new Error("GOOGLE_AI_API_KEY is not set — cannot call Veo API");
   }
 
+  // Map our model names to Gemini API model IDs
+  const MODEL_API_IDS: Record<string, string> = {
+    "veo2":                  "veo-2.0-generate-001",
+    "veo3.1-fast":           "veo-3.1-fast-generate-001",
+    "veo3.1-fast-audio":     "veo-3.1-fast-generate-001",
+    "veo3.1-standard":       "veo-3.1-generate-001",
+    "veo3.1-standard-audio": "veo-3.1-generate-001",
+    "veo3-standard-audio":   "veo-3.0-generate-001",
+  };
+  const apiModelId = MODEL_API_IDS[model] ?? "veo-3.1-fast-generate-001";
+  const includeAudio = model.endsWith("-audio");
+
   const generateResponse = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/veo-2.0-generate-001:predictLongRunning`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${apiModelId}:predictLongRunning`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
@@ -351,6 +370,7 @@ async function generateVeoFill(request: FillRequest): Promise<FillResponse> {
           sampleCount: 1,
           durationSeconds: request.duration,
           aspectRatio: "16:9",
+          ...(includeAudio ? { includeAudio: true } : {}),
         },
       }),
     },
@@ -393,6 +413,7 @@ async function generateVeoFill(request: FillRequest): Promise<FillResponse> {
       return {
         s3_key: s3Key,
         provider: "veo",
+        model,
         quality_score: 0.90,
       };
     }

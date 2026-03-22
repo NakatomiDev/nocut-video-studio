@@ -267,7 +267,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
           {cuts.length + manualCuts.length} total · {activeCuts.size + activeManualCuts.size} active
         </p>
         <p className="mt-0.5 text-[10px] text-muted-foreground">
-          Cuts are free · AI fills cost 1 credit/sec
+          Cuts are free · AI fills cost 1–6 credits/sec by model
         </p>
       </div>
 

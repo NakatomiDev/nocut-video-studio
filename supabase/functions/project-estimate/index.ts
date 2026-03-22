@@ -1,7 +1,13 @@
 import { handleCors } from "../_shared/cors.ts";
 import { getAuthenticatedUser, AuthError } from "../_shared/auth.ts";
 import { successResponse, errorResponse } from "../_shared/response.ts";
-import { getCreditBalance, estimateGaps } from "../_shared/credits.ts";
+import {
+  getCreditBalance,
+  estimateGaps,
+  MODEL_CREDITS_PER_SEC,
+  DEFAULT_AI_FILL_MODEL,
+  type AiFillModel,
+} from "../_shared/credits.ts";
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req);
@@ -25,13 +31,18 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { gaps } = body as {
+    const { gaps, model: requestedModel } = body as {
       gaps: Array<{ pre_cut_timestamp: number; post_cut_timestamp: number }>;
+      model?: string;
     };
 
     if (!Array.isArray(gaps) || gaps.length === 0) {
       return errorResponse("invalid_request", "gaps must be a non-empty array", 400);
     }
+
+    const model: AiFillModel = (requestedModel && requestedModel in MODEL_CREDITS_PER_SEC)
+      ? requestedModel as AiFillModel
+      : DEFAULT_AI_FILL_MODEL;
 
     // Validate each gap has required fields
     for (let i = 0; i < gaps.length; i++) {
@@ -45,16 +56,22 @@ Deno.serve(async (req) => {
       }
     }
 
-    const { estimates, total_credits } = estimateGaps(gaps);
+    const { estimates, total_credits, credits_per_sec } = estimateGaps(gaps, undefined, model);
 
     // Get user's current balance
     const balance = await getCreditBalance(supabaseClient, user.id);
 
     return successResponse({
+      model,
+      credits_per_sec,
       total_credits_required: total_credits,
       credits_available: balance.total,
       sufficient: balance.total >= total_credits,
       gap_estimates: estimates,
+      available_models: Object.entries(MODEL_CREDITS_PER_SEC).map(([m, cps]) => ({
+        model: m,
+        credits_per_sec: cps,
+      })),
     });
   } catch (err) {
     console.error("Unhandled error in project-estimate:", err);

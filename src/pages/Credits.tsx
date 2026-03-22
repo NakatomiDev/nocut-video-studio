@@ -12,9 +12,9 @@ import { format, differenceInDays, parseISO } from "date-fns";
 
 const TOPUP_PACKS = [
   { id: "nocut_credits_10", credits: 10, price: "$4.99", perCredit: "$0.50", name: "Starter" },
-  { id: "nocut_credits_30", credits: 30, price: "$11.99", perCredit: "$0.40", name: "Standard", badge: "Most Popular" },
-  { id: "nocut_credits_75", credits: 75, price: "$24.99", perCredit: "$0.33", name: "Value", badge: "Best Value" },
-  { id: "nocut_credits_200", credits: 200, price: "$54.99", perCredit: "$0.27", name: "Bulk" },
+  { id: "nocut_credits_40", credits: 40, price: "$14.99", perCredit: "$0.37", name: "Standard", badge: "Most Popular" },
+  { id: "nocut_credits_100", credits: 100, price: "$34.99", perCredit: "$0.35", name: "Pro", badge: "Best Value" },
+  { id: "nocut_credits_250", credits: 250, price: "$79.99", perCredit: "$0.32", name: "Studio" },
 ];
 
 const Credits = () => {
