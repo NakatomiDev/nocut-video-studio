@@ -418,7 +418,6 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
   const operationName = operation.name;
 
   const pollBaseUrl = `https://generativelanguage.googleapis.com/v1beta`;
-    : `https://generativelanguage.googleapis.com/v1beta`;
 
   // Poll for completion (up to 5 minutes)
   const maxWaitMs = 300_000;
