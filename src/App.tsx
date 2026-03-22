@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AppLayout from "@/components/AppLayout";
+import Landing from "@/pages/Landing";
 import SignUp from "@/pages/SignUp";
 import SignIn from "@/pages/SignIn";
 import Dashboard from "@/pages/Dashboard";
@@ -15,10 +16,9 @@ import Upload from "@/pages/Upload";
 import ProjectEditor from "@/pages/ProjectEditor";
 import NotFound from "@/pages/NotFound";
 import { Loader2 } from "lucide-react";
-
 const queryClient = new QueryClient();
 
-const RootRedirect = () => {
+const AuthRedirect = () => {
   const { session, loading } = useAuth();
   if (loading) {
     return (
@@ -27,7 +27,7 @@ const RootRedirect = () => {
       </div>
     );
   }
-  return <Navigate to={session ? "/dashboard" : "/sign-in"} replace />;
+  return session ? <Navigate to="/dashboard" replace /> : <Landing />;
 };
 
 const ProtectedWithLayout = ({ children }: { children: React.ReactNode }) => (
@@ -44,7 +44,7 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
-            <Route path="/" element={<RootRedirect />} />
+            <Route path="/" element={<AuthRedirect />} />
             <Route path="/sign-up" element={<SignUp />} />
             <Route path="/sign-in" element={<SignIn />} />
             <Route path="/dashboard" element={<ProtectedWithLayout><Dashboard /></ProtectedWithLayout>} />
