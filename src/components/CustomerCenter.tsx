@@ -114,7 +114,7 @@ export const CustomerCenter = ({ onManageSubscription }: CustomerCenterProps) =>
         {expiresDate && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <CalendarClock className="h-3.5 w-3.5" />
-            Renews {format(parseISO(expiresDate), "MMM d, yyyy")}
+            Renews {format(typeof expiresDate === "string" ? parseISO(expiresDate) : expiresDate, "MMM d, yyyy")}
           </div>
         )}
 
