@@ -303,15 +303,11 @@ async function generateAiFill(request: FillRequest): Promise<FillResponse> {
   const model = request.model ?? "veo3.1-fast";
 
   if (provider === "veo") {
-    try {
-      return await generateVeoFill(request, model);
-    } catch (err) {
-      console.warn(`Veo generation failed, falling back to mock: ${(err as Error).message}`);
-      return await generateMockFill(request, model);
-    }
+    // No fallback — let failures propagate so we can debug them
+    return await generateVeoFill(request, model);
   }
 
-  return await generateMockFill(request, model);
+  throw new Error(`AI_FILL_PROVIDER "${provider || "(not set)"}" is not a supported provider. Set it to "veo" in Edge Function secrets.`);
 }
 
 async function generateMockFill(request: FillRequest, model: string): Promise<FillResponse> {
