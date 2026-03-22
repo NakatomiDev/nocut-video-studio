@@ -62,6 +62,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, duration }: CutsPanelProps) => {
   const [exporting, setExporting] = useState(false);
   const [userTier, setUserTier] = useState<string>('free');
   const [expandedReviewId, setExpandedReviewId] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<{ time: number; label: string } | null>(null);
 
   useEffect(() => {
     const fetchBalance = async () => {
@@ -397,7 +398,12 @@ const CutsPanel = ({ thumbnailSpriteUrl, duration }: CutsPanelProps) => {
                           <div className="flex items-stretch gap-3">
                             <div className="flex flex-col items-center gap-1 flex-1">
                               <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Before cut</span>
-                              <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={edit.start} duration={duration} width={180} height={100} />
+                              <button
+                                className="rounded ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover:opacity-80 transition-opacity cursor-zoom-in"
+                                onClick={(e) => { e.stopPropagation(); setLightbox({ time: edit.start, label: `Before cut · ${formatTimestamp(edit.start)}` }); }}
+                              >
+                                <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={edit.start} duration={duration} width={180} height={100} />
+                              </button>
                               <span className="text-[10px] font-mono text-muted-foreground">{formatTimestamp(edit.start)}</span>
                             </div>
                             <div className="flex flex-col items-center justify-center gap-1">
@@ -409,7 +415,12 @@ const CutsPanel = ({ thumbnailSpriteUrl, duration }: CutsPanelProps) => {
                             </div>
                             <div className="flex flex-col items-center gap-1 flex-1">
                               <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">After cut</span>
-                              <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={edit.end} duration={duration} width={180} height={100} />
+                              <button
+                                className="rounded ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover:opacity-80 transition-opacity cursor-zoom-in"
+                                onClick={(e) => { e.stopPropagation(); setLightbox({ time: edit.end, label: `After cut · ${formatTimestamp(edit.end)}` }); }}
+                              >
+                                <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={edit.end} duration={duration} width={180} height={100} />
+                              </button>
                               <span className="text-[10px] font-mono text-muted-foreground">{formatTimestamp(edit.end)}</span>
                             </div>
                           </div>
@@ -446,6 +457,27 @@ const CutsPanel = ({ thumbnailSpriteUrl, duration }: CutsPanelProps) => {
               {exporting ? 'Exporting...' : 'Confirm & Export'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Lightbox for zoomed thumbnail */}
+      <Dialog open={!!lightbox} onOpenChange={(open) => { if (!open) setLightbox(null); }}>
+        <DialogContent className="max-w-2xl p-0 overflow-hidden bg-black/95 border-border">
+          <DialogHeader className="p-4 pb-2">
+            <DialogTitle className="text-sm text-foreground">{lightbox?.label}</DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center justify-center p-4 pt-0">
+            {lightbox && thumbnailSpriteUrl && (
+              <CutThumbnail
+                spriteUrl={thumbnailSpriteUrl}
+                time={lightbox.time}
+                duration={duration}
+                width={560}
+                height={315}
+                className="rounded-lg"
+              />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
