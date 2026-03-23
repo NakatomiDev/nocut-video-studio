@@ -163,10 +163,12 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
     return () => clearInterval(interval);
   }, []);
 
-  // Sync external playhead changes (e.g. timeline scrub) to the video element
+  // Sync external playhead changes (e.g. timeline scrub) to the video element.
+  // While actively playing, the video element is the source of truth to avoid
+  // feedback-loop seeks that cause stutter/jitter.
   useEffect(() => {
     const v = videoRef.current;
-    if (!v) return;
+    if (!v || isPlaying || playingFillId) return;
     if (internalSeekRef.current) {
       internalSeekRef.current = false;
       return;
@@ -174,8 +176,7 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
     if (Math.abs(v.currentTime - playheadPosition) > 0.15) {
       v.currentTime = playheadPosition;
     }
-  }, [playheadPosition]);
-
+  }, [playheadPosition, isPlaying, playingFillId]);
   useEffect(() => {
     const v = videoRef.current;
     if (!v || !videoUrl) return;
