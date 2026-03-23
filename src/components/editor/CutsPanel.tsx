@@ -202,9 +202,9 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     const generatedFill = cutFills[0] ?? null;
 
     return (
-      <div className="flex flex-col gap-1.5 pl-5 mt-1">
+      <div className="flex flex-col gap-1.5 pl-5 mt-1 overflow-hidden">
         {/* Model selector first — durations depend on it */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           {generatedFill ? (
             <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
           ) : (
@@ -319,30 +319,30 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   };
 
   const renderPreview = (start: number, end: number) => (
-    <div className="flex items-center gap-1.5 pl-3">
-      <div className="flex flex-col items-center gap-0.5 shrink-0">
+    <div className="flex items-center gap-1 pl-2 pr-1 overflow-hidden">
+      <div className="flex flex-col items-center gap-0.5 shrink-0 min-w-0">
         {thumbnailSpriteUrl ? (
-          <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={start} duration={duration} width={56} height={32} />
+          <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={start} duration={duration} width={48} height={28} />
         ) : videoUrl ? (
           <ExactVideoFrame
             videoUrl={videoUrl}
             time={start}
             label={`Start frame ${formatTimestamp(start)}`}
-            className="h-8 w-14"
+            className="h-7 w-12"
           />
         ) : null}
         <span className="text-[9px] text-muted-foreground font-mono">Start</span>
       </div>
-      <div className="flex-1 border-t border-dashed border-muted-foreground/30 min-w-2" />
-      <div className="flex flex-col items-center gap-0.5 shrink-0">
+      <div className="flex-1 border-t border-dashed border-muted-foreground/30 min-w-1" />
+      <div className="flex flex-col items-center gap-0.5 shrink-0 min-w-0">
         {thumbnailSpriteUrl ? (
-          <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={end} duration={duration} width={56} height={32} />
+          <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={end} duration={duration} width={48} height={28} />
         ) : videoUrl ? (
           <ExactVideoFrame
             videoUrl={videoUrl}
             time={end}
             label={`End frame ${formatTimestamp(end)}`}
-            className="h-8 w-14"
+            className="h-7 w-12"
           />
         ) : null}
         <span className="text-[9px] text-muted-foreground font-mono">End</span>
@@ -433,8 +433,8 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   };
 
   return (
-    <div className="flex h-full flex-col border-l border-border bg-card">
-      <div className="border-b border-border p-4">
+    <div className="flex h-full flex-col border-l border-border bg-card overflow-hidden">
+      <div className="border-b border-border p-4 shrink-0">
         <h3 className="text-sm font-semibold text-foreground">Cuts</h3>
         <p className="mt-1 text-xs text-muted-foreground">
           {cuts.length + manualCuts.length} total · {activeCuts.size + activeManualCuts.size} active
@@ -444,7 +444,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
         </p>
       </div>
 
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0">
         <div className="space-y-1 p-2">
           <div className="px-3 pb-1 pt-2">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -551,7 +551,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
         </div>
       </ScrollArea>
 
-      <div className="space-y-3 border-t border-border p-4">
+      <div className="space-y-3 border-t border-border p-4 shrink-0">
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground">Active cuts</span>
           <span className="text-sm font-semibold text-foreground">

@@ -114,8 +114,7 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
           ref={videoRef}
           src={videoUrl}
           className="max-h-full max-w-full"
-          preload="metadata"
-          crossOrigin="anonymous"
+          preload="auto"
           onError={() => setVideoError('Video failed to load')}
         />
         {videoError && (
