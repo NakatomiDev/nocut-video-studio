@@ -891,6 +891,65 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                           </div>
                         </div>
                       )}
+
+                      {/* Inline AI Fill video player */}
+                      {inlineFillPreview?.editId === edit.id && (
+                        <div className="border-t border-border/50 p-3" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[10px] font-semibold text-primary uppercase tracking-wider flex items-center gap-1.5">
+                              <Sparkles className="h-3 w-3" />
+                              AI Fill Preview — {inlineFillPreview.fill.duration}s
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5"
+                              onClick={() => { setInlineFillPreview(null); setInlineFillVideoUrl(null); setInlineFillPlaying(false); }}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          <div className="relative bg-black rounded-lg overflow-hidden aspect-video flex items-center justify-center group/video">
+                            {inlineFillLoading && <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
+                            {!inlineFillLoading && !inlineFillVideoUrl && (
+                              <span className="text-xs text-muted-foreground">Fill video not available yet</span>
+                            )}
+                            {!inlineFillLoading && inlineFillVideoUrl && (
+                              <>
+                                <video
+                                  ref={inlineFillVideoRef}
+                                  key={inlineFillVideoUrl}
+                                  src={inlineFillVideoUrl}
+                                  className="w-full h-full object-contain"
+                                  preload="auto"
+                                  crossOrigin="anonymous"
+                                  onPlay={() => setInlineFillPlaying(true)}
+                                  onPause={() => setInlineFillPlaying(false)}
+                                  onEnded={() => setInlineFillPlaying(false)}
+                                />
+                                <button
+                                  className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover/video:opacity-100 transition-opacity cursor-pointer"
+                                  onClick={() => {
+                                    if (!inlineFillVideoRef.current) return;
+                                    if (inlineFillPlaying) {
+                                      inlineFillVideoRef.current.pause();
+                                    } else {
+                                      if (inlineFillVideoRef.current.ended) inlineFillVideoRef.current.currentTime = 0;
+                                      inlineFillVideoRef.current.play();
+                                    }
+                                  }}
+                                >
+                                  {inlineFillPlaying ? (
+                                    <Pause className="h-8 w-8 text-white drop-shadow-lg" />
+                                  ) : (
+                                    <Play className="h-8 w-8 text-white drop-shadow-lg" />
+                                  )}
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 });
