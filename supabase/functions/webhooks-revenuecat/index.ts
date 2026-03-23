@@ -63,12 +63,14 @@ Deno.serve(async (req) => {
   try {
     // 1. Verify webhook secret
     const webhookSecret = Deno.env.get("REVENUECAT_WEBHOOK_SECRET");
-    if (webhookSecret) {
-      const authHeader = req.headers.get("Authorization");
-      if (authHeader !== `Bearer ${webhookSecret}`) {
-        console.error("RevenueCat webhook auth failed");
-        return jsonResponse({ error: "Unauthorized" }, 401);
-      }
+    if (!webhookSecret) {
+      console.error("REVENUECAT_WEBHOOK_SECRET is not configured");
+      return jsonResponse({ error: "Webhook not configured" }, 500);
+    }
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader !== `Bearer ${webhookSecret}`) {
+      console.error("RevenueCat webhook auth failed");
+      return jsonResponse({ error: "Unauthorized" }, 401);
     }
 
     // 2. Parse event
