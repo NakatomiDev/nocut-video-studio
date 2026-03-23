@@ -113,24 +113,46 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
     };
   }, [setPlayhead, pause, showFills, isPlaying, getCutAtTime, fillVideoUrls]);
 
-  // Handle fill video ending — resume main video
+  // Resume main video after fill ends or errors
+  const resumeAfterFill = useCallback(() => {
+    setPlayingFillId(null);
+    skipLockRef.current = false;
+    const v = videoRef.current;
+    if (v) {
+      const resumeAt = (v as any)._resumeAt ?? v.currentTime;
+      v.currentTime = resumeAt;
+      delete (v as any)._resumeAt;
+      if (isPlaying) v.play().catch(() => {});
+    }
+  }, [isPlaying]);
+
   useEffect(() => {
     const fillVideo = fillVideoRef.current;
     if (!fillVideo) return;
-    const onEnded = () => {
-      setPlayingFillId(null);
-      const v = videoRef.current;
-      if (v) {
-        const resumeAt = (v as any)._resumeAt ?? v.currentTime;
-        v.currentTime = resumeAt;
-        delete (v as any)._resumeAt;
-        v.play().catch(() => {});
-        skipLockRef.current = false;
-      }
+    const onEnded = () => resumeAfterFill();
+    const onError = () => {
+      console.warn('Fill video failed to load, skipping');
+      resumeAfterFill();
+    };
+    const onStalled = () => {
+      // If fill stalls for 3s, skip it
+      const timeout = setTimeout(() => {
+        if (playingFillId) {
+          console.warn('Fill video stalled, skipping');
+          resumeAfterFill();
+        }
+      }, 3000);
+      fillVideo.addEventListener('playing', () => clearTimeout(timeout), { once: true });
     };
     fillVideo.addEventListener('ended', onEnded);
-    return () => fillVideo.removeEventListener('ended', onEnded);
-  }, []);
+    fillVideo.addEventListener('error', onError);
+    fillVideo.addEventListener('stalled', onStalled);
+    return () => {
+      fillVideo.removeEventListener('ended', onEnded);
+      fillVideo.removeEventListener('error', onError);
+      fillVideo.removeEventListener('stalled', onStalled);
+    };
+  }, [resumeAfterFill, playingFillId]);
 
   // Sync external playhead changes (e.g. timeline scrub) to the video element
   useEffect(() => {
