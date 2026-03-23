@@ -979,7 +979,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
             </div>
           </ScrollArea>
 
-          <div className="space-y-2 text-sm border-t border-border pt-3">
+          <div className="shrink-0 space-y-2 border-t border-border px-6 py-3 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Cuts (removal)</span>
               <span className="font-semibold">{activeCuts.size + activeManualCuts.size} — Free</span>
@@ -997,7 +997,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
               </>
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="shrink-0 border-t border-border px-6 py-3">
             <Button variant="ghost" onClick={() => setShowExportDialog(false)}>Cancel</Button>
             <Button onClick={handleExport} disabled={exporting}>
               {exporting ? 'Exporting...' : 'Confirm & Export'}

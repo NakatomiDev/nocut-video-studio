@@ -203,6 +203,7 @@ interface PersistedEditorState {
   insertedFills: string[];
   fillDurations: [string, number][];
   fillModels: [string, string][];
+  showFills: boolean;
 }
 
 function saveEditorState(state: EditorState) {
@@ -215,6 +216,7 @@ function saveEditorState(state: EditorState) {
       insertedFills: Array.from(state.insertedFills),
       fillDurations: Array.from(state.fillDurations.entries()),
       fillModels: Array.from(state.fillModels.entries()),
+      showFills: state.showFills,
     };
     localStorage.setItem(storageKey(cm.id), JSON.stringify(data));
   } catch { /* quota exceeded or private browsing */ }
@@ -352,6 +354,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       ? new Map(saved.fillModels.filter(([id]) => cuts.some((c) => c.id === id) || manualCuts.some((c) => c.id === id))) as Map<string, AiFillModel>
       : new Map<string, AiFillModel>();
     const insertedFills = saved ? new Set(saved.insertedFills) : new Set<string>();
+    const showFills = saved?.showFills ?? false;
 
     set({
       cutMap,
@@ -362,6 +365,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       fillDurations,
       fillModels,
       insertedFills,
+      showFills,
       creditEstimate: calcCredits(fillDurations, fillModels),
     });
   },
@@ -537,7 +541,8 @@ useEditorStore.subscribe((state, prev) => {
     state.activeManualCuts === prev.activeManualCuts &&
     state.insertedFills === prev.insertedFills &&
     state.fillDurations === prev.fillDurations &&
-    state.fillModels === prev.fillModels
+    state.fillModels === prev.fillModels &&
+    state.showFills === prev.showFills
   ) return;
   // Debounce to avoid excessive writes
   if (persistTimer) clearTimeout(persistTimer);
