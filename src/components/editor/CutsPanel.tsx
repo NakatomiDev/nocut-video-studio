@@ -1,12 +1,12 @@
 // @refresh reset
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEditorStore, AI_FILL_MODELS, MODEL_CREDITS_PER_SEC, DEFAULT_AI_FILL_MODEL, getAvailableModels, getModelDurations, getFillsForCut, type AiFill, type AiFillModel } from '@/stores/editorStore';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { X, AlertTriangle, Sparkles, CheckCircle2, Eye, RefreshCw, Loader2, ChevronRight, Plus, Minus, Play } from 'lucide-react';
+import { X, AlertTriangle, Sparkles, CheckCircle2, Eye, RefreshCw, Loader2, ChevronRight, Plus, Minus, Play, Pause } from 'lucide-react';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import CutThumbnail from './CutThumbnail';
 import ExactVideoFrame from './ExactVideoFrame';
@@ -91,6 +91,11 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   const [expandedReviewId, setExpandedReviewId] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{ time: number; label: string } | null>(null);
   const [expandedFillsCuts, setExpandedFillsCuts] = useState<Set<string>>(new Set());
+  const [inlineFillPreview, setInlineFillPreview] = useState<{ editId: string; fill: AiFill } | null>(null);
+  const [inlineFillVideoUrl, setInlineFillVideoUrl] = useState<string | null>(null);
+  const [inlineFillLoading, setInlineFillLoading] = useState(false);
+  const inlineFillVideoRef = useRef<HTMLVideoElement>(null);
+  const [inlineFillPlaying, setInlineFillPlaying] = useState(false);
 
   useEffect(() => {
     const fetchBalance = async () => {
@@ -655,7 +660,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
         </Button>
       </div>
 
-      <Dialog open={showExportDialog} onOpenChange={(open) => { setShowExportDialog(open); if (!open) setExpandedReviewId(null); }}>
+      <Dialog open={showExportDialog} onOpenChange={(open) => { setShowExportDialog(open); if (!open) { setExpandedReviewId(null); setInlineFillPreview(null); setInlineFillVideoUrl(null); setInlineFillPlaying(false); } }}>
         <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Review Edits</DialogTitle>
@@ -812,8 +817,27 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                                     className="flex flex-col items-center gap-1 rounded-lg border border-primary/30 bg-primary/5 px-2 py-1.5 hover:bg-primary/10 transition-colors cursor-pointer group/fill"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      selectFill(edit.existingFill!);
-                                      setShowExportDialog(false);
+                                      const fill = edit.existingFill!;
+                                      if (inlineFillPreview?.editId === edit.id) {
+                                        setInlineFillPreview(null);
+                                        setInlineFillVideoUrl(null);
+                                        setInlineFillPlaying(false);
+                                      } else {
+                                        setInlineFillPreview({ editId: edit.id, fill });
+                                        setInlineFillVideoUrl(null);
+                                        setInlineFillPlaying(false);
+                                        if (fill.s3Key) {
+                                          setInlineFillLoading(true);
+                                          supabase.functions
+                                            .invoke('get-signed-url', { body: { s3_key: fill.s3Key } })
+                                            .then(({ data, error: fnErr }) => {
+                                              if (fnErr) { setInlineFillLoading(false); return; }
+                                              const url = data?.url || data?.data?.url;
+                                              setInlineFillVideoUrl(url || null);
+                                              setInlineFillLoading(false);
+                                            });
+                                        }
+                                      }
                                     }}
                                   >
                                     <div className="relative w-16 h-10 rounded bg-muted/60 border border-border flex items-center justify-center overflow-hidden">
@@ -826,7 +850,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                                       {edit.existingFill.duration}s AI Fill
                                     </span>
                                     <span className="text-[8px] text-muted-foreground">
-                                      Click to preview
+                                      {inlineFillPreview?.editId === edit.id ? 'Click to close' : 'Click to preview'}
                                     </span>
                                   </button>
                                 ) : (
@@ -864,6 +888,65 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                               </button>
                               <span className="text-[10px] font-mono text-muted-foreground">{formatTimestamp(edit.end)}</span>
                             </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Inline AI Fill video player */}
+                      {inlineFillPreview?.editId === edit.id && (
+                        <div className="border-t border-border/50 p-3" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[10px] font-semibold text-primary uppercase tracking-wider flex items-center gap-1.5">
+                              <Sparkles className="h-3 w-3" />
+                              AI Fill Preview — {inlineFillPreview.fill.duration}s
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5"
+                              onClick={() => { setInlineFillPreview(null); setInlineFillVideoUrl(null); setInlineFillPlaying(false); }}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          <div className="relative bg-black rounded-lg overflow-hidden aspect-video flex items-center justify-center group/video">
+                            {inlineFillLoading && <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
+                            {!inlineFillLoading && !inlineFillVideoUrl && (
+                              <span className="text-xs text-muted-foreground">Fill video not available yet</span>
+                            )}
+                            {!inlineFillLoading && inlineFillVideoUrl && (
+                              <>
+                                <video
+                                  ref={inlineFillVideoRef}
+                                  key={inlineFillVideoUrl}
+                                  src={inlineFillVideoUrl}
+                                  className="w-full h-full object-contain"
+                                  preload="auto"
+                                  crossOrigin="anonymous"
+                                  onPlay={() => setInlineFillPlaying(true)}
+                                  onPause={() => setInlineFillPlaying(false)}
+                                  onEnded={() => setInlineFillPlaying(false)}
+                                />
+                                <button
+                                  className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover/video:opacity-100 transition-opacity cursor-pointer"
+                                  onClick={() => {
+                                    if (!inlineFillVideoRef.current) return;
+                                    if (inlineFillPlaying) {
+                                      inlineFillVideoRef.current.pause();
+                                    } else {
+                                      if (inlineFillVideoRef.current.ended) inlineFillVideoRef.current.currentTime = 0;
+                                      inlineFillVideoRef.current.play();
+                                    }
+                                  }}
+                                >
+                                  {inlineFillPlaying ? (
+                                    <Pause className="h-8 w-8 text-white drop-shadow-lg" />
+                                  ) : (
+                                    <Play className="h-8 w-8 text-white drop-shadow-lg" />
+                                  )}
+                                </button>
+                              </>
+                            )}
                           </div>
                         </div>
                       )}
