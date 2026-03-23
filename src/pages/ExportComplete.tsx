@@ -14,6 +14,7 @@ import {
   Film,
   Loader2,
 } from 'lucide-react';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
 interface ExportData {
   id: string;
