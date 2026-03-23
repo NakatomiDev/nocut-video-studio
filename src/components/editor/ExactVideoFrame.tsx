@@ -7,6 +7,8 @@ interface ExactVideoFrameProps {
   label: string;
   className?: string;
   videoClassName?: string;
+  /** Pre-extracted frame data URL — if provided, skip video seeking entirely */
+  cachedFrame?: string;
 }
 
 const FRAME_EPSILON = 0.04;
