@@ -55,6 +55,7 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
+          <Suspense fallback={<LazyFallback />}>
             <Route path="/" element={<AuthRedirect />} />
             <Route path="/sign-up" element={<SignUp />} />
             <Route path="/sign-in" element={<SignIn />} />
@@ -67,6 +68,7 @@ const App = () => (
             <Route path="/editor/:projectId" element={<ProtectedRoute><ProjectEditor /></ProtectedRoute>} />
             <Route path="/commercial-disclosure" element={<CommercialDisclosure />} />
             <Route path="*" element={<NotFound />} />
+          </Suspense>
           </Routes>
         </AuthProvider>
       </BrowserRouter>
