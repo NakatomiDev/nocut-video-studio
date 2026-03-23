@@ -459,7 +459,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
           {cuts.map((cut) => (
             <div
               key={cut.id}
-              className="flex flex-col gap-2 rounded-md p-3 transition-colors hover:bg-secondary/50 cursor-pointer"
+              className="flex flex-col gap-2 rounded-md p-3 transition-colors hover:bg-secondary/50 cursor-pointer overflow-hidden"
               onClick={() => setPlayhead(cut.start)}
             >
               <div className="flex items-center gap-3">
