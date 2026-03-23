@@ -83,7 +83,17 @@ const Credits = () => {
                   </div>
                 </div>
               )}
-              {expiringCredits > 0 && earliestExpiry && (
+              {balance && balance.total === 0 && !expiringCredits && (
+                <div className="flex items-center justify-between rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm">
+                  <span className="text-foreground font-medium">No credits remaining</span>
+                  <Button size="sm" variant="default" className="gap-1.5" onClick={() => {
+                    const el = document.getElementById('topup-section');
+                    el?.scrollIntoView({ behavior: 'smooth' });
+                  }}>
+                    Top Up <ArrowRight className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              )}
                 <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                   <AlertTriangle className="h-4 w-4 shrink-0" />
                   {expiringCredits} credit{expiringCredits > 1 ? "s" : ""} expiring on {format(parseISO(earliestExpiry), "MMM d, yyyy")}
