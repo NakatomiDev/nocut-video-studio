@@ -1,3 +1,4 @@
+// @refresh reset
 import { useEffect, useRef, useState } from 'react';
 import { useEditorStore } from '@/stores/editorStore';
 import { supabase } from '@/integrations/supabase/client';
