@@ -139,11 +139,11 @@ const ExportProgress = ({ projectId, onComplete, onRetry }: ExportProgressProps)
       .order('created_at', { ascending: false })
       .limit(2);
 
-    if (jobs) {
-      // Apply oldest first so the most recent state wins
-      for (const job of [...jobs].reverse()) {
-        applyJobState(job as Record<string, unknown>);
-      }
+    if (jobs && jobs.length > 0) {
+      // Only use the most recent job (index 0, ordered by created_at desc).
+      // Older failed jobs should not override the current job's state.
+      const latestJob = jobs[0];
+      applyJobState(latestJob as Record<string, unknown>);
     }
 
     const { data: proj } = await supabase
