@@ -526,3 +526,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       previewJobId: null,
     }),
 }));
+
+// Auto-persist UI state whenever relevant fields change
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+useEditorStore.subscribe((state, prev) => {
+  if (!state.cutMap) return;
+  // Only save when persisted fields actually changed
+  if (
+    state.activeCuts === prev.activeCuts &&
+    state.activeManualCuts === prev.activeManualCuts &&
+    state.insertedFills === prev.insertedFills &&
+    state.fillDurations === prev.fillDurations &&
+    state.fillModels === prev.fillModels
+  ) return;
+  // Debounce to avoid excessive writes
+  if (persistTimer) clearTimeout(persistTimer);
+  persistTimer = setTimeout(() => saveEditorState(state), 300);
+});
