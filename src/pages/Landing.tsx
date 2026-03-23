@@ -103,6 +103,8 @@ const Landing = () => {
                 src={heroMockup}
                 alt="NoCut timeline editor showing AI-generated fill segments on a professional video editing interface"
                 className="w-full rounded-lg"
+                width={1920}
+                height={1080}
                 loading="eager"
               />
             </div>
