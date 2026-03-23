@@ -135,7 +135,7 @@ const Landing = () => {
       <section className="border-y border-border/50 bg-card/30 py-10 px-6">
         <div className="mx-auto max-w-5xl text-center">
           <p className="text-sm text-muted-foreground mb-6">Trusted by creators who value their time</p>
-          <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-4 text-muted-foreground/60">
+          <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-4 text-muted-foreground">
             {["YouTubers", "Course Creators", "Podcasters", "Streamers", "Agencies"].map((label) => (
               <span key={label} className="text-sm font-medium tracking-wider uppercase">{label}</span>
             ))}
