@@ -686,7 +686,6 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                           )}
                         </div>
                       )}
-                      </div>
 
                       {isExpanded && (videoUrl || thumbnailSpriteUrl) && (
                         <div className="px-3 pb-3 pt-1 border-t border-border/50">
