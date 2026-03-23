@@ -202,21 +202,20 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     const generatedFill = cutFills[0] ?? null;
 
     return (
-      <div className="flex flex-col gap-1.5 pl-5 mt-1 overflow-hidden">
-        {/* Model selector first — durations depend on it */}
-        <div className="flex items-center gap-2 min-w-0">
+      <div className="flex flex-col gap-1.5 pl-3 pr-1 mt-1 overflow-hidden">
+        {/* Model selector — stacked layout to prevent overflow */}
+        <div className="flex items-center gap-1.5 min-w-0">
           {generatedFill ? (
             <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
           ) : (
             <Sparkles className="h-3 w-3 text-primary shrink-0" />
           )}
-          <span className="text-[10px] text-muted-foreground whitespace-nowrap">Model:</span>
+          <span className="text-[10px] text-muted-foreground shrink-0">Model:</span>
           <Select
             value={currentModel}
             onValueChange={(val) => {
               const newModel = val as AiFillModel;
               setFillModel(cutId, newModel);
-              // Reset duration if current one is invalid for new model
               const newDurations = getModelDurations(newModel, userTier);
               if (currentFill > 0 && !newDurations.includes(currentFill)) {
                 setFillDuration(cutId, newDurations[0] ?? 0);
@@ -224,7 +223,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
             }}
           >
             <SelectTrigger
-              className="h-6 w-[170px] text-[10px] px-2"
+              className="h-6 min-w-0 flex-1 text-[10px] px-2 truncate"
               onClick={(e) => e.stopPropagation()}
             >
               <SelectValue />
@@ -238,14 +237,14 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
             </SelectContent>
           </Select>
           {generatedFill && (
-            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[9px] ml-1">
-              Generated
+            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[9px] shrink-0">
+              ✓
             </Badge>
           )}
         </div>
-        {/* Duration selector — filtered by model + tier */}
-        <div className="flex items-center gap-2 pl-5">
-          <span className="text-[10px] text-muted-foreground whitespace-nowrap">Duration:</span>
+        {/* Duration selector */}
+        <div className="flex items-center gap-1.5 pl-4 min-w-0">
+          <span className="text-[10px] text-muted-foreground shrink-0">Duration:</span>
           <Select
             value={currentFill > 0 ? String(currentFill) : 'none'}
             onValueChange={(val) => {
@@ -253,7 +252,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
             }}
           >
             <SelectTrigger
-              className="h-6 w-[120px] text-[10px] px-2"
+              className="h-6 min-w-0 flex-1 text-[10px] px-2"
               onClick={(e) => e.stopPropagation()}
             >
               <SelectValue />
@@ -271,26 +270,26 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
             </SelectContent>
           </Select>
           {modelConfig && !modelConfig.audio && (
-            <span className="text-[9px] text-muted-foreground">Silent</span>
+            <span className="text-[9px] text-muted-foreground shrink-0">Silent</span>
           )}
         </div>
         {/* Preview fill button */}
         {currentFill > 0 && (
-          <div className="flex items-center gap-2 pl-5">
+          <div className="flex items-center gap-1.5 pl-4 flex-wrap">
             {generatedFill ? (
               <>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-6 text-[10px]"
+                  className="h-6 text-[10px] px-2"
                   onClick={(e) => { e.stopPropagation(); selectFill(generatedFill); }}
                 >
-                  <Eye className="h-3 w-3 mr-1" /> View Fill
+                  <Eye className="h-3 w-3 mr-1" /> View
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-6 text-[10px]"
+                  className="h-6 text-[10px] px-2"
                   disabled={!!previewGeneratingCutId}
                   onClick={(e) => { e.stopPropagation(); generatePreview(cutId); }}
                 >
@@ -298,18 +297,18 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                 </Button>
               </>
             ) : previewGeneratingCutId === cutId ? (
-              <Button variant="outline" size="sm" className="h-6 text-[10px]" disabled>
+              <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" disabled>
                 <Loader2 className="h-3 w-3 mr-1 animate-spin" /> Generating...
               </Button>
             ) : (
               <Button
                 variant="outline"
                 size="sm"
-                className="h-6 text-[10px]"
+                className="h-6 text-[10px] px-2"
                 disabled={!!previewGeneratingCutId}
                 onClick={(e) => { e.stopPropagation(); generatePreview(cutId); }}
               >
-                <Eye className="h-3 w-3 mr-1" /> Preview Fill
+                <Eye className="h-3 w-3 mr-1" /> Preview
               </Button>
             )}
           </div>
