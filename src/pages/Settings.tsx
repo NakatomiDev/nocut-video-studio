@@ -6,11 +6,13 @@ import { LogOut } from "lucide-react";
 import { UpgradePaywall } from "@/components/UpgradePaywall";
 import { CustomerCenter } from "@/components/CustomerCenter";
 import { useRevenueCatCustomer } from "@/hooks/useRevenueCat";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 const SettingsPage = () => {
   const { user, signOut } = useAuth();
   const [paywallOpen, setPaywallOpen] = useState(false);
   const { hasProAccess, hasBusinessAccess } = useRevenueCatCustomer();
+  useDocumentTitle("Settings");
 
   const currentTier = hasBusinessAccess ? "business" : hasProAccess ? "pro" : "free";
 

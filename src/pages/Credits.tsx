@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useCreditsBalance, useCreditsHistory, useCreditsTopup } from "@/hooks/useCredits";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
-import { Coins, AlertTriangle, Loader2, ArrowDownCircle, ArrowUpCircle, RefreshCw } from "lucide-react";
+import { Coins, AlertTriangle, Loader2, ArrowDownCircle, ArrowUpCircle, RefreshCw, ArrowRight } from "lucide-react";
 import { format, differenceInDays, parseISO } from "date-fns";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 const TOPUP_PACKS = [
   { id: "nocut_credits_10", credits: 10, price: "$4.99", perCredit: "$0.50", name: "Starter" },
@@ -19,9 +20,11 @@ const TOPUP_PACKS = [
 
 const Credits = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { balance, loading: balanceLoading, refetch: refetchBalance } = useCreditsBalance();
   const { transactions, loading: historyLoading, loadMore, hasMore } = useCreditsHistory();
   const { purchase, loading: topupLoading } = useCreditsTopup();
+  useDocumentTitle("Credits");
 
   useEffect(() => {
     if (searchParams.get("success") === "true") {
@@ -80,6 +83,17 @@ const Credits = () => {
                   </div>
                 </div>
               )}
+              {balance && balance.total === 0 && !expiringCredits && (
+                <div className="flex items-center justify-between rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm">
+                  <span className="text-foreground font-medium">No credits remaining</span>
+                  <Button size="sm" variant="default" className="gap-1.5" onClick={() => {
+                    const el = document.getElementById('topup-section');
+                    el?.scrollIntoView({ behavior: 'smooth' });
+                  }}>
+                    Top Up <ArrowRight className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              )}
               {expiringCredits > 0 && earliestExpiry && (
                 <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                   <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -92,7 +106,7 @@ const Credits = () => {
       </Card>
 
       {/* Top-Up Packs */}
-      <div className="space-y-3">
+      <div className="space-y-3" id="topup-section">
         <h2 className="text-lg font-semibold text-foreground">Top Up Credits</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {TOPUP_PACKS.map((pack) => (
