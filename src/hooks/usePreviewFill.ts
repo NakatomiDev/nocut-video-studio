@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useEditorStore, DEFAULT_AI_FILL_MODEL, MODEL_CREDITS_PER_SEC, type AiFill } from '@/stores/editorStore';
+import { useEditorStore, DEFAULT_AI_FILL_MODEL, type AiFill } from '@/stores/editorStore';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -54,80 +54,56 @@ export function usePreviewFill() {
       return;
     }
 
-    // Check credits
-    const cost = duration * MODEL_CREDITS_PER_SEC[model];
-    if (cost > state.creditBalance.total) {
-      toast.error('Insufficient credits for preview');
-      return;
-    }
-
     try {
-      // 1. Create minimal edit decision with single-entry EDL
-      const edlJson = [{
-        start: cut.start,
-        end: cut.end,
-        type: cut.type,
-        fill_duration: duration,
-        model,
-      }];
-
-      const { data: editDecision, error: edError } = await supabase
-        .from('edit_decisions')
-        .insert({
+      // 1. Call preview-fill edge function (handles credits, edit_decisions, job_queue server-side)
+      const { data: pfData, error: pfError } = await supabase.functions.invoke('preview-fill', {
+        body: {
           project_id: project.id,
-          edl_json: edlJson,
-          total_fill_seconds: duration,
-          credits_charged: cost,
-          status: 'pending',
-        })
-        .select('id')
-        .single();
+          start: cut.start,
+          end: cut.end,
+          type: cut.type,
+          fill_duration: duration,
+          model,
+        },
+      });
 
-      if (edError || !editDecision) throw edError || new Error('Failed to create edit decision');
+      if (pfError) throw pfError;
 
-      // 2. Create job queue entry with preview flag
+      const response = pfData?.data ?? pfData;
+      if (!response?.job_id || !response?.edit_decision_id) {
+        throw new Error('Invalid response from preview-fill');
+      }
+
+      const { job_id, edit_decision_id } = response as { job_id: string; edit_decision_id: string };
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { data: jobRow, error: jobError } = await supabase
-        .from('job_queue')
-        .insert({
-          project_id: project.id,
-          user_id: user.id,
-          type: 'ai.fill',
-          payload: { edit_decision_id: editDecision.id, preview: true },
-          priority: 5,
-        })
-        .select('id')
-        .single();
-
-      if (jobError || !jobRow) throw jobError || new Error('Failed to enqueue job');
-
-      // 3. Update store
-      useEditorStore.getState().startPreviewGeneration(cutId, jobRow.id);
+      // 2. Update store
+      useEditorStore.getState().startPreviewGeneration(cutId, job_id);
       toast.info('Generating fill preview...');
 
-      // 4. Subscribe to job completion via realtime
+      // 3. Subscribe to job completion via realtime
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
       }
 
       const channel = supabase
-        .channel(`preview-job-${jobRow.id}`)
+        .channel(`preview-job-${job_id}`)
         .on(
           'postgres_changes',
           {
             event: 'UPDATE',
             schema: 'public',
             table: 'job_queue',
-            filter: `id=eq.${jobRow.id}`,
+            filter: `id=eq.${job_id}`,
           },
           async (payload) => {
             const updated = payload.new as Record<string, unknown>;
             const status = updated.status as string;
 
             if (status === 'complete') {
-              await handlePreviewComplete(editDecision.id, cut.end, duration, user.id);
+              await handlePreviewComplete(edit_decision_id, cut.end, duration, user.id);
               cleanup();
             } else if (status === 'failed') {
               const msg = (updated.error_message as string) || 'Fill generation failed';
@@ -141,9 +117,9 @@ export function usePreviewFill() {
 
       channelRef.current = channel;
 
-      // 5. Invoke edge function (fire-and-forget)
+      // 4. Invoke process-ai-fill to start generation (fire-and-forget)
       supabase.functions.invoke('process-ai-fill', {
-        body: { job_id: jobRow.id },
+        body: { job_id },
       }).then(({ error: invokeError }) => {
         if (invokeError) {
           console.error('Failed to invoke process-ai-fill for preview:', invokeError);
