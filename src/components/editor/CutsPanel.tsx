@@ -611,9 +611,22 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
               {(() => {
                 const activeCutsList = cuts.filter((c) => activeCuts.has(c.id));
                 const activeManualList = manualCuts.filter((c) => activeManualCuts.has(c.id));
+                const aiFills = useEditorStore.getState().aiFills;
                 const allEdits = [
-                  ...activeCutsList.map((c) => ({ id: c.id, start: c.start, end: c.end, duration: c.duration, type: c.type, fill: fillDurations.get(c.id) || 0 })),
-                  ...activeManualList.map((c) => ({ id: c.id, start: c.start, end: c.end, duration: c.duration, type: 'manual' as string, fill: fillDurations.get(c.id) || 0 })),
+                  ...activeCutsList.map((c) => {
+                    const fill = fillDurations.get(c.id) || 0;
+                    const model = fillModels.get(c.id) ?? DEFAULT_AI_FILL_MODEL;
+                    const modelConfig = AI_FILL_MODELS.find((m) => m.id === model);
+                    const existingFill = getFillsForCut(c, aiFills)[0] ?? null;
+                    return { id: c.id, start: c.start, end: c.end, duration: c.duration, type: c.type, fill, model, modelLabel: modelConfig?.label ?? model, existingFill };
+                  }),
+                  ...activeManualList.map((c) => {
+                    const fill = fillDurations.get(c.id) || 0;
+                    const model = fillModels.get(c.id) ?? DEFAULT_AI_FILL_MODEL;
+                    const modelConfig = AI_FILL_MODELS.find((m) => m.id === model);
+                    const existingFill = getFillsForCut(c, aiFills)[0] ?? null;
+                    return { id: c.id, start: c.start, end: c.end, duration: c.duration, type: 'manual' as string, fill, model, modelLabel: modelConfig?.label ?? model, existingFill };
+                  }),
                 ].sort((a, b) => a.start - b.start);
 
                 return allEdits.map((edit, idx) => {
