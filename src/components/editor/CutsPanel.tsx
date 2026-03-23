@@ -11,6 +11,7 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/component
 import CutThumbnail from './CutThumbnail';
 import ExactVideoFrame from './ExactVideoFrame';
 import { usePreviewFill } from '@/hooks/usePreviewFill';
+import { useFrameCache } from '@/hooks/useFrameCache';
 import {
   Select,
   SelectContent,
