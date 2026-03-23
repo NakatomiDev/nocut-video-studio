@@ -19,10 +19,24 @@ const ExactVideoFrame = ({
   label,
   className,
   videoClassName,
+  cachedFrame,
 }: ExactVideoFrameProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(!!cachedFrame);
   const [failed, setFailed] = useState(false);
+
+  // If we have a cached frame, render it directly as an image
+  if (cachedFrame) {
+    return (
+      <div className={cn('relative overflow-hidden rounded border border-border bg-muted/40', className)}>
+        <img
+          src={cachedFrame}
+          alt={label}
+          className={cn('h-full w-full object-contain', videoClassName)}
+        />
+      </div>
+    );
+  }
 
   const normalizedTime = useMemo(() => Math.max(0, time), [time]);
 
