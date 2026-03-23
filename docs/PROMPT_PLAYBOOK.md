@@ -1957,7 +1957,7 @@ POST-COMPLETION (mandatory):
 
 ---
 
-### - [ ] Prompt 7.1.2 — UI polish pass
+### - [x] Prompt 7.1.2 — UI polish pass *(completed 2026-03-23)*
 
 **Tool: Lovable**
 
