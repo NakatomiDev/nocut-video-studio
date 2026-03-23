@@ -119,6 +119,24 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   const creditsAfterExport = creditBalance.total - creditEstimate;
   const cutsWithFills = fillDurations.size;
 
+  /** Resolve the effective fill for a cut: explicit fillDuration, or an inserted existing fill */
+  const getEffectiveFill = useCallback((cutId: string, cutObj: { end: number }) => {
+    const explicit = fillDurations.get(cutId) || 0;
+    if (explicit > 0) {
+      return { duration: explicit, model: fillModels.get(cutId) ?? DEFAULT_AI_FILL_MODEL, isExisting: false };
+    }
+    // Check if user inserted an existing generated fill
+    const fills = getFillsForCut(cutObj, aiFills);
+    const inserted = fills.find((f) => insertedFills.has(f.id));
+    if (inserted && inserted.duration) {
+      const m = (inserted.provider && inserted.provider in MODEL_CREDITS_PER_SEC)
+        ? inserted.provider as AiFillModel
+        : DEFAULT_AI_FILL_MODEL;
+      return { duration: inserted.duration, model: m, isExisting: true, fillId: inserted.id };
+    }
+    return { duration: 0, model: fillModels.get(cutId) ?? DEFAULT_AI_FILL_MODEL, isExisting: false };
+  }, [fillDurations, fillModels, aiFills, insertedFills]);
+
   const handleExport = useCallback(async () => {
     if (!project) return;
     setExporting(true);
@@ -126,20 +144,14 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
       const activeCutsList = cuts.filter((c) => activeCuts.has(c.id));
       const activeManualList = manualCuts.filter((c) => activeManualCuts.has(c.id));
       const allCuts = [
-        ...activeCutsList.map((c) => ({
-          start: c.start,
-          end: c.end,
-          type: c.type,
-          fill_duration: fillDurations.get(c.id) || 0,
-          model: fillModels.get(c.id) ?? DEFAULT_AI_FILL_MODEL,
-        })),
-        ...activeManualList.map((c) => ({
-          start: c.start,
-          end: c.end,
-          type: 'manual',
-          fill_duration: fillDurations.get(c.id) || 0,
-          model: fillModels.get(c.id) ?? DEFAULT_AI_FILL_MODEL,
-        })),
+        ...activeCutsList.map((c) => {
+          const eff = getEffectiveFill(c.id, c);
+          return { start: c.start, end: c.end, type: c.type, fill_duration: eff.duration, model: eff.model, isExisting: eff.isExisting };
+        }),
+        ...activeManualList.map((c) => {
+          const eff = getEffectiveFill(c.id, c);
+          return { start: c.start, end: c.end, type: 'manual', fill_duration: eff.duration, model: eff.model, isExisting: eff.isExisting };
+        }),
       ].sort((a, b) => a.start - b.start);
 
       const totalFill = allCuts.reduce((s, c) => s + c.fill_duration, 0);
