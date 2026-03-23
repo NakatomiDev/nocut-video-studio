@@ -22,7 +22,7 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const fillVideoRef = useRef<HTMLVideoElement>(null);
   const internalSeekRef = useRef(false);
-  const skipLockRef = useRef(false); // prevents recursive skip during seek
+  const skipLockRef = useRef(false);
 
   const {
     isPlaying, playheadPosition, setPlayhead, play, pause,
@@ -36,11 +36,6 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
   const [duration, setDuration] = useState(0);
   const [videoError, setVideoError] = useState<string | null>(null);
   const [playingFillId, setPlayingFillId] = useState<string | null>(null);
-
-  // Get active cut segments for skip logic
-  const activeCutSegments = useMemo(() => {
-    return getActiveCutSegments(useEditorStore.getState());
-  }, [cuts, activeCuts, manualCuts, activeManualCuts, aiFills]);
 
   // Fetch signed URLs for AI fills that don't have them yet
   useEffect(() => {
@@ -57,27 +52,29 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
     }
   }, [showFills, aiFills, fillVideoUrls, setFillVideoUrl]);
 
-  // Check if a time falls within an active cut
-  const getCutAtTime = useCallback((time: number): typeof activeCutSegments[0] | null => {
-    if (!showFills) return null;
-    for (const seg of activeCutSegments) {
-      if (time >= seg.start && time < seg.end) return seg;
-    }
-    return null;
-  }, [showFills, activeCutSegments]);
-
+  // Core timeupdate / ended / loadedmetadata listeners.
+  // Reads state from the store INSIDE the callback to avoid stale closures
+  // and prevent the effect from re-running on every state change.
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
+
     const onTime = () => {
       if (skipLockRef.current) return;
 
-      // Skip-cut logic when showFills is on
-      if (showFills && isPlaying) {
-        const cutSeg = getCutAtTime(v.currentTime);
+      const state = useEditorStore.getState();
+
+      // Skip-cut logic when showFills (Preview Final) is on
+      if (state.showFills && state.isPlaying) {
+        const segments = getActiveCutSegments(state);
+        const cutSeg = segments.find(
+          (s) => v.currentTime >= s.start && v.currentTime < s.end,
+        ) ?? null;
+
         if (cutSeg) {
+          const urls = state.fillVideoUrls;
           // If fill exists and has a video URL, play it
-          if (cutSeg.fill && fillVideoUrls.has(cutSeg.fill.id)) {
+          if (cutSeg.fill && urls.has(cutSeg.fill.id)) {
             skipLockRef.current = true;
             v.pause();
             setPlayingFillId(cutSeg.fill.id);
@@ -86,11 +83,10 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
               fillVideo.currentTime = 0;
               fillVideo.play().catch(() => {});
             }
-            // Store where to resume after fill
             (v as any)._resumeAt = cutSeg.end;
             return;
           }
-          // No fill — just skip
+          // No fill — just skip past the cut
           skipLockRef.current = true;
           v.currentTime = cutSeg.end;
           setTimeout(() => { skipLockRef.current = false; }, 50);
@@ -99,10 +95,12 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
       }
 
       internalSeekRef.current = true;
-      setPlayhead(v.currentTime);
+      state.setPlayhead(v.currentTime);
     };
-    const onEnd = () => pause();
+
+    const onEnd = () => useEditorStore.getState().pause();
     const onMeta = () => { setDuration(v.duration); setVideoError(null); };
+
     v.addEventListener('timeupdate', onTime);
     v.addEventListener('ended', onEnd);
     v.addEventListener('loadedmetadata', onMeta);
@@ -111,7 +109,9 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
       v.removeEventListener('ended', onEnd);
       v.removeEventListener('loadedmetadata', onMeta);
     };
-  }, [setPlayhead, pause, showFills, isPlaying, getCutAtTime, fillVideoUrls]);
+  // Only re-attach when the video element could change (videoUrl swap)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoUrl]);
 
   // Resume main video after fill ends or errors
   const resumeAfterFill = useCallback(() => {
