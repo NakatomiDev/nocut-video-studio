@@ -11,7 +11,7 @@ export interface TranscodeJobRow {
   project_id: string;
   user_id: string;
   type: string;
-  payload: { video_id: string; s3_key: string };
+  payload: Record<string, unknown>;
   status: string;
   attempts: number;
   max_attempts: number;
@@ -21,7 +21,7 @@ export async function pollQueuedJobs(limit: number): Promise<TranscodeJobRow[]> 
   const { data, error } = await supabase
     .from("job_queue")
     .select("id, project_id, user_id, type, payload, status, attempts, max_attempts")
-    .eq("type", "video.transcode")
+    .in("type", ["video.transcode", "video.extract_frames"])
     .eq("status", "queued")
     .order("priority", { ascending: false })
     .order("created_at", { ascending: true })
