@@ -367,7 +367,10 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
             </span>
           </div>
           {cuts.length === 0 && (
-            <p className="p-3 text-center text-xs text-muted-foreground">No pauses detected</p>
+            <div className="p-3 text-center text-xs text-muted-foreground space-y-1">
+              <p>No pauses detected.</p>
+              <p>You can still add manual cuts using the razor tool on the timeline.</p>
+            </div>
           )}
           {cuts.map((cut) => (
             <div

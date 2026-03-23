@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Plus, Scissors, Video } from "lucide-react";
 import ProjectCard from "@/components/ProjectCard";
+import ProjectCardSkeleton from "@/components/ProjectCardSkeleton";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Project {
@@ -17,6 +19,7 @@ const Dashboard = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  useDocumentTitle("Dashboard");
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -100,8 +103,8 @@ const Dashboard = () => {
       </div>
 
       {loading ? (
-        <div className="mt-24 flex items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => <ProjectCardSkeleton key={i} />)}
         </div>
       ) : projects.length === 0 ? (
         <div className="mt-24 flex flex-col items-center justify-center text-center">
