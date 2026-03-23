@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { X, AlertTriangle, Sparkles, CheckCircle2, Eye, RefreshCw, Loader2, ChevronRight, Plus, Minus } from 'lucide-react';
+import { X, AlertTriangle, Sparkles, CheckCircle2, Eye, RefreshCw, Loader2, ChevronRight, Plus, Minus, Play } from 'lucide-react';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import CutThumbnail from './CutThumbnail';
 import ExactVideoFrame from './ExactVideoFrame';
@@ -776,10 +776,10 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                           )}
                             {edit.existingFillIdentity && (
                               <span className="text-[10px] text-foreground/90 basis-full pl-5">
-                                Using selected fill: <span className="font-mono">#{edit.existingFillIdentity.shortId}</span>
+                                AI fill selected for this cut
                               </span>
                             )}
-                        </div>
+                          </div>
                       )}
 
                       {isExpanded && (videoUrl || thumbnailSpriteUrl) && (
@@ -807,16 +807,41 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                             <div className="flex flex-col items-center justify-center gap-1">
                               <div className="h-px w-8 bg-muted-foreground/30" />
                               {(edit.fill > 0 || edit.existingFill) && (
-                                <div className="flex flex-col items-center gap-0.5">
-                                  <span className="text-[9px] text-primary font-medium">
-                                    {edit.existingFill ? `${edit.existingFill.duration}s` : `${edit.fill}s`} AI fill
-                                  </span>
-                                  {edit.existingFillIdentity && (
-                                    <span className="text-[9px] text-muted-foreground font-mono">
-                                      #{edit.existingFillIdentity.shortId}
+                                edit.existingFill ? (
+                                  <button
+                                    className="flex flex-col items-center gap-1 rounded-lg border border-primary/30 bg-primary/5 px-2 py-1.5 hover:bg-primary/10 transition-colors cursor-pointer group/fill"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      selectFill(edit.existingFill!);
+                                      setShowExportDialog(false);
+                                    }}
+                                  >
+                                    <div className="relative w-16 h-10 rounded bg-muted/60 border border-border flex items-center justify-center overflow-hidden">
+                                      <Sparkles className="h-4 w-4 text-primary/60" />
+                                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/fill:opacity-100 transition-opacity bg-black/40">
+                                        <Play className="h-4 w-4 text-white" />
+                                      </div>
+                                    </div>
+                                    <span className="text-[9px] text-primary font-semibold">
+                                      {edit.existingFill.duration}s AI Fill
                                     </span>
-                                  )}
-                                </div>
+                                    <span className="text-[8px] text-muted-foreground">
+                                      Click to preview
+                                    </span>
+                                  </button>
+                                ) : (
+                                  <div className="flex flex-col items-center gap-0.5 rounded-lg border border-amber-500/20 bg-amber-500/5 px-2 py-1.5">
+                                    <div className="w-16 h-10 rounded bg-muted/60 border border-dashed border-muted-foreground/30 flex items-center justify-center">
+                                      <Sparkles className="h-4 w-4 text-amber-400/60" />
+                                    </div>
+                                    <span className="text-[9px] text-amber-400 font-semibold">
+                                      {edit.fill}s AI Fill
+                                    </span>
+                                    <span className="text-[8px] text-muted-foreground">
+                                      Pending
+                                    </span>
+                                  </div>
+                                )
                               )}
                               <div className="h-px w-8 bg-muted-foreground/30" />
                             </div>
