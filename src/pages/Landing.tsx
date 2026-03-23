@@ -44,6 +44,7 @@ const Landing = () => {
         </div>
       </nav>
 
+      <main>
       {/* Hero Section */}
       <section className="relative pt-32 pb-20 px-6">
         {/* Background gradient orbs */}
