@@ -138,32 +138,28 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
 
       const totalFill = allCuts.reduce((s, c) => s + c.fill_duration, 0);
 
-      const { data: editDecision, error } = await supabase.from('edit_decisions').insert({
-        project_id: project.id,
-        edl_json: allCuts,
-        total_fill_seconds: totalFill,
-        credits_charged: creditEstimate,
-        status: 'pending',
-      }).select('id').single();
+      // Build gaps array for the project-edl edge function
+      const gaps = allCuts.map((c) => ({
+        pre_cut_timestamp: c.start,
+        post_cut_timestamp: c.end,
+        fill_duration: c.fill_duration,
+        model: c.model,
+        type: c.type,
+      }));
 
-      if (error) throw error;
+      // Call project-edl: handles credit deduction, edit_decisions, and job_queue server-side
+      const { data: edlData, error: edlError } = await supabase.functions.invoke('project-edl', {
+        body: { project_id: project.id, gaps },
+      });
 
-      // Enqueue the AI fill job so the backend picks it up
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      if (edlError) throw edlError;
 
-      const { data: jobRow, error: jobError } = await supabase.from('job_queue').insert({
-        project_id: project.id,
-        user_id: user.id,
-        type: totalFill > 0 ? 'ai.fill' : 'video.export',
-        payload: { edit_decision_id: editDecision.id },
-        priority: 10,
-      }).select('id').single();
-
-      if (jobError) throw jobError;
+      const response = edlData?.data ?? edlData;
+      if (!response?.edit_decision_id) {
+        throw new Error('Invalid response from project-edl');
+      }
 
       setShowExportDialog(false);
-      // Navigate to export progress view
       navigate(`/project/${project.id}?exporting=true`);
       toast.success(
         totalFill > 0
@@ -171,9 +167,9 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
           : 'Export submitted — processing your edits'
       );
 
-      // Invoke the edge function to start processing
+      // Invoke process-ai-fill to start generation (fire-and-forget)
       supabase.functions.invoke('process-ai-fill', {
-        body: { job_id: jobRow.id },
+        body: { job_id: response.job_id },
       }).then(({ error: invokeError }) => {
         if (invokeError) {
           console.error('Failed to invoke process-ai-fill:', invokeError);

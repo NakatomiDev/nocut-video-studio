@@ -6,6 +6,28 @@ import {
   AuthError,
 } from "../_shared/auth.ts";
 import { successResponse, errorResponse } from "../_shared/response.ts";
+import {
+  MODEL_CREDITS_PER_SEC,
+  DEFAULT_AI_FILL_MODEL,
+  type AiFillModel,
+} from "../_shared/credits.ts";
+
+/**
+ * Independently recalculate the credit cost from edl_json entries.
+ * This prevents attackers from inserting edit_decisions with credits_charged=0
+ * while requesting non-zero fill durations.
+ */
+function recalculateCreditsFromEdl(edlJson: EdlEntry[], defaultModel: string): number {
+  let total = 0;
+  for (const entry of edlJson) {
+    if (entry.fill_duration > 0) {
+      const model = (entry.model ?? defaultModel) as AiFillModel;
+      const creditsPerSec = MODEL_CREDITS_PER_SEC[model] ?? 1;
+      total += entry.fill_duration * creditsPerSec;
+    }
+  }
+  return total;
+}
 
 interface EdlEntry {
   start: number;
@@ -137,13 +159,27 @@ Deno.serve(async (req) => {
       .update({ status: "processing", started_at: new Date().toISOString(), attempts: job.attempts + 1 })
       .eq("id", job.id);
 
-    // 7. Deduct credits (if any fills requested)
+    // 7. Server-side credit validation: recalculate from edl_json, never trust stored value
+    const serverCalculatedCredits = recalculateCreditsFromEdl(edlJson, defaultModel);
+
+    if (serverCalculatedCredits > 0 && creditsCharged < serverCalculatedCredits) {
+      console.error(
+        `Credit mismatch: edit_decision ${editDecision.id} claims ${creditsCharged} credits ` +
+        `but EDL requires ${serverCalculatedCredits}. Rejecting.`
+      );
+      await failJob(serviceClient, job.id, editDecision.id, "Credit validation failed: insufficient credits declared", isPreview);
+      return errorResponse("invalid_request", "Credit validation failed", 400);
+    }
+
+    // Use server-calculated credits for deduction
+    const creditsToDeduct = serverCalculatedCredits;
+
     let creditTransactionId: string | null = null;
-    if (creditsCharged > 0) {
+    if (creditsToDeduct > 0) {
       const { data: creditResult, error: creditError } = await serviceClient
         .rpc("deduct_credits", {
           p_user_id: user.id,
-          p_required_credits: creditsCharged,
+          p_required_credits: creditsToDeduct,
           p_project_id: project.id,
           p_reason: "ai_fill",
         });
