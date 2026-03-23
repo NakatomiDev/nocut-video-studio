@@ -304,7 +304,7 @@ Deno.serve(async (req) => {
 
     if (!isPreview) {
       // Enqueue the video.export job so the exporter service stitches the final video
-      const { error: exportJobError } = await serviceClient
+      const { data: exportJobData, error: exportJobError } = await serviceClient
         .from("job_queue")
         .insert({
           user_id: user.id,
@@ -316,7 +316,9 @@ Deno.serve(async (req) => {
             edit_decision_id: editDecision.id,
           },
           priority: 10,
-        });
+        })
+        .select("id")
+        .single();
 
       if (exportJobError) {
         console.error("Failed to enqueue video.export job:", exportJobError.message);
@@ -327,6 +329,24 @@ Deno.serve(async (req) => {
         .from("projects")
         .update({ status: "exporting" })
         .eq("id", project.id);
+
+      // Fire-and-forget: invoke export-video edge function to process the job
+      // immediately, instead of relying on a separate polling service
+      const exportJobId = exportJobData?.id;
+      if (!exportJobError && exportJobId) {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        fetch(`${supabaseUrl}/functions/v1/export-video`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${serviceRoleKey}`,
+          },
+          body: JSON.stringify({ job_id: exportJobId }),
+        }).catch((err) => {
+          console.error("Failed to invoke export-video:", err);
+        });
+      }
     } else {
       // Preview mode — no export needed, just mark ready
       await serviceClient

@@ -87,3 +87,14 @@ output "ecs_task_definition_detector" {
   description = "Detector task definition ARN"
   value       = aws_ecs_task_definition.detector.arn
 }
+
+# MediaConvert
+output "mediaconvert_role_arn" {
+  description = "MediaConvert IAM role ARN — set as AWS_MEDIACONVERT_ROLE_ARN in Supabase secrets"
+  value       = aws_iam_role.mediaconvert.arn
+}
+
+output "mediaconvert_endpoint" {
+  description = "MediaConvert API endpoint — set as AWS_MEDIACONVERT_ENDPOINT in Supabase secrets"
+  value       = var.mediaconvert_endpoint
+}
