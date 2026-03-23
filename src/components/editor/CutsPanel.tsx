@@ -681,7 +681,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
       </div>
 
       <Dialog open={showExportDialog} onOpenChange={(open) => { setShowExportDialog(open); if (!open) { setExpandedReviewId(null); setInlineFillPreview(null); setInlineFillVideoUrl(null); setInlineFillPlaying(false); } }}>
-        <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle>Review Edits</DialogTitle>
             <DialogDescription>
@@ -691,8 +691,8 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
             </DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="flex-1 -mx-6 px-6">
-            <div className="space-y-2 max-h-[45vh]">
+          <ScrollArea className="flex-1 -mx-6 px-6 min-h-0">
+            <div className="space-y-2 pb-2">
               {(() => {
                 const activeCutsList = cuts.filter((c) => activeCuts.has(c.id));
                 const activeManualList = manualCuts.filter((c) => activeManualCuts.has(c.id));
