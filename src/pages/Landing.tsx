@@ -240,6 +240,8 @@ const Landing = () => {
               src={beforeAfter}
               alt="Before: timeline with visible jump cuts. After: seamless timeline with AI-generated bridging footage"
               className="w-full rounded-lg"
+              width={1920}
+              height={1080}
               loading="lazy"
             />
           </motion.div>
