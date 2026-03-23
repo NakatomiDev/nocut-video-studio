@@ -3,6 +3,8 @@
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2",
     "@aws-sdk/client-s3": "npm:@aws-sdk/client-s3",
     "@aws-sdk/s3-request-presigner": "npm:@aws-sdk/s3-request-presigner",
+    "@aws-sdk/client-mediaconvert": "npm:@aws-sdk/client-mediaconvert",
+    "@aws-sdk/cloudfront-signer": "npm:@aws-sdk/cloudfront-signer",
     "stripe": "https://esm.sh/stripe@14"
   }
 }
