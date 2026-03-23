@@ -22,7 +22,6 @@ interface WaveformTimelineProps {
 const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration }: WaveformTimelineProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const animFrameRef = useRef<number>(0);
   const isDraggingRef = useRef(false);
 
   const {
@@ -578,14 +577,11 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
     segments, timelineDuration,
   ]);
 
-  // RAF loop
+  // Draw on demand instead of repainting every animation frame.
+  // The old RAF loop forced continuous canvas work even while the main
+  // video was decoding, which could starve playback and cause visible stutter.
   useEffect(() => {
-    const loop = () => {
-      draw();
-      animFrameRef.current = requestAnimationFrame(loop);
-    };
-    animFrameRef.current = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(animFrameRef.current);
+    draw();
   }, [draw]);
 
   // Auto-scroll playhead
