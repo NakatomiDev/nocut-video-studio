@@ -200,7 +200,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     } finally {
       setExporting(false);
     }
-  }, [project, cuts, activeCuts, manualCuts, activeManualCuts, fillDurations, fillModels, creditEstimate]);
+  }, [project, cuts, activeCuts, manualCuts, activeManualCuts, fillDurations, fillModels, creditEstimate, getEffectiveFill]);
 
   const renderFillSelector = (cutId: string) => {
     const currentFill = fillDurations.get(cutId) || 0;
