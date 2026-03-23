@@ -253,6 +253,7 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
           src={videoUrl}
           className={`max-h-full max-w-full ${playingFillId ? 'hidden' : ''}`}
           preload="auto"
+          playsInline
           onError={() => setVideoError('Video failed to load')}
         />
         {/* AI Fill video — shown when fill is playing */}
@@ -261,6 +262,7 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
           src={currentFillUrl ?? undefined}
           className={`max-h-full max-w-full ${playingFillId ? '' : 'hidden'}`}
           preload="auto"
+          playsInline
         />
         {playingFillId && (
           <div className="absolute top-3 left-3 bg-accent/80 text-accent-foreground text-xs px-2 py-1 rounded font-medium">
