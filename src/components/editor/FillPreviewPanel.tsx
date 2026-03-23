@@ -178,30 +178,7 @@ const FillPreviewPanel = () => {
             )}
           </div>
           <div className="flex items-center gap-2">
-            {matchingCut && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs"
-                disabled={!!previewGeneratingCutId}
-                onClick={() => {
-                  generatePreview(matchingCut.id);
-                  selectFill(null);
-                }}
-              >
-                <RefreshCw className="h-3 w-3 mr-1" /> Regenerate
-              </Button>
-            )}
-            {isInserted ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs text-destructive hover:text-destructive"
-                onClick={() => removeFill(fill.id)}
-              >
-                <Trash2 className="h-3 w-3 mr-1" /> Remove
-              </Button>
-            ) : (
+            {!isInserted && (
               <Button
                 size="sm"
                 className="h-7 text-xs"
