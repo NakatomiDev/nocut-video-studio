@@ -299,14 +299,40 @@ Deno.serve(async (req) => {
 
     await serviceClient
       .from("edit_decisions")
-      .update({ status: "complete" })
+      .update({ status: "fills_complete" })
       .eq("id", editDecision.id);
 
     if (!isPreview) {
+      // Enqueue the video.export job so the exporter service stitches the final video
+      const { error: exportJobError } = await serviceClient
+        .from("job_queue")
+        .insert({
+          user_id: user.id,
+          project_id: project.id,
+          type: "video.export",
+          status: "queued",
+          payload: {
+            project_id: project.id,
+            edit_decision_id: editDecision.id,
+          },
+          priority: 10,
+        });
+
+      if (exportJobError) {
+        console.error("Failed to enqueue video.export job:", exportJobError.message);
+        // Don't fail the whole request — fills are saved; user can retry export
+      }
+
       await serviceClient
         .from("projects")
-        .update({ status: "ready" })
+        .update({ status: "exporting" })
         .eq("id", project.id);
+    } else {
+      // Preview mode — no export needed, just mark ready
+      await serviceClient
+        .from("edit_decisions")
+        .update({ status: "complete" })
+        .eq("id", editDecision.id);
     }
 
     return successResponse({
