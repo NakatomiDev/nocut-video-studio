@@ -130,6 +130,23 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
 
   const availableModels = getAvailableModels(userTier);
 
+  // Pre-extract frame thumbnails for all cuts in background
+  const allCutTimestamps = useMemo(() => {
+    const times: number[] = [];
+    for (const c of cuts) { times.push(c.start, c.end); }
+    for (const c of manualCuts) { times.push(c.start, c.end); }
+    return times;
+  }, [cuts, manualCuts]);
+
+  const priorityCutTimestamps = useMemo(() => {
+    const times: number[] = [];
+    for (const c of cuts) { if (activeCuts.has(c.id)) { times.push(c.start, c.end); } }
+    for (const c of manualCuts) { if (activeManualCuts.has(c.id)) { times.push(c.start, c.end); } }
+    return times;
+  }, [cuts, manualCuts, activeCuts, activeManualCuts]);
+
+  const { getFrame } = useFrameCache(videoUrl ?? null, allCutTimestamps, priorityCutTimestamps);
+
   const hasActiveCuts = activeCuts.size > 0 || activeManualCuts.size > 0;
   const insufficientCredits = creditEstimate > creditBalance.total;
   const creditsAfterExport = creditBalance.total - creditEstimate;
