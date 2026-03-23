@@ -119,15 +119,24 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   const creditsAfterExport = creditBalance.total - creditEstimate;
   const cutsWithFills = fillDurations.size;
 
+  const getInsertedFillForCut = useCallback((cutObj: { end: number }) => {
+    const fills = getFillsForCut(cutObj, aiFills);
+    return fills.find((fill) => insertedFills.has(fill.id)) ?? null;
+  }, [aiFills, insertedFills]);
+
+  const getPreviewFillForCut = useCallback((cutObj: { end: number }) => {
+    const insertedFill = getInsertedFillForCut(cutObj);
+    if (insertedFill) return insertedFill;
+    return getFillsForCut(cutObj, aiFills)[0] ?? null;
+  }, [aiFills, getInsertedFillForCut]);
+
   /** Resolve the effective fill for a cut: explicit fillDuration, or an inserted existing fill */
   const getEffectiveFill = useCallback((cutId: string, cutObj: { end: number }) => {
     const explicit = fillDurations.get(cutId) || 0;
     if (explicit > 0) {
       return { duration: explicit, model: fillModels.get(cutId) ?? DEFAULT_AI_FILL_MODEL, isExisting: false };
     }
-    // Check if user inserted an existing generated fill
-    const fills = getFillsForCut(cutObj, aiFills);
-    const inserted = fills.find((f) => insertedFills.has(f.id));
+    const inserted = getInsertedFillForCut(cutObj);
     if (inserted && inserted.duration) {
       const m = (inserted.provider && inserted.provider in MODEL_CREDITS_PER_SEC)
         ? inserted.provider as AiFillModel
@@ -135,7 +144,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
       return { duration: inserted.duration, model: m, isExisting: true, fillId: inserted.id };
     }
     return { duration: 0, model: fillModels.get(cutId) ?? DEFAULT_AI_FILL_MODEL, isExisting: false };
-  }, [fillDurations, fillModels, aiFills, insertedFills]);
+  }, [fillDurations, fillModels, getInsertedFillForCut]);
 
   const handleExport = useCallback(async () => {
     if (!project) return;
@@ -211,11 +220,27 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     // Check if this cut already has a generated AI fill
     const allCutsArr = [...cuts, ...manualCuts.map((c) => ({ ...c, type: 'manual' }))];
     const cutObj = allCutsArr.find((c) => c.id === cutId);
-    const cutFills = cutObj ? getFillsForCut(cutObj, aiFills) : [];
-    const generatedFill = cutFills[0] ?? null;
+    const generatedFill = cutObj ? getPreviewFillForCut(cutObj) : null;
+    const selectedExistingFill = cutObj ? getInsertedFillForCut(cutObj) : null;
+    const selectedExistingModelLabel = selectedExistingFill
+      ? AI_FILL_MODELS.find((m) => m.id === selectedExistingFill.provider)?.label ?? selectedExistingFill.provider ?? 'Generated AI Fill'
+      : null;
 
     return (
       <div className="flex flex-col gap-1.5 pl-3 pr-1 mt-1 overflow-hidden">
+        {selectedExistingFill && (
+          <div className="flex items-center gap-1.5 pl-4 flex-wrap">
+            <Badge className="bg-primary/15 text-primary border-primary/30 text-[9px]">
+              Selected for export
+            </Badge>
+            <span className="text-[10px] text-foreground font-medium">
+              {selectedExistingFill.duration}s AI Fill
+            </span>
+            <span className="text-[10px] text-muted-foreground truncate">
+              {selectedExistingModelLabel}
+            </span>
+          </div>
+        )}
         {/* Model selector — stacked layout to prevent overflow */}
         <div className="flex items-center gap-1.5 min-w-0">
           {generatedFill ? (
@@ -378,7 +403,9 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     const allCutsArr = [...cuts, ...manualCuts.map((c) => ({ ...c, type: 'manual' }))];
     const cutObj = allCutsArr.find((c) => c.id === cutId);
     if (!cutObj) return null;
-    const fills = getFillsForCut(cutObj, aiFills);
+    const fills = [...getFillsForCut(cutObj, aiFills)].sort(
+      (a, b) => Number(insertedFills.has(b.id)) - Number(insertedFills.has(a.id)),
+    );
     if (fills.length === 0) return null;
 
     const isOpen = expandedFillsCuts.has(cutId);
@@ -417,6 +444,11 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                   <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[9px] shrink-0">
                     {fill.duration}s
                   </Badge>
+                  {isInserted && (
+                    <Badge className="bg-primary/15 text-primary border-primary/30 text-[9px] shrink-0">
+                      Selected
+                    </Badge>
+                  )}
                   <span className="text-muted-foreground truncate flex-1">
                     {fill.method || fill.provider || 'AI Fill'}
                   </span>
@@ -627,13 +659,13 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                   ...activeCutsList.map((c) => {
                     const eff = getEffectiveFill(c.id, c);
                     const modelConfig = AI_FILL_MODELS.find((m) => m.id === eff.model);
-                    const existingFill = getFillsForCut(c, aiFills)[0] ?? null;
+                    const existingFill = eff.isExisting ? getInsertedFillForCut(c) : null;
                     return { id: c.id, start: c.start, end: c.end, duration: c.duration, type: c.type, fill: eff.duration, model: eff.model, modelLabel: modelConfig?.label ?? eff.model, existingFill, isExisting: eff.isExisting };
                   }),
                   ...activeManualList.map((c) => {
                     const eff = getEffectiveFill(c.id, c);
                     const modelConfig = AI_FILL_MODELS.find((m) => m.id === eff.model);
-                    const existingFill = getFillsForCut(c, aiFills)[0] ?? null;
+                    const existingFill = eff.isExisting ? getInsertedFillForCut(c) : null;
                     return { id: c.id, start: c.start, end: c.end, duration: c.duration, type: 'manual' as string, fill: eff.duration, model: eff.model, modelLabel: modelConfig?.label ?? eff.model, existingFill, isExisting: eff.isExisting };
                   }),
                 ].sort((a, b) => a.start - b.start);
