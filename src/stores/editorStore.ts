@@ -203,6 +203,7 @@ interface PersistedEditorState {
   insertedFills: string[];
   fillDurations: [string, number][];
   fillModels: [string, string][];
+  showFills: boolean;
 }
 
 function saveEditorState(state: EditorState) {
@@ -215,6 +216,7 @@ function saveEditorState(state: EditorState) {
       insertedFills: Array.from(state.insertedFills),
       fillDurations: Array.from(state.fillDurations.entries()),
       fillModels: Array.from(state.fillModels.entries()),
+      showFills: state.showFills,
     };
     localStorage.setItem(storageKey(cm.id), JSON.stringify(data));
   } catch { /* quota exceeded or private browsing */ }
