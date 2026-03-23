@@ -27,6 +27,7 @@ const ProjectEditor = () => {
   const [thumbnailSpriteUrl, setThumbnailSpriteUrl] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [editingTitle, setEditingTitle] = useState(false);
+  useDocumentTitle(title || 'Editor');
 
   const extractSignedUrl = (response: unknown) => {
     if (!response || typeof response !== 'object') return null;
