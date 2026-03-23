@@ -817,8 +817,27 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                                     className="flex flex-col items-center gap-1 rounded-lg border border-primary/30 bg-primary/5 px-2 py-1.5 hover:bg-primary/10 transition-colors cursor-pointer group/fill"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      selectFill(edit.existingFill!);
-                                      setShowExportDialog(false);
+                                      const fill = edit.existingFill!;
+                                      if (inlineFillPreview?.editId === edit.id) {
+                                        setInlineFillPreview(null);
+                                        setInlineFillVideoUrl(null);
+                                        setInlineFillPlaying(false);
+                                      } else {
+                                        setInlineFillPreview({ editId: edit.id, fill });
+                                        setInlineFillVideoUrl(null);
+                                        setInlineFillPlaying(false);
+                                        if (fill.s3Key) {
+                                          setInlineFillLoading(true);
+                                          supabase.functions
+                                            .invoke('get-signed-url', { body: { s3_key: fill.s3Key } })
+                                            .then(({ data, error: fnErr }) => {
+                                              if (fnErr) { setInlineFillLoading(false); return; }
+                                              const url = data?.url || data?.data?.url;
+                                              setInlineFillVideoUrl(url || null);
+                                              setInlineFillLoading(false);
+                                            });
+                                        }
+                                      }
                                     }}
                                   >
                                     <div className="relative w-16 h-10 rounded bg-muted/60 border border-border flex items-center justify-center overflow-hidden">
@@ -831,7 +850,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                                       {edit.existingFill.duration}s AI Fill
                                     </span>
                                     <span className="text-[8px] text-muted-foreground">
-                                      Click to preview
+                                      {inlineFillPreview?.editId === edit.id ? 'Click to close' : 'Click to preview'}
                                     </span>
                                   </button>
                                 ) : (
