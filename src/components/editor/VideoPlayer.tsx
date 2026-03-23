@@ -113,24 +113,46 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
     };
   }, [setPlayhead, pause, showFills, isPlaying, getCutAtTime, fillVideoUrls]);
 
-  // Handle fill video ending — resume main video
+  // Resume main video after fill ends or errors
+  const resumeAfterFill = useCallback(() => {
+    setPlayingFillId(null);
+    skipLockRef.current = false;
+    const v = videoRef.current;
+    if (v) {
+      const resumeAt = (v as any)._resumeAt ?? v.currentTime;
+      v.currentTime = resumeAt;
+      delete (v as any)._resumeAt;
+      if (isPlaying) v.play().catch(() => {});
+    }
+  }, [isPlaying]);
+
   useEffect(() => {
     const fillVideo = fillVideoRef.current;
     if (!fillVideo) return;
-    const onEnded = () => {
-      setPlayingFillId(null);
-      const v = videoRef.current;
-      if (v) {
-        const resumeAt = (v as any)._resumeAt ?? v.currentTime;
-        v.currentTime = resumeAt;
-        delete (v as any)._resumeAt;
-        v.play().catch(() => {});
-        skipLockRef.current = false;
-      }
+    const onEnded = () => resumeAfterFill();
+    const onError = () => {
+      console.warn('Fill video failed to load, skipping');
+      resumeAfterFill();
+    };
+    const onStalled = () => {
+      // If fill stalls for 3s, skip it
+      const timeout = setTimeout(() => {
+        if (playingFillId) {
+          console.warn('Fill video stalled, skipping');
+          resumeAfterFill();
+        }
+      }, 3000);
+      fillVideo.addEventListener('playing', () => clearTimeout(timeout), { once: true });
     };
     fillVideo.addEventListener('ended', onEnded);
-    return () => fillVideo.removeEventListener('ended', onEnded);
-  }, []);
+    fillVideo.addEventListener('error', onError);
+    fillVideo.addEventListener('stalled', onStalled);
+    return () => {
+      fillVideo.removeEventListener('ended', onEnded);
+      fillVideo.removeEventListener('error', onError);
+      fillVideo.removeEventListener('stalled', onStalled);
+    };
+  }, [resumeAfterFill, playingFillId]);
 
   // Sync external playhead changes (e.g. timeline scrub) to the video element
   useEffect(() => {
@@ -147,11 +169,23 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
 
   useEffect(() => {
     const v = videoRef.current;
-    if (!v) return;
+    if (!v || !videoUrl) return;
     if (playingFillId) return; // don't control main video while fill is playing
-    if (isPlaying) v.play().catch((err) => { if (err.name !== 'AbortError') setVideoError('Playback failed'); });
-    else v.pause();
-  }, [isPlaying, playingFillId]);
+    if (isPlaying) {
+      const playPromise = v.play();
+      if (playPromise) {
+        playPromise.catch((err) => {
+          if (err.name !== 'AbortError') {
+            console.error('Playback failed:', err);
+            setVideoError('Playback failed — try clicking play again');
+            pause();
+          }
+        });
+      }
+    } else {
+      v.pause();
+    }
+  }, [isPlaying, playingFillId, videoUrl, pause]);
 
   useEffect(() => {
     const v = videoRef.current;
@@ -219,6 +253,7 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
           src={videoUrl}
           className={`max-h-full max-w-full ${playingFillId ? 'hidden' : ''}`}
           preload="auto"
+          playsInline
           onError={() => setVideoError('Video failed to load')}
         />
         {/* AI Fill video — shown when fill is playing */}
@@ -227,6 +262,7 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
           src={currentFillUrl ?? undefined}
           className={`max-h-full max-w-full ${playingFillId ? '' : 'hidden'}`}
           preload="auto"
+          playsInline
         />
         {playingFillId && (
           <div className="absolute top-3 left-3 bg-accent/80 text-accent-foreground text-xs px-2 py-1 rounded font-medium">
