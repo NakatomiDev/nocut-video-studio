@@ -38,10 +38,8 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
 
   // Get active cut segments for skip logic
   const activeCutSegments = useMemo(() => {
-    const state = useEditorStore.getState();
-    return getActiveCutSegments(state);
-    // Re-derive when cuts/fills change
-  }, [useEditorStore().cuts, useEditorStore().activeCuts, useEditorStore().manualCuts, useEditorStore().activeManualCuts, aiFills]);
+    return getActiveCutSegments(useEditorStore.getState());
+  }, [cuts, activeCuts, manualCuts, activeManualCuts, aiFills]);
 
   // Fetch signed URLs for AI fills that don't have them yet
   useEffect(() => {
