@@ -1,3 +1,4 @@
+// @refresh reset
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { useEditorStore, getFillsForCut } from '@/stores/editorStore';
 import { ZoomIn, ZoomOut, Scissors, Sparkles } from 'lucide-react';
