@@ -177,6 +177,9 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
       v.currentTime = playheadPosition;
     }
   }, [playheadPosition, isPlaying, playingFillId]);
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !videoUrl) return;
     if (playingFillId) return; // don't control main video while fill is playing
     if (isPlaying) {
       const playPromise = v.play();
