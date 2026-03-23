@@ -473,6 +473,8 @@ const Landing = () => {
         </div>
       </section>
 
+      </main>
+
       {/* Footer */}
       <footer className="border-t border-border/50 bg-card/20 py-12 px-6">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 sm:flex-row">
