@@ -660,6 +660,11 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                             <Sparkles className="h-2.5 w-2.5 mr-1" />
                             {edit.fill}s fill
                           </Badge>
+                        ) : edit.existingFill ? (
+                          <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[10px]">
+                            <Sparkles className="h-2.5 w-2.5 mr-1" />
+                            {edit.existingFill.duration}s fill
+                          </Badge>
                         ) : (
                           <Badge variant="outline" className="text-[10px] text-muted-foreground border-border">
                             cut only
