@@ -321,30 +321,30 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   const renderPreview = (start: number, end: number) => (
     <div className="flex items-center gap-1.5 pl-3">
       <div className="flex flex-col items-center gap-0.5 shrink-0">
-        {videoUrl ? (
+        {thumbnailSpriteUrl ? (
+          <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={start} duration={duration} width={56} height={32} />
+        ) : videoUrl ? (
           <ExactVideoFrame
             videoUrl={videoUrl}
             time={start}
             label={`Start frame ${formatTimestamp(start)}`}
             className="h-8 w-14"
           />
-        ) : (
-          <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={start} duration={duration} width={56} height={32} />
-        )}
+        ) : null}
         <span className="text-[9px] text-muted-foreground font-mono">Start</span>
       </div>
       <div className="flex-1 border-t border-dashed border-muted-foreground/30 min-w-2" />
       <div className="flex flex-col items-center gap-0.5 shrink-0">
-        {videoUrl ? (
+        {thumbnailSpriteUrl ? (
+          <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={end} duration={duration} width={56} height={32} />
+        ) : videoUrl ? (
           <ExactVideoFrame
             videoUrl={videoUrl}
             time={end}
             label={`End frame ${formatTimestamp(end)}`}
             className="h-8 w-14"
           />
-        ) : (
-          <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={end} duration={duration} width={56} height={32} />
-        )}
+        ) : null}
         <span className="text-[9px] text-muted-foreground font-mono">End</span>
       </div>
     </div>
@@ -651,16 +651,16 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                                 className="rounded ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover:opacity-80 transition-opacity cursor-zoom-in"
                                 onClick={(e) => { e.stopPropagation(); setLightbox({ time: edit.start, label: `Before cut · ${formatTimestamp(edit.start)}` }); }}
                               >
-                                {videoUrl ? (
+                                {thumbnailSpriteUrl ? (
+                                  <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={edit.start} duration={duration} width={180} height={100} />
+                                ) : videoUrl ? (
                                   <ExactVideoFrame
                                     videoUrl={videoUrl}
                                     time={edit.start}
                                     label={`Before cut ${formatTimestamp(edit.start)}`}
                                     className="h-[100px] w-[180px]"
                                   />
-                                ) : (
-                                  <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={edit.start} duration={duration} width={180} height={100} />
-                                )}
+                                ) : null}
                               </button>
                               <span className="text-[10px] font-mono text-muted-foreground">{formatTimestamp(edit.start)}</span>
                             </div>
@@ -677,16 +677,16 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                                 className="rounded ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover:opacity-80 transition-opacity cursor-zoom-in"
                                 onClick={(e) => { e.stopPropagation(); setLightbox({ time: edit.end, label: `After cut · ${formatTimestamp(edit.end)}` }); }}
                               >
-                                {videoUrl ? (
+                                {thumbnailSpriteUrl ? (
+                                  <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={edit.end} duration={duration} width={180} height={100} />
+                                ) : videoUrl ? (
                                   <ExactVideoFrame
                                     videoUrl={videoUrl}
                                     time={edit.end}
                                     label={`After cut ${formatTimestamp(edit.end)}`}
                                     className="h-[100px] w-[180px]"
                                   />
-                                ) : (
-                                  <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={edit.end} duration={duration} width={180} height={100} />
-                                )}
+                                ) : null}
                               </button>
                               <span className="text-[10px] font-mono text-muted-foreground">{formatTimestamp(edit.end)}</span>
                             </div>
