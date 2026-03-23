@@ -194,6 +194,40 @@ const calcCredits = (fillDurations: Map<string, number>, fillModels: Map<string,
 
 let manualCutCounter = 0;
 
+/** localStorage key for persisting editor UI state per cut map */
+const storageKey = (cutMapId: string) => `nocut-editor-state-${cutMapId}`;
+
+interface PersistedEditorState {
+  activeCuts: string[];
+  activeManualCuts: string[];
+  insertedFills: string[];
+  fillDurations: [string, number][];
+  fillModels: [string, string][];
+}
+
+function saveEditorState(state: EditorState) {
+  const cm = state.cutMap;
+  if (!cm) return;
+  try {
+    const data: PersistedEditorState = {
+      activeCuts: Array.from(state.activeCuts),
+      activeManualCuts: Array.from(state.activeManualCuts),
+      insertedFills: Array.from(state.insertedFills),
+      fillDurations: Array.from(state.fillDurations.entries()),
+      fillModels: Array.from(state.fillModels.entries()),
+    };
+    localStorage.setItem(storageKey(cm.id), JSON.stringify(data));
+  } catch { /* quota exceeded or private browsing */ }
+}
+
+function loadEditorState(cutMapId: string): PersistedEditorState | null {
+  try {
+    const raw = localStorage.getItem(storageKey(cutMapId));
+    if (!raw) return null;
+    return JSON.parse(raw) as PersistedEditorState;
+  } catch { return null; }
+}
+
 /** Persist manual cuts alongside auto-detected cuts in the cut_maps row.
  *  Returns true if the DB write succeeded, false otherwise. */
 async function persistManualCuts(
