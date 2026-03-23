@@ -21,6 +21,7 @@ on:
 env:
   AWS_REGION: ap-northeast-1
   ECR_REGISTRY: 985655976031.dkr.ecr.ap-northeast-1.amazonaws.com
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
   id-token: write
