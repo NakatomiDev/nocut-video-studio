@@ -169,11 +169,23 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
 
   useEffect(() => {
     const v = videoRef.current;
-    if (!v) return;
+    if (!v || !videoUrl) return;
     if (playingFillId) return; // don't control main video while fill is playing
-    if (isPlaying) v.play().catch((err) => { if (err.name !== 'AbortError') setVideoError('Playback failed'); });
-    else v.pause();
-  }, [isPlaying, playingFillId]);
+    if (isPlaying) {
+      const playPromise = v.play();
+      if (playPromise) {
+        playPromise.catch((err) => {
+          if (err.name !== 'AbortError') {
+            console.error('Playback failed:', err);
+            setVideoError('Playback failed — try clicking play again');
+            pause();
+          }
+        });
+      }
+    } else {
+      v.pause();
+    }
+  }, [isPlaying, playingFillId, videoUrl, pause]);
 
   useEffect(() => {
     const v = videoRef.current;
