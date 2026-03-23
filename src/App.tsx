@@ -54,22 +54,22 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <Routes>
           <Suspense fallback={<LazyFallback />}>
-            <Route path="/" element={<AuthRedirect />} />
-            <Route path="/sign-up" element={<SignUp />} />
-            <Route path="/sign-in" element={<SignIn />} />
-            <Route path="/dashboard" element={<ProtectedWithLayout><Dashboard /></ProtectedWithLayout>} />
-            <Route path="/credits" element={<ProtectedWithLayout><Credits /></ProtectedWithLayout>} />
-            <Route path="/settings" element={<ProtectedWithLayout><Settings /></ProtectedWithLayout>} />
-            <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
-            <Route path="/project/:projectId" element={<ProtectedRoute><ProjectEditor /></ProtectedRoute>} />
-            <Route path="/project/:projectId/export/:exportId" element={<ProtectedRoute><ExportComplete /></ProtectedRoute>} />
-            <Route path="/editor/:projectId" element={<ProtectedRoute><ProjectEditor /></ProtectedRoute>} />
-            <Route path="/commercial-disclosure" element={<CommercialDisclosure />} />
-            <Route path="*" element={<NotFound />} />
+            <Routes>
+              <Route path="/" element={<AuthRedirect />} />
+              <Route path="/sign-up" element={<SignUp />} />
+              <Route path="/sign-in" element={<SignIn />} />
+              <Route path="/dashboard" element={<ProtectedWithLayout><Dashboard /></ProtectedWithLayout>} />
+              <Route path="/credits" element={<ProtectedWithLayout><Credits /></ProtectedWithLayout>} />
+              <Route path="/settings" element={<ProtectedWithLayout><Settings /></ProtectedWithLayout>} />
+              <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
+              <Route path="/project/:projectId" element={<ProtectedRoute><ProjectEditor /></ProtectedRoute>} />
+              <Route path="/project/:projectId/export/:exportId" element={<ProtectedRoute><ExportComplete /></ProtectedRoute>} />
+              <Route path="/editor/:projectId" element={<ProtectedRoute><ProjectEditor /></ProtectedRoute>} />
+              <Route path="/commercial-disclosure" element={<CommercialDisclosure />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
           </Suspense>
-          </Routes>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
