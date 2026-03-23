@@ -20,9 +20,11 @@ const TOPUP_PACKS = [
 
 const Credits = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { balance, loading: balanceLoading, refetch: refetchBalance } = useCreditsBalance();
   const { transactions, loading: historyLoading, loadMore, hasMore } = useCreditsHistory();
   const { purchase, loading: topupLoading } = useCreditsTopup();
+  useDocumentTitle("Credits");
 
   useEffect(() => {
     if (searchParams.get("success") === "true") {
