@@ -7,6 +7,13 @@ import { Badge } from '@/components/ui/badge';
 import { X, Play, Pause, Plus, Trash2, Loader2, Sparkles, RefreshCw } from 'lucide-react';
 import { usePreviewFill } from '@/hooks/usePreviewFill';
 import { Progress } from '@/components/ui/progress';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 
 const formatTimestamp = (s: number) => {
   const m = Math.floor(s / 60);
@@ -51,14 +58,11 @@ const FillPreviewPanel = () => {
     setPlayProgress(0);
     setIsPlaying(false);
 
-    console.log('[FillPreview] Fetching signed URL for:', fill.s3Key);
-
     supabase.functions
       .invoke('get-signed-url', { body: { s3_key: fill.s3Key } })
       .then(({ data, error: fnErr }) => {
         if (cancelled) return;
         if (fnErr) {
-          console.error('[FillPreview] Function error:', fnErr);
           setError('Could not load fill video');
           setLoading(false);
           return;
@@ -72,9 +76,7 @@ const FillPreviewPanel = () => {
         setLoading(false);
       });
 
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [fill?.id, fill?.s3Key]);
 
   if (!fill) return null;
@@ -103,121 +105,115 @@ const FillPreviewPanel = () => {
   };
 
   return (
-    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-50 w-[420px] rounded-xl border border-border bg-card shadow-2xl overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-3.5 w-3.5 text-primary" />
-          <span className="text-xs font-semibold text-foreground">AI Fill Preview</span>
-          <Badge variant="outline" className="text-[9px]">
-            AI Fill · {fill.duration}s
-          </Badge>
-        </div>
-        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => selectFill(null)}>
-          <X className="h-3 w-3" />
-        </Button>
-      </div>
+    <Dialog open={!!fill} onOpenChange={(open) => { if (!open) selectFill(null); }}>
+      <DialogContent className="max-w-lg p-0 overflow-hidden bg-card border-border gap-0">
+        <DialogHeader className="px-4 py-3 border-b border-border bg-muted/30">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-3.5 w-3.5 text-primary" />
+            <DialogTitle className="text-sm font-semibold">AI Fill Preview</DialogTitle>
+            <Badge variant="outline" className="text-[9px]">
+              {fill.duration}s
+            </Badge>
+          </div>
+          <DialogDescription className="sr-only">Preview of generated AI fill video</DialogDescription>
+        </DialogHeader>
 
-      {/* Video preview */}
-      <div className="bg-black aspect-video flex items-center justify-center relative group">
-        {loading && <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
-        {error && <span className="text-xs text-muted-foreground px-4 text-center">{error}</span>}
-        {!loading && !error && videoUrl && (
-          <>
-            <video
-              ref={videoRef}
-              key={videoUrl}
-              src={videoUrl}
-              className="w-full h-full object-contain"
-              preload="auto"
-              crossOrigin="anonymous"
-              onTimeUpdate={() => {
-                if (!videoRef.current) return;
-                const dur = videoRef.current.duration || 1;
-                setPlayProgress((videoRef.current.currentTime / dur) * 100);
-              }}
-              onPlay={() => setIsPlaying(true)}
-              onPause={() => setIsPlaying(false)}
-              onEnded={() => { setIsPlaying(false); setPlayProgress(100); }}
-              onError={(e) => {
-                console.error('[FillPreview] Video load error:', e);
-                setError('Failed to load video file');
-              }}
-            />
-            {/* Play/pause overlay */}
+        {/* Video preview */}
+        <div className="bg-black aspect-video flex items-center justify-center relative group">
+          {loading && <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
+          {error && <span className="text-xs text-muted-foreground px-4 text-center">{error}</span>}
+          {!loading && !error && videoUrl && (
+            <>
+              <video
+                ref={videoRef}
+                key={videoUrl}
+                src={videoUrl}
+                className="w-full h-full object-contain"
+                preload="auto"
+                crossOrigin="anonymous"
+                onTimeUpdate={() => {
+                  if (!videoRef.current) return;
+                  const dur = videoRef.current.duration || 1;
+                  setPlayProgress((videoRef.current.currentTime / dur) * 100);
+                }}
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
+                onEnded={() => { setIsPlaying(false); setPlayProgress(100); }}
+                onError={() => setError('Failed to load video file')}
+              />
+              <button
+                className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                onClick={togglePlay}
+              >
+                {isPlaying ? (
+                  <Pause className="h-10 w-10 text-white drop-shadow-lg" />
+                ) : (
+                  <Play className="h-10 w-10 text-white drop-shadow-lg" />
+                )}
+              </button>
+              <div className="absolute bottom-0 left-0 right-0 h-1">
+                <Progress value={playProgress} className="h-1 rounded-none bg-black/40 [&>div]:bg-primary" />
+              </div>
+            </>
+          )}
+          {!loading && !error && !videoUrl && (
+            <span className="text-xs text-muted-foreground">No video file available</span>
+          )}
+        </div>
+
+        {/* Info + actions */}
+        <div className="flex items-center justify-between px-4 py-2 border-t border-border">
+          <div className="flex items-center gap-3">
             <button
-              className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-              onClick={togglePlay}
+              onClick={handleJumpTo}
+              className="text-[10px] font-mono text-muted-foreground hover:text-foreground transition-colors"
             >
-              {isPlaying ? (
-                <Pause className="h-10 w-10 text-white drop-shadow-lg" />
-              ) : (
-                <Play className="h-10 w-10 text-white drop-shadow-lg" />
-              )}
+              <Play className="h-3 w-3 inline mr-1" />
+              {formatTimestamp(fill.startTime)}
             </button>
-            {/* Progress bar */}
-            <div className="absolute bottom-0 left-0 right-0 h-1">
-              <Progress value={playProgress} className="h-1 rounded-none bg-black/40 [&>div]:bg-primary" />
-            </div>
-          </>
-        )}
-        {!loading && !error && !videoUrl && (
-          <span className="text-xs text-muted-foreground">No video file available</span>
-        )}
-      </div>
-
-      {/* Info + actions */}
-      <div className="flex items-center justify-between px-4 py-2 border-t border-border">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleJumpTo}
-            className="text-[10px] font-mono text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <Play className="h-3 w-3 inline mr-1" />
-            {formatTimestamp(fill.startTime)}
-          </button>
-          {fill.qualityScore !== null && (
-            <span className="text-[10px] text-muted-foreground">
-              Quality: {Math.round(fill.qualityScore * 100)}%
-            </span>
-          )}
+            {fill.qualityScore !== null && (
+              <span className="text-[10px] text-muted-foreground">
+                Quality: {Math.round(fill.qualityScore * 100)}%
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {matchingCut && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                disabled={!!previewGeneratingCutId}
+                onClick={() => {
+                  generatePreview(matchingCut.id);
+                  selectFill(null);
+                }}
+              >
+                <RefreshCw className="h-3 w-3 mr-1" /> Regenerate
+              </Button>
+            )}
+            {isInserted ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs text-destructive hover:text-destructive"
+                onClick={() => removeFill(fill.id)}
+              >
+                <Trash2 className="h-3 w-3 mr-1" /> Remove
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => insertFill(fill.id)}
+              >
+                <Plus className="h-3 w-3 mr-1" /> Insert Fill
+              </Button>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {matchingCut && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs"
-              disabled={!!previewGeneratingCutId}
-              onClick={() => {
-                generatePreview(matchingCut.id);
-                selectFill(null);
-              }}
-            >
-              <RefreshCw className="h-3 w-3 mr-1" /> Regenerate
-            </Button>
-          )}
-          {isInserted ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs text-destructive hover:text-destructive"
-              onClick={() => removeFill(fill.id)}
-            >
-              <Trash2 className="h-3 w-3 mr-1" /> Remove
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => insertFill(fill.id)}
-            >
-              <Plus className="h-3 w-3 mr-1" /> Insert Fill
-            </Button>
-          )}
-        </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 
