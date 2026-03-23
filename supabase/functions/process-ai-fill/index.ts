@@ -114,6 +114,11 @@ Deno.serve(async (req) => {
     }
 
     const project = editDecision.projects as { id: string; user_id: string; status: string };
+
+    // Verify the edit decision's project belongs to the requesting user
+    if (project.user_id !== user.id) {
+      return errorResponse("forbidden", "Forbidden", 403);
+    }
     const edlJson = editDecision.edl_json as EdlEntry[];
     const totalFillSeconds = editDecision.total_fill_seconds as number;
     const creditsCharged = editDecision.credits_charged as number;
