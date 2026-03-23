@@ -122,9 +122,10 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
       const resumeAt = (v as any)._resumeAt ?? v.currentTime;
       v.currentTime = resumeAt;
       delete (v as any)._resumeAt;
-      if (isPlaying) v.play().catch(() => {});
+      // Read current isPlaying from store to avoid stale closure
+      if (useEditorStore.getState().isPlaying) v.play().catch(() => {});
     }
-  }, [isPlaying]);
+  }, []);
 
   useEffect(() => {
     const fillVideo = fillVideoRef.current;
