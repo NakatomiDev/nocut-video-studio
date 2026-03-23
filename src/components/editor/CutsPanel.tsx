@@ -611,9 +611,22 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
               {(() => {
                 const activeCutsList = cuts.filter((c) => activeCuts.has(c.id));
                 const activeManualList = manualCuts.filter((c) => activeManualCuts.has(c.id));
+                const aiFills = useEditorStore.getState().aiFills;
                 const allEdits = [
-                  ...activeCutsList.map((c) => ({ id: c.id, start: c.start, end: c.end, duration: c.duration, type: c.type, fill: fillDurations.get(c.id) || 0 })),
-                  ...activeManualList.map((c) => ({ id: c.id, start: c.start, end: c.end, duration: c.duration, type: 'manual' as string, fill: fillDurations.get(c.id) || 0 })),
+                  ...activeCutsList.map((c) => {
+                    const fill = fillDurations.get(c.id) || 0;
+                    const model = fillModels.get(c.id) ?? DEFAULT_AI_FILL_MODEL;
+                    const modelConfig = AI_FILL_MODELS.find((m) => m.id === model);
+                    const existingFill = getFillsForCut(c, aiFills)[0] ?? null;
+                    return { id: c.id, start: c.start, end: c.end, duration: c.duration, type: c.type, fill, model, modelLabel: modelConfig?.label ?? model, existingFill };
+                  }),
+                  ...activeManualList.map((c) => {
+                    const fill = fillDurations.get(c.id) || 0;
+                    const model = fillModels.get(c.id) ?? DEFAULT_AI_FILL_MODEL;
+                    const modelConfig = AI_FILL_MODELS.find((m) => m.id === model);
+                    const existingFill = getFillsForCut(c, aiFills)[0] ?? null;
+                    return { id: c.id, start: c.start, end: c.end, duration: c.duration, type: 'manual' as string, fill, model, modelLabel: modelConfig?.label ?? model, existingFill };
+                  }),
                 ].sort((a, b) => a.start - b.start);
 
                 return allEdits.map((edit, idx) => {
@@ -653,6 +666,26 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                           </Badge>
                         )}
                       </div>
+
+                      {/* AI Fill details row */}
+                      {edit.fill > 0 && (
+                        <div className="flex items-center gap-2 px-3 pb-2 -mt-1">
+                          <span className="w-5" />
+                          <span className="text-[10px] text-muted-foreground">
+                            Model: <span className="text-foreground font-medium">{edit.modelLabel}</span>
+                          </span>
+                          {edit.existingFill ? (
+                            <Badge variant="outline" className="text-[10px] border-green-500/30 text-green-600 bg-green-500/10">
+                              <CheckCircle2 className="h-2.5 w-2.5 mr-1" />
+                              Generated
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-600 bg-amber-500/10">
+                              Pending
+                            </Badge>
+                          )}
+                        </div>
+                      )}
 
                       {isExpanded && (videoUrl || thumbnailSpriteUrl) && (
                         <div className="px-3 pb-3 pt-1 border-t border-border/50">
