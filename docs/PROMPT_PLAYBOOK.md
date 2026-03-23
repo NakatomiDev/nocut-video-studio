@@ -1900,7 +1900,7 @@ POST-COMPLETION (mandatory):
 
 ---
 
-### - [ ] Prompt 7.1.1 — End-to-end testing checklist
+### - [x] Prompt 7.1.1 — End-to-end testing checklist *(completed 2026-03-23)*
 
 **Tool: Claude Code**
 
