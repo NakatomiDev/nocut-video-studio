@@ -528,14 +528,30 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
     }
 
     // --- Inserted fill indicators (solid green bottom bar, original mode only) ---
-    if (!showingEffective && showFills && aiFills.length > 0) {
+    if (!showingEffective && aiFills.length > 0) {
       for (const fill of aiFills) {
         if (!insertedFills.has(fill.id)) continue;
         const fx1 = timeToX(fill.startTime) - scrollLeft;
         const fx2 = timeToX(fill.startTime + fill.duration) - scrollLeft;
         if (fx2 < 0 || fx1 > w) continue;
-        ctx.fillStyle = 'hsla(160, 70%, 45%, 0.8)';
-        ctx.fillRect(fx1, overlayY + overlayH - 3, fx2 - fx1, 3);
+        // Semi-transparent teal overlay covering full track height
+        ctx.fillStyle = 'hsla(160, 70%, 30%, 0.2)';
+        ctx.fillRect(fx1, overlayY, fx2 - fx1, overlayH);
+        // Border
+        ctx.strokeStyle = 'hsla(160, 70%, 45%, 0.6)';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(fx1, overlayY, fx2 - fx1, overlayH);
+        // Bottom accent bar
+        ctx.fillStyle = 'hsla(160, 70%, 45%, 0.9)';
+        ctx.fillRect(fx1, overlayY + overlayH - 4, fx2 - fx1, 4);
+        // Label
+        const fillW = fx2 - fx1;
+        if (fillW > 40) {
+          ctx.fillStyle = 'hsla(160, 70%, 65%, 0.85)';
+          ctx.font = 'bold 10px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('AI Fill', fx1 + fillW / 2, overlayY + overlayH / 2 + 3);
+        }
       }
     }
 
