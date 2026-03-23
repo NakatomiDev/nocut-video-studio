@@ -660,7 +660,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
         </Button>
       </div>
 
-      <Dialog open={showExportDialog} onOpenChange={(open) => { setShowExportDialog(open); if (!open) setExpandedReviewId(null); }}>
+      <Dialog open={showExportDialog} onOpenChange={(open) => { setShowExportDialog(open); if (!open) { setExpandedReviewId(null); setInlineFillPreview(null); setInlineFillVideoUrl(null); setInlineFillPlaying(false); } }}>
         <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Review Edits</DialogTitle>
