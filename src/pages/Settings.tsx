@@ -6,6 +6,7 @@ import { LogOut } from "lucide-react";
 import { UpgradePaywall } from "@/components/UpgradePaywall";
 import { CustomerCenter } from "@/components/CustomerCenter";
 import { useRevenueCatCustomer } from "@/hooks/useRevenueCat";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 const SettingsPage = () => {
   const { user, signOut } = useAuth();
