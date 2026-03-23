@@ -433,8 +433,8 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   };
 
   return (
-    <div className="flex h-full flex-col border-l border-border bg-card">
-      <div className="border-b border-border p-4">
+    <div className="flex h-full flex-col border-l border-border bg-card overflow-hidden">
+      <div className="border-b border-border p-4 shrink-0">
         <h3 className="text-sm font-semibold text-foreground">Cuts</h3>
         <p className="mt-1 text-xs text-muted-foreground">
           {cuts.length + manualCuts.length} total · {activeCuts.size + activeManualCuts.size} active
