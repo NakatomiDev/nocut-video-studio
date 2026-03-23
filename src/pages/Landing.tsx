@@ -44,6 +44,7 @@ const Landing = () => {
         </div>
       </nav>
 
+      <main>
       {/* Hero Section */}
       <section className="relative pt-32 pb-20 px-6">
         {/* Background gradient orbs */}
@@ -471,6 +472,8 @@ const Landing = () => {
           </motion.div>
         </div>
       </section>
+
+      </main>
 
       {/* Footer */}
       <footer className="border-t border-border/50 bg-card/20 py-12 px-6">
