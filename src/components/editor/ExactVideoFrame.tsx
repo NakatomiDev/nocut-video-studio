@@ -24,23 +24,12 @@ const ExactVideoFrame = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [ready, setReady] = useState(!!cachedFrame);
   const [failed, setFailed] = useState(false);
-
-  // If we have a cached frame, render it directly as an image
-  if (cachedFrame) {
-    return (
-      <div className={cn('relative overflow-hidden rounded border border-border bg-muted/40', className)}>
-        <img
-          src={cachedFrame}
-          alt={label}
-          className={cn('h-full w-full object-contain', videoClassName)}
-        />
-      </div>
-    );
-  }
-
   const normalizedTime = useMemo(() => Math.max(0, time), [time]);
 
   useEffect(() => {
+    // Skip video seeking when cached frame is available
+    if (cachedFrame) return;
+
     const video = videoRef.current;
     if (!video || !videoUrl) {
       setReady(false);
@@ -101,7 +90,20 @@ const ExactVideoFrame = ({
       video.removeEventListener('seeked', handleSeeked);
       video.removeEventListener('error', handleError);
     };
-  }, [normalizedTime, videoUrl]);
+  }, [normalizedTime, videoUrl, cachedFrame]);
+
+  // Cached frame: instant render as <img>
+  if (cachedFrame) {
+    return (
+      <div className={cn('relative overflow-hidden rounded border border-border bg-muted/40', className)}>
+        <img
+          src={cachedFrame}
+          alt={label}
+          className={cn('h-full w-full object-contain', videoClassName)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className={cn('relative overflow-hidden rounded border border-border bg-muted/40', className)}>
