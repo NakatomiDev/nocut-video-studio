@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { X, AlertTriangle, Sparkles, CheckCircle2, Eye, RefreshCw, Loader2, ChevronRight, Plus, Minus, Play } from 'lucide-react';
+import { X, AlertTriangle, Sparkles, CheckCircle2, Eye, RefreshCw, Loader2, ChevronRight, Plus, Minus, Play, Pause } from 'lucide-react';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import CutThumbnail from './CutThumbnail';
 import ExactVideoFrame from './ExactVideoFrame';
