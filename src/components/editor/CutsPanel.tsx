@@ -35,6 +35,16 @@ const formatTimestamp = (s: number) => {
   return `${m}:${parseFloat(sec) < 10 ? '0' : ''}${sec}`;
 };
 
+const formatFillIdentity = (fill: AiFill) => {
+  const shortId = fill.id.slice(0, 8);
+  const modelLabel = AI_FILL_MODELS.find((m) => m.id === fill.provider)?.label ?? fill.provider ?? 'Generated AI Fill';
+  return {
+    shortId,
+    modelLabel,
+    summary: `${fill.duration ?? 0}s · ${modelLabel} · #${shortId}`,
+  };
+};
+
 const typeBadgeClass: Record<string, string> = {
   silence: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
   filler: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
@@ -222,14 +232,12 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     const cutObj = allCutsArr.find((c) => c.id === cutId);
     const generatedFill = cutObj ? getPreviewFillForCut(cutObj) : null;
     const selectedExistingFill = cutObj ? getInsertedFillForCut(cutObj) : null;
-    const selectedExistingModelLabel = selectedExistingFill
-      ? AI_FILL_MODELS.find((m) => m.id === selectedExistingFill.provider)?.label ?? selectedExistingFill.provider ?? 'Generated AI Fill'
-      : null;
+    const selectedExistingIdentity = selectedExistingFill ? formatFillIdentity(selectedExistingFill) : null;
 
     return (
       <div className="flex flex-col gap-1.5 pl-3 pr-1 mt-1 overflow-hidden">
         {selectedExistingFill && (
-          <div className="flex items-center gap-1.5 pl-4 flex-wrap">
+          <div className="flex items-center gap-1.5 pl-4 flex-wrap rounded-md border border-primary/20 bg-primary/5 px-2 py-1">
             <Badge className="bg-primary/15 text-primary border-primary/30 text-[9px]">
               Selected for export
             </Badge>
@@ -237,8 +245,16 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
               {selectedExistingFill.duration}s AI Fill
             </span>
             <span className="text-[10px] text-muted-foreground truncate">
-              {selectedExistingModelLabel}
+              {selectedExistingIdentity?.summary}
             </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 text-[10px] px-2"
+              onClick={(e) => { e.stopPropagation(); selectFill(selectedExistingFill); }}
+            >
+              <Eye className="h-3 w-3 mr-1" /> Preview selected
+            </Button>
           </div>
         )}
         {/* Model selector — stacked layout to prevent overflow */}
@@ -660,13 +676,37 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                     const eff = getEffectiveFill(c.id, c);
                     const modelConfig = AI_FILL_MODELS.find((m) => m.id === eff.model);
                     const existingFill = eff.isExisting ? getInsertedFillForCut(c) : null;
-                    return { id: c.id, start: c.start, end: c.end, duration: c.duration, type: c.type, fill: eff.duration, model: eff.model, modelLabel: modelConfig?.label ?? eff.model, existingFill, isExisting: eff.isExisting };
+                    return {
+                      id: c.id,
+                      start: c.start,
+                      end: c.end,
+                      duration: c.duration,
+                      type: c.type,
+                      fill: eff.duration,
+                      model: eff.model,
+                      modelLabel: modelConfig?.label ?? eff.model,
+                      existingFill,
+                      existingFillIdentity: existingFill ? formatFillIdentity(existingFill) : null,
+                      isExisting: eff.isExisting,
+                    };
                   }),
                   ...activeManualList.map((c) => {
                     const eff = getEffectiveFill(c.id, c);
                     const modelConfig = AI_FILL_MODELS.find((m) => m.id === eff.model);
                     const existingFill = eff.isExisting ? getInsertedFillForCut(c) : null;
-                    return { id: c.id, start: c.start, end: c.end, duration: c.duration, type: 'manual' as string, fill: eff.duration, model: eff.model, modelLabel: modelConfig?.label ?? eff.model, existingFill, isExisting: eff.isExisting };
+                    return {
+                      id: c.id,
+                      start: c.start,
+                      end: c.end,
+                      duration: c.duration,
+                      type: 'manual' as string,
+                      fill: eff.duration,
+                      model: eff.model,
+                      modelLabel: modelConfig?.label ?? eff.model,
+                      existingFill,
+                      existingFillIdentity: existingFill ? formatFillIdentity(existingFill) : null,
+                      isExisting: eff.isExisting,
+                    };
                   }),
                 ].sort((a, b) => a.start - b.start);
 
@@ -715,7 +755,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
 
                       {/* AI Fill details row */}
                       {(edit.fill > 0 || edit.existingFill) && (
-                        <div className="flex items-center gap-2 px-3 pb-2 -mt-1">
+                          <div className="flex items-center gap-2 px-3 pb-2 -mt-1 flex-wrap">
                           <span className="w-5" />
                           <span className="text-[10px] text-muted-foreground">
                             Model: <span className="text-foreground font-medium">
@@ -734,6 +774,11 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                               Pending
                             </Badge>
                           )}
+                            {edit.existingFillIdentity && (
+                              <span className="text-[10px] text-foreground/90 basis-full pl-5">
+                                Using selected fill: <span className="font-mono">#{edit.existingFillIdentity.shortId}</span>
+                              </span>
+                            )}
                         </div>
                       )}
 
@@ -762,9 +807,16 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                             <div className="flex flex-col items-center justify-center gap-1">
                               <div className="h-px w-8 bg-muted-foreground/30" />
                               {(edit.fill > 0 || edit.existingFill) && (
-                                <span className="text-[9px] text-primary font-medium">
-                                  {edit.existingFill ? `${edit.existingFill.duration}s` : `${edit.fill}s`} AI fill
-                                </span>
+                                <div className="flex flex-col items-center gap-0.5">
+                                  <span className="text-[9px] text-primary font-medium">
+                                    {edit.existingFill ? `${edit.existingFill.duration}s` : `${edit.fill}s`} AI fill
+                                  </span>
+                                  {edit.existingFillIdentity && (
+                                    <span className="text-[9px] text-muted-foreground font-mono">
+                                      #{edit.existingFillIdentity.shortId}
+                                    </span>
+                                  )}
+                                </div>
                               )}
                               <div className="h-px w-8 bg-muted-foreground/30" />
                             </div>
