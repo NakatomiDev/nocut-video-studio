@@ -1,5 +1,5 @@
 // @refresh reset
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEditorStore, AI_FILL_MODELS, MODEL_CREDITS_PER_SEC, DEFAULT_AI_FILL_MODEL, getAvailableModels, getModelDurations, getFillsForCut, type AiFill, type AiFillModel } from '@/stores/editorStore';
 import { Switch } from '@/components/ui/switch';
@@ -11,6 +11,7 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/component
 import CutThumbnail from './CutThumbnail';
 import ExactVideoFrame from './ExactVideoFrame';
 import { usePreviewFill } from '@/hooks/usePreviewFill';
+import { useFrameCache } from '@/hooks/useFrameCache';
 import {
   Select,
   SelectContent,
@@ -128,6 +129,23 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   }, [setCreditBalance]);
 
   const availableModels = getAvailableModels(userTier);
+
+  // Pre-extract frame thumbnails for all cuts in background
+  const allCutTimestamps = useMemo(() => {
+    const times: number[] = [];
+    for (const c of cuts) { times.push(c.start, c.end); }
+    for (const c of manualCuts) { times.push(c.start, c.end); }
+    return times;
+  }, [cuts, manualCuts]);
+
+  const priorityCutTimestamps = useMemo(() => {
+    const times: number[] = [];
+    for (const c of cuts) { if (activeCuts.has(c.id)) { times.push(c.start, c.end); } }
+    for (const c of manualCuts) { if (activeManualCuts.has(c.id)) { times.push(c.start, c.end); } }
+    return times;
+  }, [cuts, manualCuts, activeCuts, activeManualCuts]);
+
+  const { getFrame } = useFrameCache(videoUrl ?? null, allCutTimestamps, priorityCutTimestamps);
 
   const hasActiveCuts = activeCuts.size > 0 || activeManualCuts.size > 0;
   const insufficientCredits = creditEstimate > creditBalance.total;
@@ -394,6 +412,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
             time={start}
             label={`Start frame ${formatTimestamp(start)}`}
             className="h-10 w-[72px]"
+            cachedFrame={getFrame(start)}
           />
         ) : thumbnailSpriteUrl ? (
           <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={start} duration={duration} width={72} height={40} />
@@ -411,6 +430,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
             time={end}
             label={`End frame ${formatTimestamp(end)}`}
             className="h-10 w-[72px]"
+            cachedFrame={getFrame(end)}
           />
         ) : thumbnailSpriteUrl ? (
           <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={end} duration={duration} width={72} height={40} />
@@ -802,6 +822,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                                     time={edit.start}
                                     label={`Before cut ${formatTimestamp(edit.start)}`}
                                     className="h-[100px] w-[180px]"
+                                    cachedFrame={getFrame(edit.start)}
                                   />
                                 ) : thumbnailSpriteUrl ? (
                                   <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={edit.start} duration={duration} width={180} height={100} />
@@ -880,6 +901,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                                     videoUrl={videoUrl}
                                     time={edit.end}
                                     label={`After cut ${formatTimestamp(edit.end)}`}
+                                    cachedFrame={getFrame(edit.end)}
                                     className="h-[100px] w-[180px]"
                                   />
                                 ) : thumbnailSpriteUrl ? (
@@ -996,6 +1018,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
               <ExactVideoFrame
                 videoUrl={videoUrl}
                 time={lightbox.time}
+                cachedFrame={getFrame(lightbox.time)}
                 label={lightbox.label}
                 className="aspect-video w-full max-w-[min(80vw,960px)]"
               />

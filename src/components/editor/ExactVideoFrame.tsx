@@ -7,6 +7,8 @@ interface ExactVideoFrameProps {
   label: string;
   className?: string;
   videoClassName?: string;
+  /** Pre-extracted frame data URL — if provided, skip video seeking entirely */
+  cachedFrame?: string;
 }
 
 const FRAME_EPSILON = 0.04;
@@ -17,14 +19,17 @@ const ExactVideoFrame = ({
   label,
   className,
   videoClassName,
+  cachedFrame,
 }: ExactVideoFrameProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(!!cachedFrame);
   const [failed, setFailed] = useState(false);
-
   const normalizedTime = useMemo(() => Math.max(0, time), [time]);
 
   useEffect(() => {
+    // Skip video seeking when cached frame is available
+    if (cachedFrame) return;
+
     const video = videoRef.current;
     if (!video || !videoUrl) {
       setReady(false);
@@ -85,7 +90,20 @@ const ExactVideoFrame = ({
       video.removeEventListener('seeked', handleSeeked);
       video.removeEventListener('error', handleError);
     };
-  }, [normalizedTime, videoUrl]);
+  }, [normalizedTime, videoUrl, cachedFrame]);
+
+  // Cached frame: instant render as <img>
+  if (cachedFrame) {
+    return (
+      <div className={cn('relative overflow-hidden rounded border border-border bg-muted/40', className)}>
+        <img
+          src={cachedFrame}
+          alt={label}
+          className={cn('h-full w-full object-contain', videoClassName)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className={cn('relative overflow-hidden rounded border border-border bg-muted/40', className)}>
