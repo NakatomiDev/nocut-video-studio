@@ -37,12 +37,13 @@ function log(level: string, msg: string, extra: Record<string, unknown> = {}): v
 }
 
 export function jobRowToData(row: TranscodeJobRow): TranscodeJobData {
+  const payload = row.payload as { video_id: string; s3_key: string };
   return {
     jobId: row.id,
     projectId: row.project_id,
     userId: row.user_id,
-    videoId: row.payload.video_id,
-    s3Key: row.payload.s3_key,
+    videoId: payload.video_id,
+    s3Key: payload.s3_key,
   };
 }
 
