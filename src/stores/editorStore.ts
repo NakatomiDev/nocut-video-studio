@@ -82,6 +82,14 @@ export const MODEL_CREDITS_PER_SEC: Record<AiFillModel, number> = Object.fromEnt
 
 export const DEFAULT_AI_FILL_MODEL: AiFillModel = "veo3.1-fast";
 
+/** Return all AI fills that match a given cut (fill.startTime within 0.5s of cut.end). */
+export function getFillsForCut(
+  cut: { end: number },
+  aiFills: AiFill[],
+): AiFill[] {
+  return aiFills.filter((f) => Math.abs(f.startTime - cut.end) < 0.5);
+}
+
 interface CreditBalance {
   total: number;
   monthly: number;
