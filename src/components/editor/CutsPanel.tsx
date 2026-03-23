@@ -444,7 +444,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
         </p>
       </div>
 
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0">
         <div className="space-y-1 p-2">
           <div className="px-3 pb-1 pt-2">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
