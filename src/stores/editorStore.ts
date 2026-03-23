@@ -248,7 +248,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   manualCuts: [],
   activeManualCuts: new Set<string>(),
   aiFills: [],
-  showFills: true,
+  showFills: false,
   insertedFills: new Set<string>(),
   fillVideoUrls: new Map<string, string>(),
   selectedFill: null,
