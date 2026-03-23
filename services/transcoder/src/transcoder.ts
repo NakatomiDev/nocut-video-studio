@@ -1,5 +1,5 @@
 import { execFile, spawn } from "node:child_process";
-import { mkdir, rm, readdir } from "node:fs/promises";
+import { mkdir, rm, readdir, stat } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { promisify } from "node:util";
 
@@ -11,8 +11,10 @@ import {
   updateVideoResults,
   updateProjectStatus,
   enqueueDetectJob,
+  fetchUserTier,
   type TranscodeJobRow,
 } from "./supabase.js";
+import { type Tier, validateTierLimits } from "./tier-limits.js";
 
 const execFileAsync = promisify(execFile);
 
