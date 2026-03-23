@@ -354,6 +354,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       ? new Map(saved.fillModels.filter(([id]) => cuts.some((c) => c.id === id) || manualCuts.some((c) => c.id === id))) as Map<string, AiFillModel>
       : new Map<string, AiFillModel>();
     const insertedFills = saved ? new Set(saved.insertedFills) : new Set<string>();
+    const showFills = saved?.showFills ?? false;
 
     set({
       cutMap,
@@ -364,6 +365,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       fillDurations,
       fillModels,
       insertedFills,
+      showFills,
       creditEstimate: calcCredits(fillDurations, fillModels),
     });
   },
