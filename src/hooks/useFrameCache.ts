@@ -37,7 +37,7 @@ export function useFrameCache(
             const ctx = canvas.getContext('2d');
             if (ctx) {
               ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-              resolve(canvas.toDataURL('image/jpeg', 0.7));
+              resolve(canvas.toDataURL('image/jpeg', 0.85));
             } else {
               resolve(null);
             }
