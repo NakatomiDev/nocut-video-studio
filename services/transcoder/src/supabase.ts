@@ -159,3 +159,16 @@ export async function enqueueDetectJob(
     throw new Error(`Failed to enqueue detect job: ${error.message}`);
   }
 }
+
+export async function fetchUserTier(userId: string): Promise<string> {
+  const { data, error } = await supabase
+    .from("users")
+    .select("tier")
+    .eq("id", userId)
+    .single();
+
+  if (error || !data) {
+    throw new Error(`Failed to fetch user tier for ${userId}: ${error?.message ?? "not found"}`);
+  }
+  return data.tier;
+}

@@ -1,5 +1,5 @@
 import { execFile, spawn } from "node:child_process";
-import { mkdir, rm, readdir } from "node:fs/promises";
+import { mkdir, rm, readdir, stat } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { promisify } from "node:util";
 
@@ -11,8 +11,10 @@ import {
   updateVideoResults,
   updateProjectStatus,
   enqueueDetectJob,
+  fetchUserTier,
   type TranscodeJobRow,
 } from "./supabase.js";
+import { type Tier, validateTierLimits } from "./tier-limits.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -68,6 +70,23 @@ export async function processTranscodeJob(data: TranscodeJobData): Promise<void>
     const probe = await probeVideo(sourcePath);
     log("info", "Probe complete", { ...ctx, duration: probe.duration, resolution: `${probe.width}x${probe.height}` });
     await updateJobProgress(jobId, 10);
+
+    // Step 2b: Server-side tier limit re-validation using real probed values
+    const realFileSize = (await stat(sourcePath)).size;
+    const userTier = await fetchUserTier(userId) as Tier;
+    const resolution = `${probe.width}x${probe.height}`;
+    const violation = validateTierLimits(userTier, realFileSize, probe.duration, resolution);
+    if (violation) {
+      const msg = `Tier limit exceeded (${violation.code}): ${violation.message}`;
+      log("warn", "Tier validation failed after probe", { ...ctx, violation_code: violation.code });
+      await failJob(jobId, msg);
+      await updateProjectStatus(projectId, "failed");
+      // Update project with user-friendly error
+      await import("./supabase.js").then(({ supabase }) =>
+        supabase.from("projects").update({ error_message: violation.message }).eq("id", projectId)
+      );
+      return; // Exit without throwing — this is an expected rejection, not a crash
+    }
 
     // Step 3: Transcode to H.264/AAC (50%)
     const transcodedPath = join(tmpDir, "transcoded.mp4");
