@@ -901,6 +901,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                                     videoUrl={videoUrl}
                                     time={edit.end}
                                     label={`After cut ${formatTimestamp(edit.end)}`}
+                                    cachedFrame={getFrame(edit.end)}
                                     className="h-[100px] w-[180px]"
                                   />
                                 ) : thumbnailSpriteUrl ? (
