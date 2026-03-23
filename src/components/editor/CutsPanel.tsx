@@ -720,8 +720,10 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                             </div>
                             <div className="flex flex-col items-center justify-center gap-1">
                               <div className="h-px w-8 bg-muted-foreground/30" />
-                              {edit.fill > 0 && (
-                                <span className="text-[9px] text-primary font-medium">{edit.fill}s AI fill</span>
+                              {(edit.fill > 0 || edit.existingFill) && (
+                                <span className="text-[9px] text-primary font-medium">
+                                  {edit.existingFill ? `${edit.existingFill.duration}s` : `${edit.fill}s`} AI fill
+                                </span>
                               )}
                               <div className="h-px w-8 bg-muted-foreground/30" />
                             </div>
