@@ -79,3 +79,13 @@ variable "detector_desired_count" {
   type        = number
   default     = 1
 }
+
+# -----------------------------------------------------------------------------
+# MediaConvert
+# -----------------------------------------------------------------------------
+
+variable "mediaconvert_endpoint" {
+  description = "AWS MediaConvert API endpoint (run: aws mediaconvert describe-endpoints --region ap-northeast-1 --query 'Endpoints[0].Url' --output text)"
+  type        = string
+  default     = ""
+}

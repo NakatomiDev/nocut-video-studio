@@ -20,6 +20,10 @@ supabase_url               = "https://your-project.supabase.co"
 # AWS Secrets Manager (nocut/supabase-service-role-key, nocut/redis-auth-token)
 # and injected into containers at launch — not passed via Terraform variables.
 
+# MediaConvert (for video export assembly)
+# Get your endpoint: aws mediaconvert describe-endpoints --region ap-northeast-1 --query 'Endpoints[0].Url' --output text
+mediaconvert_endpoint = "https://XXXXXXXX.mediaconvert.ap-northeast-1.amazonaws.com"
+
 # ECS service sizing (defaults are fine for dev)
 # transcoder_cpu           = 1024
 # transcoder_memory        = 2048
