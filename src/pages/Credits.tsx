@@ -94,6 +94,7 @@ const Credits = () => {
                   </Button>
                 </div>
               )}
+              {expiringCredits > 0 && earliestExpiry && (
                 <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                   <AlertTriangle className="h-4 w-4 shrink-0" />
                   {expiringCredits} credit{expiringCredits > 1 ? "s" : ""} expiring on {format(parseISO(earliestExpiry), "MMM d, yyyy")}
