@@ -136,12 +136,9 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
       resumeAfterFill();
     };
     const onStalled = () => {
-      // If fill stalls for 3s, skip it
       const timeout = setTimeout(() => {
-        if (playingFillId) {
-          console.warn('Fill video stalled, skipping');
-          resumeAfterFill();
-        }
+        console.warn('Fill video stalled, skipping');
+        resumeAfterFill();
       }, 3000);
       fillVideo.addEventListener('playing', () => clearTimeout(timeout), { once: true });
     };
@@ -153,7 +150,18 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
       fillVideo.removeEventListener('error', onError);
       fillVideo.removeEventListener('stalled', onStalled);
     };
-  }, [resumeAfterFill, playingFillId]);
+  }, [resumeAfterFill]);
+
+  // Safety: if skipLock is stuck for >2s, force-release it
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (skipLockRef.current) {
+        console.warn('skipLock stuck, force-releasing');
+        skipLockRef.current = false;
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Sync external playhead changes (e.g. timeline scrub) to the video element
   useEffect(() => {
