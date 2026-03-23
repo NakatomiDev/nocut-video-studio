@@ -681,8 +681,8 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
       </div>
 
       <Dialog open={showExportDialog} onOpenChange={(open) => { setShowExportDialog(open); if (!open) { setExpandedReviewId(null); setInlineFillPreview(null); setInlineFillVideoUrl(null); setInlineFillPlaying(false); } }}>
-        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[92vh] w-[min(96vw,1100px)] max-w-[1100px] flex-col overflow-hidden p-0">
+          <DialogHeader className="shrink-0 border-b border-border px-6 py-4">
             <DialogTitle>Review Edits</DialogTitle>
             <DialogDescription>
               {creditEstimate > 0
@@ -691,8 +691,8 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
             </DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="flex-1 -mx-6 px-6 min-h-0">
-            <div className="space-y-2 pb-2">
+          <ScrollArea className="min-h-0 flex-1">
+            <div className="space-y-2 px-6 py-4">
               {(() => {
                 const activeCutsList = cuts.filter((c) => activeCuts.has(c.id));
                 const activeManualList = manualCuts.filter((c) => activeManualCuts.has(c.id));
@@ -740,80 +740,80 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                   return (
                     <div
                       key={edit.id}
-                      className={`rounded-lg border transition-colors cursor-pointer ${
+                      className={`cursor-pointer overflow-hidden rounded-lg border transition-colors ${
                         isExpanded ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/40'
                       }`}
                       onClick={() => setExpandedReviewId(isExpanded ? null : edit.id)}
                     >
-                      <div className="flex items-center gap-3 p-3">
-                        <span className="text-[10px] font-mono text-muted-foreground w-5 text-center">{idx + 1}</span>
+                      <div className="flex flex-wrap items-center gap-2 p-3 md:flex-nowrap md:gap-3">
+                        <span className="w-5 text-center text-[10px] font-mono text-muted-foreground">{idx + 1}</span>
                         <Badge
                           variant="outline"
                           className={
                             edit.type === 'manual'
-                              ? 'border-border text-foreground bg-secondary'
+                              ? 'border-border bg-secondary text-foreground'
                               : typeBadgeClass[edit.type] || 'border-border text-muted-foreground'
                           }
                         >
                           {edit.type}
                         </Badge>
-                        <span className="font-mono text-xs text-muted-foreground flex-1">
+                        <span className="min-w-0 flex-1 font-mono text-xs text-muted-foreground">
                           {formatTimestamp(edit.start)} → {formatTimestamp(edit.end)}
                         </span>
                         <span className="text-xs text-muted-foreground">{edit.duration.toFixed(1)}s</span>
                         {edit.fill > 0 ? (
-                          <Badge className="bg-primary/20 text-primary border-primary/30 text-[10px]">
-                            <Sparkles className="h-2.5 w-2.5 mr-1" />
+                          <Badge className="border-primary/30 bg-primary/20 text-[10px] text-primary">
+                            <Sparkles className="mr-1 h-2.5 w-2.5" />
                             {edit.fill}s fill
                           </Badge>
                         ) : edit.existingFill ? (
-                          <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[10px]">
-                            <Sparkles className="h-2.5 w-2.5 mr-1" />
+                          <Badge className="border-emerald-500/30 bg-emerald-500/20 text-[10px] text-emerald-400">
+                            <Sparkles className="mr-1 h-2.5 w-2.5" />
                             {edit.existingFill.duration}s fill
                           </Badge>
                         ) : (
-                          <Badge variant="outline" className="text-[10px] text-muted-foreground border-border">
+                          <Badge variant="outline" className="border-border text-[10px] text-muted-foreground">
                             cut only
                           </Badge>
                         )}
                       </div>
 
-                      {/* AI Fill details row */}
                       {(edit.fill > 0 || edit.existingFill) && (
-                          <div className="flex items-center gap-2 px-3 pb-2 -mt-1 flex-wrap">
-                          <span className="w-5" />
+                        <div className="-mt-1 flex flex-wrap items-center gap-2 px-3 pb-2">
+                          <span className="hidden w-5 md:block" />
                           <span className="text-[10px] text-muted-foreground">
-                            Model: <span className="text-foreground font-medium">
+                            Model:{' '}
+                            <span className="font-medium text-foreground">
                               {edit.existingFill
-                                ? (AI_FILL_MODELS.find(m => m.id === edit.existingFill!.provider)?.label ?? edit.existingFill.provider ?? edit.modelLabel)
+                                ? (AI_FILL_MODELS.find((m) => m.id === edit.existingFill!.provider)?.label ?? edit.existingFill.provider ?? edit.modelLabel)
                                 : edit.modelLabel}
                             </span>
                           </span>
                           {edit.existingFill ? (
-                            <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-400 bg-emerald-500/10">
-                              <CheckCircle2 className="h-2.5 w-2.5 mr-1" />
+                            <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-[10px] text-emerald-400">
+                              <CheckCircle2 className="mr-1 h-2.5 w-2.5" />
                               Generated
                             </Badge>
                           ) : (
-                            <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-400 bg-amber-500/10">
+                            <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-[10px] text-amber-400">
                               Pending
                             </Badge>
                           )}
-                            {edit.existingFillIdentity && (
-                              <span className="text-[10px] text-foreground/90 basis-full pl-5">
-                                AI fill selected for this cut
-                              </span>
-                            )}
-                          </div>
+                          {edit.existingFillIdentity && (
+                            <span className="basis-full text-[10px] text-foreground/90 md:pl-5">
+                              AI fill selected for this cut
+                            </span>
+                          )}
+                        </div>
                       )}
 
                       {isExpanded && (videoUrl || thumbnailSpriteUrl) && (
-                        <div className="px-3 pb-3 pt-1 border-t border-border/50">
-                          <div className="flex items-stretch gap-3">
-                            <div className="flex flex-col items-center gap-1 flex-1">
-                              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Before cut</span>
+                        <div className="border-t border-border/50 px-3 pb-3 pt-2">
+                          <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-stretch">
+                            <div className="flex min-w-0 flex-col items-center gap-1">
+                              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Before cut</span>
                               <button
-                                className="rounded ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover:opacity-80 transition-opacity cursor-zoom-in"
+                                className="w-full max-w-[320px] cursor-zoom-in rounded ring-offset-background transition-opacity hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                                 onClick={(e) => { e.stopPropagation(); setLightbox({ time: edit.start, label: `Before cut · ${formatTimestamp(edit.start)}` }); }}
                               >
                                 {videoUrl ? (
@@ -821,21 +821,22 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                                     videoUrl={videoUrl}
                                     time={edit.start}
                                     label={`Before cut ${formatTimestamp(edit.start)}`}
-                                    className="h-[100px] w-[180px]"
+                                    className="h-auto w-full aspect-video"
                                     cachedFrame={getFrame(edit.start)}
                                   />
                                 ) : thumbnailSpriteUrl ? (
-                                  <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={edit.start} duration={duration} width={180} height={100} />
+                                  <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={edit.start} duration={duration} width={320} height={180} />
                                 ) : null}
                               </button>
                               <span className="text-[10px] font-mono text-muted-foreground">{formatTimestamp(edit.start)}</span>
                             </div>
-                            <div className="flex flex-col items-center justify-center gap-1">
-                              <div className="h-px w-8 bg-muted-foreground/30" />
+
+                            <div className="flex flex-col items-center justify-center gap-1 lg:min-w-[96px]">
+                              <div className="hidden h-px w-8 bg-muted-foreground/30 lg:block" />
                               {(edit.fill > 0 || edit.existingFill) && (
                                 edit.existingFill ? (
                                   <button
-                                    className="flex flex-col items-center gap-1 rounded-lg border border-primary/30 bg-primary/5 px-2 py-1.5 hover:bg-primary/10 transition-colors cursor-pointer group/fill"
+                                    className="group/fill flex w-full max-w-[320px] flex-col items-center gap-1 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 transition-colors hover:bg-primary/10 lg:w-auto lg:max-w-none"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       const fill = edit.existingFill!;
@@ -861,13 +862,13 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                                       }
                                     }}
                                   >
-                                    <div className="relative w-16 h-10 rounded bg-muted/60 border border-border flex items-center justify-center overflow-hidden">
+                                    <div className="relative flex h-14 w-full items-center justify-center overflow-hidden rounded border border-border bg-muted/60 lg:h-12 lg:w-20">
                                       <Sparkles className="h-4 w-4 text-primary/60" />
-                                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/fill:opacity-100 transition-opacity bg-black/40">
+                                      <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover/fill:opacity-100">
                                         <Play className="h-4 w-4 text-white" />
                                       </div>
                                     </div>
-                                    <span className="text-[9px] text-primary font-semibold">
+                                    <span className="text-[9px] font-semibold text-primary">
                                       {edit.existingFill.duration}s AI Fill
                                     </span>
                                     <span className="text-[8px] text-muted-foreground">
@@ -875,25 +876,24 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                                     </span>
                                   </button>
                                 ) : (
-                                  <div className="flex flex-col items-center gap-0.5 rounded-lg border border-amber-500/20 bg-amber-500/5 px-2 py-1.5">
-                                    <div className="w-16 h-10 rounded bg-muted/60 border border-dashed border-muted-foreground/30 flex items-center justify-center">
+                                  <div className="flex w-full max-w-[320px] flex-col items-center gap-0.5 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 lg:w-auto lg:max-w-none">
+                                    <div className="flex h-14 w-full items-center justify-center rounded border border-dashed border-muted-foreground/30 bg-muted/60 lg:h-12 lg:w-20">
                                       <Sparkles className="h-4 w-4 text-amber-400/60" />
                                     </div>
-                                    <span className="text-[9px] text-amber-400 font-semibold">
+                                    <span className="text-[9px] font-semibold text-amber-400">
                                       {edit.fill}s AI Fill
                                     </span>
-                                    <span className="text-[8px] text-muted-foreground">
-                                      Pending
-                                    </span>
+                                    <span className="text-[8px] text-muted-foreground">Pending</span>
                                   </div>
                                 )
                               )}
-                              <div className="h-px w-8 bg-muted-foreground/30" />
+                              <div className="hidden h-px w-8 bg-muted-foreground/30 lg:block" />
                             </div>
-                            <div className="flex flex-col items-center gap-1 flex-1">
-                              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">After cut</span>
+
+                            <div className="flex min-w-0 flex-col items-center gap-1">
+                              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">After cut</span>
                               <button
-                                className="rounded ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover:opacity-80 transition-opacity cursor-zoom-in"
+                                className="w-full max-w-[320px] cursor-zoom-in rounded ring-offset-background transition-opacity hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                                 onClick={(e) => { e.stopPropagation(); setLightbox({ time: edit.end, label: `After cut · ${formatTimestamp(edit.end)}` }); }}
                               >
                                 {videoUrl ? (
@@ -902,10 +902,10 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                                     time={edit.end}
                                     label={`After cut ${formatTimestamp(edit.end)}`}
                                     cachedFrame={getFrame(edit.end)}
-                                    className="h-[100px] w-[180px]"
+                                    className="h-auto w-full aspect-video"
                                   />
                                 ) : thumbnailSpriteUrl ? (
-                                  <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={edit.end} duration={duration} width={180} height={100} />
+                                  <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={edit.end} duration={duration} width={320} height={180} />
                                 ) : null}
                               </button>
                               <span className="text-[10px] font-mono text-muted-foreground">{formatTimestamp(edit.end)}</span>
