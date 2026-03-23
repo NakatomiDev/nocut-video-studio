@@ -1,0 +1,2 @@
+ALTER TABLE public.ai_fills DROP CONSTRAINT ai_fills_provider_check;
+ALTER TABLE public.ai_fills ADD CONSTRAINT ai_fills_provider_check CHECK (provider = ANY (ARRAY['did'::text, 'heygen'::text, 'veo'::text, 'custom'::text, 'mock'::text]));

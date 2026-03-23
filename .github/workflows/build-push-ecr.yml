@@ -1,0 +1,101 @@
+name: Build & Push to ECR
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "services/transcoder/**"
+      - "services/detector/**"
+  workflow_dispatch:
+    inputs:
+      service:
+        description: "Service to build (transcoder, detector, or all)"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - transcoder
+          - detector
+
+env:
+  AWS_REGION: ap-northeast-1
+  ECR_REGISTRY: 985655976031.dkr.ecr.ap-northeast-1.amazonaws.com
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  changes:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      transcoder: ${{ steps.filter.outputs.transcoder }}
+      detector: ${{ steps.filter.outputs.detector }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            transcoder:
+              - 'services/transcoder/**'
+            detector:
+              - 'services/detector/**'
+
+  build-transcoder:
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.service == 'all' || github.event.inputs.service == 'transcoder')) ||
+      (github.event_name == 'push' && needs.changes.outputs.transcoder == 'true')
+    needs: [changes]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push transcoder
+        uses: docker/build-push-action@v6
+        with:
+          context: services/transcoder
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/nocut-transcoder:latest
+            ${{ env.ECR_REGISTRY }}/nocut-transcoder:${{ github.sha }}
+
+  build-detector:
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.service == 'all' || github.event.inputs.service == 'detector')) ||
+      (github.event_name == 'push' && needs.changes.outputs.detector == 'true')
+    needs: [changes]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push detector
+        uses: docker/build-push-action@v6
+        with:
+          context: services/detector
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/nocut-detector:latest
+            ${{ env.ECR_REGISTRY }}/nocut-detector:${{ github.sha }}
