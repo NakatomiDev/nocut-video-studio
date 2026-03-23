@@ -673,19 +673,23 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                       </div>
 
                       {/* AI Fill details row */}
-                      {edit.fill > 0 && (
+                      {(edit.fill > 0 || edit.existingFill) && (
                         <div className="flex items-center gap-2 px-3 pb-2 -mt-1">
                           <span className="w-5" />
                           <span className="text-[10px] text-muted-foreground">
-                            Model: <span className="text-foreground font-medium">{edit.modelLabel}</span>
+                            Model: <span className="text-foreground font-medium">
+                              {edit.existingFill
+                                ? (AI_FILL_MODELS.find(m => m.id === edit.existingFill!.provider)?.label ?? edit.existingFill.provider ?? edit.modelLabel)
+                                : edit.modelLabel}
+                            </span>
                           </span>
                           {edit.existingFill ? (
-                            <Badge variant="outline" className="text-[10px] border-green-500/30 text-green-600 bg-green-500/10">
+                            <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-400 bg-emerald-500/10">
                               <CheckCircle2 className="h-2.5 w-2.5 mr-1" />
                               Generated
                             </Badge>
                           ) : (
-                            <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-600 bg-amber-500/10">
+                            <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-400 bg-amber-500/10">
                               Pending
                             </Badge>
                           )}
