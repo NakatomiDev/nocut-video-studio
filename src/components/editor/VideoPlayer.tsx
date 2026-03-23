@@ -1,8 +1,9 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
-import { Play, Pause, Volume2, VolumeX, RefreshCw } from 'lucide-react';
+import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { Play, Pause, Volume2, VolumeX, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { useEditorStore } from '@/stores/editorStore';
+import { useEditorStore, getActiveCutSegments, getFillsForCut } from '@/stores/editorStore';
+import { supabase } from '@/integrations/supabase/client';
 
 interface VideoPlayerProps {
   videoUrl: string | null;
@@ -18,18 +19,85 @@ const formatTime = (s: number) => {
 
 const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const fillVideoRef = useRef<HTMLVideoElement>(null);
   const internalSeekRef = useRef(false);
-  const { isPlaying, playheadPosition, setPlayhead, play, pause } = useEditorStore();
+  const skipLockRef = useRef(false); // prevents recursive skip during seek
+
+  const {
+    isPlaying, playheadPosition, setPlayhead, play, pause,
+    showFills, aiFills, fillVideoUrls, setFillVideoUrl,
+  } = useEditorStore();
+
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [duration, setDuration] = useState(0);
   const [videoError, setVideoError] = useState<string | null>(null);
+  const [playingFillId, setPlayingFillId] = useState<string | null>(null);
+
+  // Get active cut segments for skip logic
+  const activeCutSegments = useMemo(() => {
+    const state = useEditorStore.getState();
+    return getActiveCutSegments(state);
+    // Re-derive when cuts/fills change
+  }, [useEditorStore().cuts, useEditorStore().activeCuts, useEditorStore().manualCuts, useEditorStore().activeManualCuts, aiFills]);
+
+  // Fetch signed URLs for AI fills that don't have them yet
+  useEffect(() => {
+    if (!showFills) return;
+    for (const fill of aiFills) {
+      if (fill.s3Key && !fillVideoUrls.has(fill.id)) {
+        supabase.functions.invoke('get-signed-url', {
+          body: { s3_key: fill.s3Key },
+        }).then(({ data }) => {
+          const url = data?.url || data?.data?.url;
+          if (url) setFillVideoUrl(fill.id, url);
+        });
+      }
+    }
+  }, [showFills, aiFills, fillVideoUrls, setFillVideoUrl]);
+
+  // Check if a time falls within an active cut
+  const getCutAtTime = useCallback((time: number): typeof activeCutSegments[0] | null => {
+    if (!showFills) return null;
+    for (const seg of activeCutSegments) {
+      if (time >= seg.start && time < seg.end) return seg;
+    }
+    return null;
+  }, [showFills, activeCutSegments]);
 
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
     const onTime = () => {
+      if (skipLockRef.current) return;
+
+      // Skip-cut logic when showFills is on
+      if (showFills && isPlaying) {
+        const cutSeg = getCutAtTime(v.currentTime);
+        if (cutSeg) {
+          // If fill exists and has a video URL, play it
+          if (cutSeg.fill && fillVideoUrls.has(cutSeg.fill.id)) {
+            skipLockRef.current = true;
+            v.pause();
+            setPlayingFillId(cutSeg.fill.id);
+            const fillVideo = fillVideoRef.current;
+            if (fillVideo) {
+              fillVideo.currentTime = 0;
+              fillVideo.play().catch(() => {});
+            }
+            // Store where to resume after fill
+            (v as any)._resumeAt = cutSeg.end;
+            return;
+          }
+          // No fill — just skip
+          skipLockRef.current = true;
+          v.currentTime = cutSeg.end;
+          setTimeout(() => { skipLockRef.current = false; }, 50);
+          return;
+        }
+      }
+
       internalSeekRef.current = true;
       setPlayhead(v.currentTime);
     };
@@ -43,7 +111,26 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
       v.removeEventListener('ended', onEnd);
       v.removeEventListener('loadedmetadata', onMeta);
     };
-  }, [setPlayhead, pause]);
+  }, [setPlayhead, pause, showFills, isPlaying, getCutAtTime, fillVideoUrls]);
+
+  // Handle fill video ending — resume main video
+  useEffect(() => {
+    const fillVideo = fillVideoRef.current;
+    if (!fillVideo) return;
+    const onEnded = () => {
+      setPlayingFillId(null);
+      const v = videoRef.current;
+      if (v) {
+        const resumeAt = (v as any)._resumeAt ?? v.currentTime;
+        v.currentTime = resumeAt;
+        delete (v as any)._resumeAt;
+        v.play().catch(() => {});
+        skipLockRef.current = false;
+      }
+    };
+    fillVideo.addEventListener('ended', onEnded);
+    return () => fillVideo.removeEventListener('ended', onEnded);
+  }, []);
 
   // Sync external playhead changes (e.g. timeline scrub) to the video element
   useEffect(() => {
@@ -61,13 +148,16 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
+    if (playingFillId) return; // don't control main video while fill is playing
     if (isPlaying) v.play().catch((err) => { if (err.name !== 'AbortError') setVideoError('Playback failed'); });
     else v.pause();
-  }, [isPlaying]);
+  }, [isPlaying, playingFillId]);
 
   useEffect(() => {
     const v = videoRef.current;
     if (v) v.playbackRate = speed;
+    const fv = fillVideoRef.current;
+    if (fv) fv.playbackRate = speed;
   }, [speed]);
 
   useEffect(() => {
@@ -76,15 +166,25 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
       v.volume = volume;
       v.muted = muted;
     }
+    const fv = fillVideoRef.current;
+    if (fv) {
+      fv.volume = volume;
+      fv.muted = muted;
+    }
   }, [volume, muted]);
 
   const handleSeek = useCallback((val: number[]) => {
+    // Stop any playing fill
+    if (playingFillId) {
+      setPlayingFillId(null);
+      skipLockRef.current = false;
+    }
     const v = videoRef.current;
     if (v) {
       v.currentTime = val[0];
       setPlayhead(val[0]);
     }
-  }, [setPlayhead]);
+  }, [setPlayhead, playingFillId]);
 
   const cycleSpeed = () => {
     const idx = SPEEDS.indexOf(speed);
@@ -99,6 +199,9 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
     }
   }, []);
 
+  // Current fill video URL for the secondary player
+  const currentFillUrl = playingFillId ? fillVideoUrls.get(playingFillId) ?? null : null;
+
   if (!videoUrl) {
     return (
       <div className="flex h-full items-center justify-center bg-background rounded-lg">
@@ -110,13 +213,26 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
   return (
     <div className="flex h-full flex-col bg-background rounded-lg overflow-hidden">
       <div className="relative flex-1 flex items-center justify-center bg-black">
+        {/* Main video — hidden when fill is playing */}
         <video
           ref={videoRef}
           src={videoUrl}
-          className="max-h-full max-w-full"
+          className={`max-h-full max-w-full ${playingFillId ? 'hidden' : ''}`}
           preload="auto"
           onError={() => setVideoError('Video failed to load')}
         />
+        {/* AI Fill video — shown when fill is playing */}
+        <video
+          ref={fillVideoRef}
+          src={currentFillUrl ?? undefined}
+          className={`max-h-full max-w-full ${playingFillId ? '' : 'hidden'}`}
+          preload="auto"
+        />
+        {playingFillId && (
+          <div className="absolute top-3 left-3 bg-teal-600/80 text-white text-xs px-2 py-1 rounded font-medium">
+            AI Fill
+          </div>
+        )}
         {videoError && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80">
             <p className="text-sm text-muted-foreground">{videoError}</p>

@@ -90,6 +90,30 @@ export function getFillsForCut(
   return aiFills.filter((f) => Math.abs(f.startTime - cut.end) < 0.5);
 }
 
+export interface ActiveCutSegment {
+  start: number;
+  end: number;
+  fill: AiFill | null;
+}
+
+/** Return sorted list of active cut segments with their associated AI fills (if any). */
+export function getActiveCutSegments(state: EditorState): ActiveCutSegment[] {
+  const { cuts, activeCuts, manualCuts, activeManualCuts, aiFills } = state;
+  const allActive = [
+    ...cuts.filter((c) => activeCuts.has(c.id)),
+    ...manualCuts.filter((c) => activeManualCuts.has(c.id)).map((c) => ({ ...c, type: 'manual' })),
+  ].sort((a, b) => a.start - b.start);
+
+  return allActive.map((cut) => {
+    const fills = getFillsForCut(cut, aiFills);
+    return {
+      start: cut.start,
+      end: cut.end,
+      fill: fills.length > 0 ? fills[0] : null,
+    };
+  });
+}
+
 interface CreditBalance {
   total: number;
   monthly: number;
