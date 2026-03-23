@@ -541,7 +541,8 @@ useEditorStore.subscribe((state, prev) => {
     state.activeManualCuts === prev.activeManualCuts &&
     state.insertedFills === prev.insertedFills &&
     state.fillDurations === prev.fillDurations &&
-    state.fillModels === prev.fillModels
+    state.fillModels === prev.fillModels &&
+    state.showFills === prev.showFills
   ) return;
   // Debounce to avoid excessive writes
   if (persistTimer) clearTimeout(persistTimer);
