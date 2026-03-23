@@ -194,6 +194,40 @@ const calcCredits = (fillDurations: Map<string, number>, fillModels: Map<string,
 
 let manualCutCounter = 0;
 
+/** localStorage key for persisting editor UI state per cut map */
+const storageKey = (cutMapId: string) => `nocut-editor-state-${cutMapId}`;
+
+interface PersistedEditorState {
+  activeCuts: string[];
+  activeManualCuts: string[];
+  insertedFills: string[];
+  fillDurations: [string, number][];
+  fillModels: [string, string][];
+}
+
+function saveEditorState(state: EditorState) {
+  const cm = state.cutMap;
+  if (!cm) return;
+  try {
+    const data: PersistedEditorState = {
+      activeCuts: Array.from(state.activeCuts),
+      activeManualCuts: Array.from(state.activeManualCuts),
+      insertedFills: Array.from(state.insertedFills),
+      fillDurations: Array.from(state.fillDurations.entries()),
+      fillModels: Array.from(state.fillModels.entries()),
+    };
+    localStorage.setItem(storageKey(cm.id), JSON.stringify(data));
+  } catch { /* quota exceeded or private browsing */ }
+}
+
+function loadEditorState(cutMapId: string): PersistedEditorState | null {
+  try {
+    const raw = localStorage.getItem(storageKey(cutMapId));
+    if (!raw) return null;
+    return JSON.parse(raw) as PersistedEditorState;
+  } catch { return null; }
+}
+
 /** Persist manual cuts alongside auto-detected cuts in the cut_maps row.
  *  Returns true if the DB write succeeded, false otherwise. */
 async function persistManualCuts(
@@ -300,17 +334,35 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (maxIdx > manualCutCounter) manualCutCounter = maxIdx;
     }
     
-    const activeCuts = new Set(cuts.filter((c) => c.auto_accept).map((c) => c.id));
-    const activeManualCuts = new Set(manualCuts.map((c) => c.id));
+    const defaultActiveCuts = new Set(cuts.filter((c) => c.auto_accept).map((c) => c.id));
+    const defaultActiveManualCuts = new Set(manualCuts.map((c) => c.id));
+
+    // Restore persisted UI state if available
+    const saved = loadEditorState(cutMap.id);
+    const activeCuts = saved
+      ? new Set(saved.activeCuts.filter((id) => cuts.some((c) => c.id === id)))
+      : defaultActiveCuts;
+    const activeManualCuts = saved
+      ? new Set(saved.activeManualCuts.filter((id) => manualCuts.some((c) => c.id === id)))
+      : defaultActiveManualCuts;
+    const fillDurations = saved
+      ? new Map(saved.fillDurations.filter(([id]) => cuts.some((c) => c.id === id) || manualCuts.some((c) => c.id === id)))
+      : new Map<string, number>();
+    const fillModels = saved
+      ? new Map(saved.fillModels.filter(([id]) => cuts.some((c) => c.id === id) || manualCuts.some((c) => c.id === id))) as Map<string, AiFillModel>
+      : new Map<string, AiFillModel>();
+    const insertedFills = saved ? new Set(saved.insertedFills) : new Set<string>();
+
     set({
       cutMap,
       cuts,
       activeCuts,
       manualCuts,
       activeManualCuts,
-      fillDurations: new Map(),
-      fillModels: new Map(),
-      creditEstimate: 0,
+      fillDurations,
+      fillModels,
+      insertedFills,
+      creditEstimate: calcCredits(fillDurations, fillModels),
     });
   },
   setCuts: (cuts) => set({ cuts }),
@@ -474,3 +526,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       previewJobId: null,
     }),
 }));
+
+// Auto-persist UI state whenever relevant fields change
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+useEditorStore.subscribe((state, prev) => {
+  if (!state.cutMap) return;
+  // Only save when persisted fields actually changed
+  if (
+    state.activeCuts === prev.activeCuts &&
+    state.activeManualCuts === prev.activeManualCuts &&
+    state.insertedFills === prev.insertedFills &&
+    state.fillDurations === prev.fillDurations &&
+    state.fillModels === prev.fillModels
+  ) return;
+  // Debounce to avoid excessive writes
+  if (persistTimer) clearTimeout(persistTimer);
+  persistTimer = setTimeout(() => saveEditorState(state), 300);
+});
