@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
-import { useEditorStore } from '@/stores/editorStore';
+import { useEditorStore, getFillsForCut } from '@/stores/editorStore';
 import { ZoomIn, ZoomOut, Scissors, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -179,14 +179,101 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
     [containerWidth, zoomLevel]
   );
 
+  // Build segment map for effective timeline when fills are shown
+  interface TimelineSegment {
+    type: 'keep' | 'fill';
+    effectiveStart: number;
+    effectiveEnd: number;
+    sourceStart: number;
+    sourceEnd: number;
+    fillId?: string;
+  }
+
+  const { segments, effectiveDuration } = useMemo(() => {
+    if (!showFills || aiFills.length === 0 || duration <= 0) {
+      return {
+        segments: [{ type: 'keep' as const, effectiveStart: 0, effectiveEnd: duration, sourceStart: 0, sourceEnd: duration }],
+        effectiveDuration: duration,
+      };
+    }
+
+    // Collect all active cuts sorted by start time
+    const allActiveCuts = [
+      ...cuts.filter((c) => activeCuts.has(c.id)).map((c) => ({ ...c, type: c.type })),
+      ...manualCuts.filter((c) => activeManualCuts.has(c.id)).map((c) => ({ ...c, type: 'manual' })),
+    ].sort((a, b) => a.start - b.start);
+
+    if (allActiveCuts.length === 0) {
+      return {
+        segments: [{ type: 'keep' as const, effectiveStart: 0, effectiveEnd: duration, sourceStart: 0, sourceEnd: duration }],
+        effectiveDuration: duration,
+      };
+    }
+
+    const segs: TimelineSegment[] = [];
+    let effectivePos = 0;
+    let sourcePos = 0;
+
+    for (const cut of allActiveCuts) {
+      // Keep segment before this cut
+      if (cut.start > sourcePos) {
+        const keepLen = cut.start - sourcePos;
+        segs.push({
+          type: 'keep',
+          effectiveStart: effectivePos,
+          effectiveEnd: effectivePos + keepLen,
+          sourceStart: sourcePos,
+          sourceEnd: cut.start,
+        });
+        effectivePos += keepLen;
+      }
+
+      // Fill segment (or skip if no fill configured)
+      const matchingFills = getFillsForCut(cut, aiFills);
+      if (matchingFills.length > 0) {
+        const fill = matchingFills[0];
+        segs.push({
+          type: 'fill',
+          effectiveStart: effectivePos,
+          effectiveEnd: effectivePos + fill.duration,
+          sourceStart: cut.start,
+          sourceEnd: cut.end,
+          fillId: fill.id,
+        });
+        effectivePos += fill.duration;
+      }
+      // If no AI fill, the cut is simply removed (no segment added)
+
+      sourcePos = cut.end;
+    }
+
+    // Keep segment after last cut
+    if (sourcePos < duration) {
+      const keepLen = duration - sourcePos;
+      segs.push({
+        type: 'keep',
+        effectiveStart: effectivePos,
+        effectiveEnd: effectivePos + keepLen,
+        sourceStart: sourcePos,
+        sourceEnd: duration,
+      });
+      effectivePos += keepLen;
+    }
+
+    return { segments: segs, effectiveDuration: effectivePos };
+  }, [showFills, aiFills, duration, cuts, activeCuts, manualCuts, activeManualCuts]);
+
+  // Use effective duration for timeline scaling when fills are shown
+  const timelineDuration = showFills && aiFills.length > 0 ? effectiveDuration : duration;
+
   const timeToX = useCallback(
-    (time: number) => (duration > 0 ? (time / duration) * totalWidth : 0),
-    [duration, totalWidth]
+    (time: number) => (timelineDuration > 0 ? (time / timelineDuration) * totalWidth : 0),
+    [timelineDuration, totalWidth]
   );
 
   const xToTime = useCallback(
-    (x: number) => (totalWidth > 0 ? ((x + scrollLeft) / totalWidth) * duration : 0),
-    [totalWidth, scrollLeft, duration]
+    (x: number) => (totalWidth > 0 ? ((x + scrollLeft) / totalWidth) * timelineDuration : 0),
+    [totalWidth, scrollLeft, timelineDuration]
   );
 
   const snapTime = useCallback(
@@ -234,10 +321,10 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
     ctx.fillRect(0, 0, w, h);
 
     // --- Time ruler ---
-    if (duration > 0) {
+    if (timelineDuration > 0) {
       ctx.fillStyle = 'hsl(230, 40%, 14%)';
       ctx.fillRect(0, 0, w, rulerH);
-      const pixelsPerSecond = totalWidth / duration;
+      const pixelsPerSecond = totalWidth / timelineDuration;
       let tickInterval = 1;
       if (pixelsPerSecond < 5) tickInterval = 30;
       else if (pixelsPerSecond < 15) tickInterval = 10;
@@ -245,8 +332,8 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
       ctx.fillStyle = 'hsl(230, 30%, 50%)';
       ctx.font = '9px monospace';
       ctx.textAlign = 'center';
-      const startT = Math.floor((scrollLeft / totalWidth) * duration / tickInterval) * tickInterval;
-      const endT = Math.ceil(((scrollLeft + w) / totalWidth) * duration / tickInterval) * tickInterval;
+      const startT = Math.floor((scrollLeft / totalWidth) * timelineDuration / tickInterval) * tickInterval;
+      const endT = Math.ceil(((scrollLeft + w) / totalWidth) * timelineDuration / tickInterval) * tickInterval;
       for (let t = startT; t <= endT; t += tickInterval) {
         const x = timeToX(t) - scrollLeft;
         if (x < 0 || x > w) continue;
@@ -257,7 +344,7 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
       }
     }
 
-    // --- Thumbnail filmstrip (frame-by-frame, proper aspect ratio) ---
+    // --- Thumbnail filmstrip (segment-aware when fills shown) ---
     if (thumbnailSprite && duration > 0) {
       ctx.save();
       ctx.beginPath();
@@ -266,21 +353,65 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
 
       const spriteNatW = thumbnailSprite.naturalWidth;
       const spriteNatH = thumbnailSprite.naturalHeight;
-      // Frame count matches generation logic: ceil(duration/2) clamped to [5, 60]
       const frameCount = Math.min(Math.max(Math.ceil(duration / 2), 5), 60);
       const singleFrameW = spriteNatW / frameCount;
+      const secondsPerFrame = duration / frameCount;
 
-      // Each frame occupies (totalWidth / frameCount) pixels on the timeline
-      const frameW = totalWidth / frameCount;
+      for (const seg of segments) {
+        const segDrawStart = timeToX(seg.effectiveStart) - scrollLeft;
+        const segDrawEnd = timeToX(seg.effectiveEnd) - scrollLeft;
+        if (segDrawEnd < 0 || segDrawStart > w) continue;
 
-      for (let i = 0; i < frameCount; i++) {
-        const drawX = i * frameW - scrollLeft;
-        if (drawX + frameW < 0 || drawX > w) continue;
-        ctx.drawImage(
-          thumbnailSprite,
-          i * singleFrameW, 0, singleFrameW, spriteNatH,
-          drawX, thumbY, frameW, thumbH,
-        );
+        if (seg.type === 'fill') {
+          // Draw teal placeholder for fill segments
+          ctx.fillStyle = 'hsla(160, 70%, 20%, 0.8)';
+          ctx.fillRect(segDrawStart, thumbY, segDrawEnd - segDrawStart, thumbH);
+          ctx.strokeStyle = 'hsla(160, 70%, 45%, 0.7)';
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(segDrawStart, thumbY, segDrawEnd - segDrawStart, thumbH);
+          const labelW = segDrawEnd - segDrawStart;
+          if (labelW > 30) {
+            ctx.fillStyle = 'hsla(160, 70%, 65%, 0.9)';
+            ctx.font = 'bold 10px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('AI Fill', segDrawStart + labelW / 2, thumbY + thumbH / 2 + 3);
+          }
+        } else {
+          // Draw original video frames for keep segments
+          const segPixelWidth = segDrawEnd - segDrawStart;
+          const segSourceDur = seg.sourceEnd - seg.sourceStart;
+          // Determine which sprite frames overlap this source range
+          const firstFrame = Math.floor(seg.sourceStart / secondsPerFrame);
+          const lastFrame = Math.min(frameCount - 1, Math.ceil(seg.sourceEnd / secondsPerFrame));
+
+          for (let i = firstFrame; i <= lastFrame; i++) {
+            const frameSrcStart = i * secondsPerFrame;
+            const frameSrcEnd = (i + 1) * secondsPerFrame;
+            // Clamp to segment source bounds
+            const visStart = Math.max(frameSrcStart, seg.sourceStart);
+            const visEnd = Math.min(frameSrcEnd, seg.sourceEnd);
+            if (visEnd <= visStart) continue;
+
+            // Position within the effective timeline
+            const fracStart = (visStart - seg.sourceStart) / segSourceDur;
+            const fracEnd = (visEnd - seg.sourceStart) / segSourceDur;
+            const drawX = segDrawStart + fracStart * segPixelWidth;
+            const drawW = (fracEnd - fracStart) * segPixelWidth;
+
+            // Source crop from sprite
+            const frameFracStart = (visStart - frameSrcStart) / secondsPerFrame;
+            const frameFracEnd = (visEnd - frameSrcStart) / secondsPerFrame;
+            const srcX = i * singleFrameW + frameFracStart * singleFrameW;
+            const srcW = (frameFracEnd - frameFracStart) * singleFrameW;
+
+            if (drawX + drawW < 0 || drawX > w) continue;
+            ctx.drawImage(
+              thumbnailSprite,
+              srcX, 0, srcW, spriteNatH,
+              drawX, thumbY, drawW, thumbH,
+            );
+          }
+        }
       }
       ctx.restore();
     }
@@ -289,28 +420,49 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
     ctx.fillStyle = 'hsl(230, 30%, 20%)';
     ctx.fillRect(0, thumbY + thumbH, w, dividerH);
 
-    // --- Waveform ---
+    // --- Waveform (segment-aware) ---
     if (waveformData.length > 0 && duration > 0) {
       ctx.save();
       ctx.beginPath();
       ctx.rect(0, waveY, w, waveH);
       ctx.clip();
 
-      const samplesPerPixel = waveformData.length / totalWidth;
-      const startSample = Math.max(0, Math.floor(scrollLeft * samplesPerPixel));
-      const endSample = Math.min(waveformData.length, Math.ceil((scrollLeft + w) * samplesPerPixel));
-
-      const barWidth = Math.max(1, 1 / samplesPerPixel);
       const midY = waveY + waveH / 2;
 
-      for (let i = startSample; i < endSample; i++) {
-        const x = (i / samplesPerPixel) - scrollLeft;
-        const amplitude = waveformData[i] || 0;
-        const barH = amplitude * (waveH * 0.45);
+      for (const seg of segments) {
+        const segDrawStart = timeToX(seg.effectiveStart) - scrollLeft;
+        const segDrawEnd = timeToX(seg.effectiveEnd) - scrollLeft;
+        if (segDrawEnd < 0 || segDrawStart > w) continue;
 
-        const alpha = 0.35 + amplitude * 0.65;
-        ctx.fillStyle = `hsla(210, 60%, 55%, ${alpha})`;
-        ctx.fillRect(x, midY - barH, barWidth, barH * 2);
+        if (seg.type === 'fill') {
+          // Draw flat low-amplitude fill waveform placeholder
+          ctx.fillStyle = 'hsla(160, 60%, 45%, 0.3)';
+          const fillBarH = waveH * 0.08;
+          ctx.fillRect(segDrawStart, midY - fillBarH, segDrawEnd - segDrawStart, fillBarH * 2);
+        } else {
+          // Draw original waveform samples for keep segments
+          const segPixelWidth = segDrawEnd - segDrawStart;
+          const segSourceDur = seg.sourceEnd - seg.sourceStart;
+          const pixelsPerSec = segPixelWidth / segSourceDur;
+          const samplesPerSec = waveformData.length / duration;
+
+          const srcStartSample = Math.floor(seg.sourceStart * samplesPerSec);
+          const srcEndSample = Math.min(waveformData.length, Math.ceil(seg.sourceEnd * samplesPerSec));
+          const srcSampleCount = srcEndSample - srcStartSample;
+          if (srcSampleCount <= 0) continue;
+
+          const barWidth = Math.max(1, segPixelWidth / srcSampleCount);
+
+          for (let i = 0; i < srcSampleCount; i++) {
+            const x = segDrawStart + (i / srcSampleCount) * segPixelWidth;
+            if (x + barWidth < 0 || x > w) continue;
+            const amplitude = waveformData[srcStartSample + i] || 0;
+            const barH = amplitude * (waveH * 0.45);
+            const alpha = 0.35 + amplitude * 0.65;
+            ctx.fillStyle = `hsla(210, 60%, 55%, ${alpha})`;
+            ctx.fillRect(x, midY - barH, barWidth, barH * 2);
+          }
+        }
       }
       ctx.restore();
     }
@@ -319,59 +471,39 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
     const overlayY = thumbY;
     const overlayH = thumbH + dividerH + waveH;
 
-    // --- AI Fill overlays (rendered before cuts so cuts draw on top) ---
-    if (showFills && aiFills.length > 0) {
-      for (const fill of aiFills) {
-        const x1 = timeToX(fill.startTime) - scrollLeft;
-        const fillEnd = fill.startTime + fill.duration;
-        const x2 = timeToX(fillEnd) - scrollLeft;
-        if (x2 < 0 || x1 > w) continue;
+    // --- Overlays: only show cut/fill overlays in original mode (fills hidden) ---
+    // When fills are shown, the segment map already visualizes cuts removed + fills inserted.
+    const showingEffective = showFills && aiFills.length > 0;
 
-        // Green/teal fill overlay
-        ctx.fillStyle = 'hsla(160, 70%, 45%, 0.25)';
+    if (!showingEffective) {
+      for (const cut of cuts) {
+        const isActive = activeCuts.has(cut.id);
+        const isHovered = hoveredCut === cut.id;
+        if (!isActive && !isHovered) continue;
+        const x1 = timeToX(cut.start) - scrollLeft;
+        const x2 = timeToX(cut.end) - scrollLeft;
+        if (x2 < 0 || x1 > w) continue;
+        ctx.fillStyle = isActive
+          ? isHovered ? 'hsla(252, 75%, 65%, 0.45)' : 'hsla(252, 75%, 65%, 0.3)'
+          : 'hsla(220, 13%, 36%, 0.15)';
         ctx.fillRect(x1, overlayY, x2 - x1, overlayH);
-        ctx.strokeStyle = 'hsla(160, 70%, 45%, 0.7)';
+        ctx.strokeStyle = isActive ? 'hsla(252, 75%, 65%, 0.6)' : 'hsla(220, 13%, 36%, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x1, overlayY, x2 - x1, overlayH);
+      }
+
+      for (const cut of manualCuts) {
+        const isActive = activeManualCuts.has(cut.id);
+        if (!isActive) continue;
+        const x1 = timeToX(cut.start) - scrollLeft;
+        const x2 = timeToX(cut.end) - scrollLeft;
+        if (x2 < 0 || x1 > w) continue;
+        ctx.fillStyle = 'hsla(270, 70%, 60%, 0.35)';
+        ctx.fillRect(x1, overlayY, x2 - x1, overlayH);
+        ctx.strokeStyle = 'hsla(270, 70%, 60%, 0.7)';
         ctx.lineWidth = 1.5;
         ctx.strokeRect(x1, overlayY, x2 - x1, overlayH);
-
-        // Small "AI" label
-        const labelW = x2 - x1;
-        if (labelW > 20) {
-          ctx.fillStyle = 'hsla(160, 70%, 45%, 0.9)';
-          ctx.font = 'bold 9px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('AI', x1 + labelW / 2, overlayY + 10);
-        }
       }
-    }
-
-    for (const cut of cuts) {
-      const isActive = activeCuts.has(cut.id);
-      const isHovered = hoveredCut === cut.id;
-      if (!isActive && !isHovered) continue;
-      const x1 = timeToX(cut.start) - scrollLeft;
-      const x2 = timeToX(cut.end) - scrollLeft;
-      if (x2 < 0 || x1 > w) continue;
-      ctx.fillStyle = isActive
-        ? isHovered ? 'hsla(252, 75%, 65%, 0.45)' : 'hsla(252, 75%, 65%, 0.3)'
-        : 'hsla(220, 13%, 36%, 0.15)';
-      ctx.fillRect(x1, overlayY, x2 - x1, overlayH);
-      ctx.strokeStyle = isActive ? 'hsla(252, 75%, 65%, 0.6)' : 'hsla(220, 13%, 36%, 0.3)';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x1, overlayY, x2 - x1, overlayH);
-    }
-
-    for (const cut of manualCuts) {
-      const isActive = activeManualCuts.has(cut.id);
-      if (!isActive) continue;
-      const x1 = timeToX(cut.start) - scrollLeft;
-      const x2 = timeToX(cut.end) - scrollLeft;
-      if (x2 < 0 || x1 > w) continue;
-      ctx.fillStyle = 'hsla(270, 70%, 60%, 0.35)';
-      ctx.fillRect(x1, overlayY, x2 - x1, overlayH);
-      ctx.strokeStyle = 'hsla(270, 70%, 60%, 0.7)';
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(x1, overlayY, x2 - x1, overlayH);
     }
 
     // Razor
@@ -395,8 +527,8 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
       }
     }
 
-    // --- Inserted fill indicators (solid green bottom bar) ---
-    if (showFills && aiFills.length > 0) {
+    // --- Inserted fill indicators (solid green bottom bar, original mode only) ---
+    if (!showingEffective && showFills && aiFills.length > 0) {
       for (const fill of aiFills) {
         if (!insertedFills.has(fill.id)) continue;
         const fx1 = timeToX(fill.startTime) - scrollLeft;
@@ -426,6 +558,7 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
     razorMode, razorStart, razorPreview,
     aiFills, showFills,
     insertedFills,
+    segments, timelineDuration,
   ]);
 
   // RAF loop
@@ -620,7 +753,7 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="text-xs">
-                  {showFills ? 'Hide AI fill regions' : 'Show AI fill regions'}
+                  {showFills ? 'Showing expected output — click to show original' : 'Showing original — click to preview expected output'}
                 </TooltipContent>
               </Tooltip>
               <div className="w-px h-4 bg-border" />
