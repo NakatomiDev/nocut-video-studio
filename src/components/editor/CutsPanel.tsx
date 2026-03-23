@@ -202,9 +202,9 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     const generatedFill = cutFills[0] ?? null;
 
     return (
-      <div className="flex flex-col gap-1.5 pl-5 mt-1">
+      <div className="flex flex-col gap-1.5 pl-5 mt-1 overflow-hidden">
         {/* Model selector first — durations depend on it */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           {generatedFill ? (
             <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
           ) : (
