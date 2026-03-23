@@ -53,6 +53,7 @@ const ExportComplete = () => {
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  useDocumentTitle(projectTitle ? `${projectTitle} — Export` : 'Export');
 
   useEffect(() => {
     if (!projectId || !exportId) return;
