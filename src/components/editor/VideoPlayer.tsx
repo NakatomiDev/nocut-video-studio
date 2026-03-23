@@ -229,7 +229,7 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
           preload="auto"
         />
         {playingFillId && (
-          <div className="absolute top-3 left-3 bg-teal-600/80 text-white text-xs px-2 py-1 rounded font-medium">
+          <div className="absolute top-3 left-3 bg-accent/80 text-accent-foreground text-xs px-2 py-1 rounded font-medium">
             AI Fill
           </div>
         )}
