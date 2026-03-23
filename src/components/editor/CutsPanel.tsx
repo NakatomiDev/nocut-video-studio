@@ -776,7 +776,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                           )}
                             {edit.existingFillIdentity && (
                               <span className="text-[10px] text-foreground/90 basis-full pl-5">
-                                Using selected fill: <span className="font-mono">#{edit.existingFillIdentity.shortId}</span>
+                                AI fill selected for this cut
                               </span>
                             )}
                           </div>
