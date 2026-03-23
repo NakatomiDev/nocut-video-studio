@@ -1018,6 +1018,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
               <ExactVideoFrame
                 videoUrl={videoUrl}
                 time={lightbox.time}
+                cachedFrame={getFrame(lightbox.time)}
                 label={lightbox.label}
                 className="aspect-video w-full max-w-[min(80vw,960px)]"
               />
