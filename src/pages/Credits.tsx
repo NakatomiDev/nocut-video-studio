@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useCreditsBalance, useCreditsHistory, useCreditsTopup } from "@/hooks/useCredits";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
-import { Coins, AlertTriangle, Loader2, ArrowDownCircle, ArrowUpCircle, RefreshCw } from "lucide-react";
+import { Coins, AlertTriangle, Loader2, ArrowDownCircle, ArrowUpCircle, RefreshCw, ArrowRight } from "lucide-react";
 import { format, differenceInDays, parseISO } from "date-fns";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 const TOPUP_PACKS = [
   { id: "nocut_credits_10", credits: 10, price: "$4.99", perCredit: "$0.50", name: "Starter" },
