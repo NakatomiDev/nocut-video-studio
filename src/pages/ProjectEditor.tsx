@@ -8,8 +8,10 @@ import WaveformTimeline from '@/components/editor/WaveformTimeline';
 import CutsPanel from '@/components/editor/CutsPanel';
 import FillPreviewPanel from '@/components/editor/FillPreviewPanel';
 import ExportProgress from '@/components/ExportProgress';
+import EditorSkeleton from '@/components/editor/EditorSkeleton';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Loader2, AlertTriangle } from 'lucide-react';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
 const ProjectEditor = () => {
   const { projectId } = useParams<{ projectId: string }>();
