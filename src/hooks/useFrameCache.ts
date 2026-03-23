@@ -30,10 +30,10 @@ export function useFrameCache(
           video.removeEventListener('error', onError);
           try {
             const canvas = document.createElement('canvas');
-            // Use a small size for thumbnails — saves memory
-            const scale = Math.min(1, 160 / (video.videoWidth || 320));
-            canvas.width = Math.round((video.videoWidth || 320) * scale);
-            canvas.height = Math.round((video.videoHeight || 180) * scale);
+            // Use a reasonable size — sharp enough for lightbox too
+            const scale = Math.min(1, 640 / (video.videoWidth || 640));
+            canvas.width = Math.round((video.videoWidth || 640) * scale);
+            canvas.height = Math.round((video.videoHeight || 360) * scale);
             const ctx = canvas.getContext('2d');
             if (ctx) {
               ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
