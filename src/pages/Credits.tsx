@@ -105,7 +105,7 @@ const Credits = () => {
       </Card>
 
       {/* Top-Up Packs */}
-      <div className="space-y-3">
+      <div className="space-y-3" id="topup-section">
         <h2 className="text-lg font-semibold text-foreground">Top Up Credits</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {TOPUP_PACKS.map((pack) => (

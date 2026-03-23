@@ -12,6 +12,7 @@ const SettingsPage = () => {
   const { user, signOut } = useAuth();
   const [paywallOpen, setPaywallOpen] = useState(false);
   const { hasProAccess, hasBusinessAccess } = useRevenueCatCustomer();
+  useDocumentTitle("Settings");
 
   const currentTier = hasBusinessAccess ? "business" : hasProAccess ? "pro" : "free";
 
