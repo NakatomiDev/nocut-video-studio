@@ -319,30 +319,30 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   };
 
   const renderPreview = (start: number, end: number) => (
-    <div className="flex items-center gap-1.5 pl-3">
-      <div className="flex flex-col items-center gap-0.5 shrink-0">
+    <div className="flex items-center gap-1 pl-2 pr-1 overflow-hidden">
+      <div className="flex flex-col items-center gap-0.5 shrink-0 min-w-0">
         {thumbnailSpriteUrl ? (
-          <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={start} duration={duration} width={56} height={32} />
+          <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={start} duration={duration} width={48} height={28} />
         ) : videoUrl ? (
           <ExactVideoFrame
             videoUrl={videoUrl}
             time={start}
             label={`Start frame ${formatTimestamp(start)}`}
-            className="h-8 w-14"
+            className="h-7 w-12"
           />
         ) : null}
         <span className="text-[9px] text-muted-foreground font-mono">Start</span>
       </div>
-      <div className="flex-1 border-t border-dashed border-muted-foreground/30 min-w-2" />
-      <div className="flex flex-col items-center gap-0.5 shrink-0">
+      <div className="flex-1 border-t border-dashed border-muted-foreground/30 min-w-1" />
+      <div className="flex flex-col items-center gap-0.5 shrink-0 min-w-0">
         {thumbnailSpriteUrl ? (
-          <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={end} duration={duration} width={56} height={32} />
+          <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={end} duration={duration} width={48} height={28} />
         ) : videoUrl ? (
           <ExactVideoFrame
             videoUrl={videoUrl}
             time={end}
             label={`End frame ${formatTimestamp(end)}`}
-            className="h-8 w-14"
+            className="h-7 w-12"
           />
         ) : null}
         <span className="text-[9px] text-muted-foreground font-mono">End</span>
