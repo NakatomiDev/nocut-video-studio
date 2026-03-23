@@ -107,7 +107,7 @@ const ExportProgress = ({ projectId, onComplete, onRetry }: ExportProgressProps)
     if (!proj) return;
     const status = proj.status as string;
 
-    if (status === 'complete' || status === 'ready') {
+    if (status === 'complete') {
       advanceStage('complete', 100);
       supabase
         .from('exports')
@@ -119,6 +119,9 @@ const ExportProgress = ({ projectId, onComplete, onRetry }: ExportProgressProps)
         .then(({ data }) => {
           if (data) onComplete(data.id);
         });
+    } else if (status === 'ready') {
+      // ready means fills done but export not yet queued — treat as exporting
+      advanceStage('exporting', 60);
     } else if (status === 'failed') {
       advanceStage('failed', 0, (proj.error_message as string) || 'Processing failed');
     } else if (status === 'generating') {
