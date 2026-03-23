@@ -259,11 +259,24 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
         {/* AI Fill video — shown when fill is playing */}
         <video
           ref={fillVideoRef}
+          key={currentFillUrl ?? 'no-fill'}
           src={currentFillUrl ?? undefined}
           className={`max-h-full max-w-full ${playingFillId ? '' : 'hidden'}`}
           preload="auto"
           playsInline
         />
+        {/* Click-to-cancel overlay when fill is playing */}
+        {playingFillId && (
+          <button
+            className="absolute inset-0 z-10 cursor-pointer bg-transparent"
+            onClick={() => {
+              const fv = fillVideoRef.current;
+              if (fv) fv.pause();
+              resumeAfterFill();
+            }}
+            aria-label="Cancel AI fill playback"
+          />
+        )}
         {playingFillId && (
           <div className="absolute top-3 left-3 bg-accent/80 text-accent-foreground text-xs px-2 py-1 rounded font-medium">
             AI Fill

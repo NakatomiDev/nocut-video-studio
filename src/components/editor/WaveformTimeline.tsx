@@ -676,11 +676,14 @@ const WaveformTimeline = ({ waveformUrl, videoUrl, thumbnailSpriteUrl, duration 
         return;
       }
 
-      // Check if clicking on an AI fill region
-      const fill = getFillAtX(e.clientX);
-      if (fill) {
-        selectFill(fill);
-        return;
+      // Check if clicking on an AI fill region (only in original mode, not effective/collapsed)
+      const isEffectiveMode = showFills && aiFills.length > 0;
+      if (!isEffectiveMode) {
+        const fill = getFillAtX(e.clientX);
+        if (fill) {
+          selectFill(fill);
+          return;
+        }
       }
 
       const cut = getCutAtX(e.clientX);
