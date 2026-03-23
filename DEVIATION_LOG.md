@@ -292,3 +292,21 @@ A running log of architectural decisions that deviate from the original spec or 
 - `DEVIATION_LOG.md` — Added this entry
 **Deviation:** (1) Each test scenario documents known deviations from the original spec inline (e.g., client-side credit estimation, crossfade-only fills in Phase 1, RevenueCat SDK not yet wired). (2) Smoke test script uses curl for HTTP checks rather than Playwright — faster for post-deploy verification; full Playwright E2E tests are a separate concern. (3) Subscription purchase test (scenario 6) documents that RevenueCat purchase buttons are currently placeholder — cannot be fully tested until SDK billing key is configured.
 **Impact:** Test plan is ready for manual execution. All 8 scenarios reflect the actual implementation per DEVIATION_LOG.md. Smoke test script can be run after each deploy for quick verification.
+
+### 2026-03-23 — UI polish pass (Prompt 7.1.2)
+
+**Area:** Frontend
+**Original plan:** Polish pass covering loading states (skeleton cards/layouts), error states (toast system), empty states, consistency (colors, buttons, cards), edge cases (long titles, zero credits, no silences), and navigation (active link, page titles, browser history).
+**Files created:**
+- `src/hooks/useDocumentTitle.ts` — Sets `document.title` per route with "— NoCut" suffix
+- `src/components/ProjectCardSkeleton.tsx` — Skeleton card matching ProjectCard layout
+- `src/components/editor/EditorSkeleton.tsx` — Skeleton layout matching editor page structure
+**Files modified:**
+- `src/pages/Dashboard.tsx` — Replaced spinner with skeleton card grid, added `useDocumentTitle`
+- `src/pages/ProjectEditor.tsx` — Replaced spinner with `EditorSkeleton`, added `useDocumentTitle`
+- `src/pages/Credits.tsx` — Added `useDocumentTitle`, zero-balance CTA with scroll-to-topup, added `ArrowRight` import
+- `src/pages/Settings.tsx` — Added `useDocumentTitle`
+- `src/pages/ExportComplete.tsx` — Added `useDocumentTitle` with project title
+- `src/components/editor/CutsPanel.tsx` — Enhanced "no pauses detected" message with manual cut guidance
+**Deviation:** (1) Toast system was already implemented via shadcn Toaster + sonner — no new toast infrastructure needed, existing usage covers success/error/warning patterns. (2) Empty states were already present in Dashboard and Credits — the "No transactions yet" and "No projects yet" messages were already built. (3) AppLayout sidebar already had active link highlighting via `bg-primary text-primary-foreground`. (4) ProjectCard already truncates long titles via `truncate` class. (5) Colors use HSL design tokens (--primary, --foreground, --muted-foreground) rather than hardcoded hex values as specified in the prompt — this follows the established design system pattern. (6) Some status-specific colors (yellow for warning, green for success, red for error) remain as Tailwind utility classes since they are semantic status indicators, not theme colors.
+**Impact:** All pages now have proper skeleton loading states, document titles update per route for SEO and usability, zero-credit state is prominently surfaced with a CTA. Browser back/forward works correctly via react-router-dom (no custom handling needed).

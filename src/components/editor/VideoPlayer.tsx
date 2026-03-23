@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
-import { Play, Pause, Volume2, VolumeX } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { useEditorStore } from '@/stores/editorStore';
@@ -24,6 +24,7 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
   const [muted, setMuted] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [duration, setDuration] = useState(0);
+  const [videoError, setVideoError] = useState<string | null>(null);
 
   useEffect(() => {
     const v = videoRef.current;
@@ -33,7 +34,7 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
       setPlayhead(v.currentTime);
     };
     const onEnd = () => pause();
-    const onMeta = () => setDuration(v.duration);
+    const onMeta = () => { setDuration(v.duration); setVideoError(null); };
     v.addEventListener('timeupdate', onTime);
     v.addEventListener('ended', onEnd);
     v.addEventListener('loadedmetadata', onMeta);
@@ -60,7 +61,7 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
-    if (isPlaying) v.play().catch(() => {});
+    if (isPlaying) v.play().catch((err) => { if (err.name !== 'AbortError') setVideoError('Playback failed'); });
     else v.pause();
   }, [isPlaying]);
 
@@ -90,6 +91,14 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
     setSpeed(SPEEDS[(idx + 1) % SPEEDS.length]);
   };
 
+  const handleRetry = useCallback(() => {
+    const v = videoRef.current;
+    if (v) {
+      setVideoError(null);
+      v.load();
+    }
+  }, []);
+
   if (!videoUrl) {
     return (
       <div className="flex h-full items-center justify-center bg-background rounded-lg">
@@ -100,8 +109,23 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
 
   return (
     <div className="flex h-full flex-col bg-background rounded-lg overflow-hidden">
-      <div className="flex-1 flex items-center justify-center bg-black">
-        <video ref={videoRef} src={videoUrl} className="max-h-full max-w-full" preload="metadata" />
+      <div className="relative flex-1 flex items-center justify-center bg-black">
+        <video
+          ref={videoRef}
+          src={videoUrl}
+          className="max-h-full max-w-full"
+          preload="metadata"
+          crossOrigin="anonymous"
+          onError={() => setVideoError('Video failed to load')}
+        />
+        {videoError && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80">
+            <p className="text-sm text-muted-foreground">{videoError}</p>
+            <Button variant="secondary" size="sm" onClick={handleRetry}>
+              <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Retry
+            </Button>
+          </div>
+        )}
       </div>
       <div className="flex flex-col gap-2 p-3 border-t border-border">
         <Slider

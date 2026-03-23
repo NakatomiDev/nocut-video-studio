@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Tables } from '@/integrations/supabase/types';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export interface AiFill {
   id: string;
@@ -80,6 +81,14 @@ export const MODEL_CREDITS_PER_SEC: Record<AiFillModel, number> = Object.fromEnt
 ) as Record<AiFillModel, number>;
 
 export const DEFAULT_AI_FILL_MODEL: AiFillModel = "veo3.1-fast";
+
+/** Return all AI fills that match a given cut (fill.startTime within 0.5s of cut.end). */
+export function getFillsForCut(
+  cut: { end: number },
+  aiFills: AiFill[],
+): AiFill[] {
+  return aiFills.filter((f) => Math.abs(f.startTime - cut.end) < 0.5);
+}
 
 interface CreditBalance {
   total: number;
@@ -161,13 +170,14 @@ const calcCredits = (fillDurations: Map<string, number>, fillModels: Map<string,
 
 let manualCutCounter = 0;
 
-/** Persist manual cuts alongside auto-detected cuts in the cut_maps row */
-function persistManualCuts(
+/** Persist manual cuts alongside auto-detected cuts in the cut_maps row.
+ *  Returns true if the DB write succeeded, false otherwise. */
+async function persistManualCuts(
   cutMap: Tables<'cut_maps'> | null,
   autoCuts: Cut[],
   manualCuts: ManualCut[],
-) {
-  if (!cutMap) return;
+): Promise<boolean> {
+  if (!cutMap) return false;
   const autoRaw = autoCuts.map((c) => ({
     id: c.id,
     start: c.start,
@@ -185,16 +195,27 @@ function persistManualCuts(
     duration: c.duration,
   }));
   const combined = [...autoRaw, ...manualRaw];
-  supabase
+  const { data, error } = await supabase
     .from('cut_maps')
     .update({ cuts_json: combined as any })
     .eq('id', cutMap.id)
-    .then(({ error }) => {
-      if (error) console.error('[editorStore] Failed to persist manual cuts:', error);
+    .select('id')
+    .single();
+
+  if (error || !data) {
+    console.error('[editorStore] Failed to persist manual cuts:', error);
+    toast.error('Failed to save cut — please try again', {
+      action: {
+        label: 'Retry',
+        onClick: () => { persistManualCuts(cutMap, autoCuts, manualCuts); },
+      },
     });
+    return false;
+  }
+  return true;
 }
 
-export const useEditorStore = create<EditorState>((set) => ({
+export const useEditorStore = create<EditorState>((set, get) => ({
   project: null,
   video: null,
   cutMap: null,
@@ -288,7 +309,7 @@ export const useEditorStore = create<EditorState>((set) => ({
         creditEstimate: calcCredits(nextFills, nextModels),
       };
     }),
-  addManualCut: (start, end) =>
+  addManualCut: (start, end) => {
     set((state) => {
       const s = Math.min(start, end);
       const e = Math.max(start, end);
@@ -298,15 +319,17 @@ export const useEditorStore = create<EditorState>((set) => ({
       const manualCuts = [...state.manualCuts, cut];
       const activeManualCuts = new Set(state.activeManualCuts);
       activeManualCuts.add(id);
-      // Persist to DB
-      persistManualCuts(state.cutMap, state.cuts, manualCuts);
       return {
         manualCuts,
         activeManualCuts,
         creditEstimate: calcCredits(state.fillDurations, state.fillModels),
       };
-    }),
-  removeManualCut: (id) =>
+    });
+    // Persist to DB after state update
+    const { cutMap, cuts, manualCuts } = get();
+    persistManualCuts(cutMap, cuts, manualCuts);
+  },
+  removeManualCut: (id) => {
     set((state) => {
       const manualCuts = state.manualCuts.filter((c) => c.id !== id);
       const activeManualCuts = new Set(state.activeManualCuts);
@@ -315,8 +338,6 @@ export const useEditorStore = create<EditorState>((set) => ({
       nextFills.delete(id);
       const nextModels = new Map(state.fillModels);
       nextModels.delete(id);
-      // Persist to DB
-      persistManualCuts(state.cutMap, state.cuts, manualCuts);
       return {
         manualCuts,
         activeManualCuts,
@@ -324,7 +345,11 @@ export const useEditorStore = create<EditorState>((set) => ({
         fillModels: nextModels,
         creditEstimate: calcCredits(nextFills, nextModels),
       };
-    }),
+    });
+    // Persist to DB after state update
+    const { cutMap, cuts, manualCuts } = get();
+    persistManualCuts(cutMap, cuts, manualCuts);
+  },
   toggleManualCut: (cutId) =>
     set((state) => {
       const next = new Set(state.activeManualCuts);

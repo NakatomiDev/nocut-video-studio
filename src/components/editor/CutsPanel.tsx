@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useEditorStore, AI_FILL_MODELS, MODEL_CREDITS_PER_SEC, DEFAULT_AI_FILL_MODEL, getAvailableModels, getModelDurations, type AiFill, type AiFillModel } from '@/stores/editorStore';
+import { useEditorStore, AI_FILL_MODELS, MODEL_CREDITS_PER_SEC, DEFAULT_AI_FILL_MODEL, getAvailableModels, getModelDurations, getFillsForCut, type AiFill, type AiFillModel } from '@/stores/editorStore';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { X, AlertTriangle, Sparkles, CheckCircle2, Eye, RefreshCw, Loader2 } from 'lucide-react';
+import { X, AlertTriangle, Sparkles, CheckCircle2, Eye, RefreshCw, Loader2, ChevronRight, Plus, Minus } from 'lucide-react';
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import CutThumbnail from './CutThumbnail';
 import ExactVideoFrame from './ExactVideoFrame';
 import { usePreviewFill } from '@/hooks/usePreviewFill';
@@ -66,6 +67,9 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     project,
     aiFills,
     selectFill,
+    insertFill,
+    removeFill,
+    insertedFills,
     previewGeneratingCutId,
   } = useEditorStore();
 
@@ -75,6 +79,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   const [userTier, setUserTier] = useState<string>('free');
   const [expandedReviewId, setExpandedReviewId] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{ time: number; label: string } | null>(null);
+  const [expandedFillsCuts, setExpandedFillsCuts] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const fetchBalance = async () => {
@@ -191,12 +196,10 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     const modelDurations = getModelDurations(currentModel, userTier);
     const modelConfig = AI_FILL_MODELS.find((m) => m.id === currentModel);
     // Check if this cut already has a generated AI fill
-    const generatedFill = aiFills.find((f) => {
-      const allCuts = [...cuts, ...manualCuts.map((c) => ({ ...c, type: 'manual' }))];
-      const cut = allCuts.find((c) => c.id === cutId);
-      if (!cut) return false;
-      return Math.abs(f.startTime - cut.end) < 0.5;
-    });
+    const allCutsArr = [...cuts, ...manualCuts.map((c) => ({ ...c, type: 'manual' }))];
+    const cutObj = allCutsArr.find((c) => c.id === cutId);
+    const cutFills = cutObj ? getFillsForCut(cutObj, aiFills) : [];
+    const generatedFill = cutFills[0] ?? null;
 
     return (
       <div className="flex flex-col gap-1.5 pl-5 mt-1">
@@ -316,36 +319,118 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   };
 
   const renderPreview = (start: number, end: number) => (
-    <div className="flex items-center gap-2 pl-5">
-      <div className="flex flex-col items-center gap-0.5">
-        {videoUrl ? (
+    <div className="flex items-center gap-1.5 pl-3">
+      <div className="flex flex-col items-center gap-0.5 shrink-0">
+        {thumbnailSpriteUrl ? (
+          <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={start} duration={duration} width={56} height={32} />
+        ) : videoUrl ? (
           <ExactVideoFrame
             videoUrl={videoUrl}
             time={start}
             label={`Start frame ${formatTimestamp(start)}`}
-            className="h-10 w-[72px]"
+            className="h-8 w-14"
           />
-        ) : (
-          <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={start} duration={duration} width={72} height={40} />
-        )}
+        ) : null}
         <span className="text-[9px] text-muted-foreground font-mono">Start</span>
       </div>
-      <div className="flex-1 border-t border-dashed border-muted-foreground/30" />
-      <div className="flex flex-col items-center gap-0.5">
-        {videoUrl ? (
+      <div className="flex-1 border-t border-dashed border-muted-foreground/30 min-w-2" />
+      <div className="flex flex-col items-center gap-0.5 shrink-0">
+        {thumbnailSpriteUrl ? (
+          <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={end} duration={duration} width={56} height={32} />
+        ) : videoUrl ? (
           <ExactVideoFrame
             videoUrl={videoUrl}
             time={end}
             label={`End frame ${formatTimestamp(end)}`}
-            className="h-10 w-[72px]"
+            className="h-8 w-14"
           />
-        ) : (
-          <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={end} duration={duration} width={72} height={40} />
-        )}
+        ) : null}
         <span className="text-[9px] text-muted-foreground font-mono">End</span>
       </div>
     </div>
   );
+
+  const renderFillsList = (cutId: string) => {
+    const allCutsArr = [...cuts, ...manualCuts.map((c) => ({ ...c, type: 'manual' }))];
+    const cutObj = allCutsArr.find((c) => c.id === cutId);
+    if (!cutObj) return null;
+    const fills = getFillsForCut(cutObj, aiFills);
+    if (fills.length === 0) return null;
+
+    const isOpen = expandedFillsCuts.has(cutId);
+    const toggleOpen = () => {
+      setExpandedFillsCuts((prev) => {
+        const next = new Set(prev);
+        if (next.has(cutId)) next.delete(cutId);
+        else next.add(cutId);
+        return next;
+      });
+    };
+
+    return (
+      <Collapsible open={isOpen} onOpenChange={toggleOpen}>
+        <CollapsibleTrigger
+          className="flex items-center gap-1.5 pl-5 mt-1.5 text-[10px] font-semibold text-emerald-400 hover:text-emerald-300 transition-colors"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <ChevronRight className={`h-3 w-3 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+          <Sparkles className="h-3 w-3" />
+          AI Fills ({fills.length})
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="flex flex-col gap-1 pl-7 mt-1">
+            {fills.map((fill) => {
+              const isInserted = insertedFills.has(fill.id);
+              const hasVideo = !!fill.s3Key;
+              return (
+                <div
+                  key={fill.id}
+                  className={`flex items-center gap-1.5 rounded px-2 py-1 text-[10px] transition-colors ${
+                    isInserted ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-secondary/50'
+                  }`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[9px] shrink-0">
+                    {fill.duration}s
+                  </Badge>
+                  <span className="text-muted-foreground truncate flex-1">
+                    {fill.method || fill.provider || 'AI Fill'}
+                  </span>
+                  {fill.qualityScore !== null && (
+                    <span className="text-[9px] text-muted-foreground shrink-0">
+                      {Math.round(fill.qualityScore * 100)}%
+                    </span>
+                  )}
+                  {hasVideo ? (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5 shrink-0"
+                        onClick={() => selectFill(fill)}
+                      >
+                        <Eye className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={`h-5 w-5 shrink-0 ${isInserted ? 'text-emerald-400' : 'text-muted-foreground'}`}
+                        onClick={() => isInserted ? removeFill(fill.id) : insertFill(fill.id)}
+                      >
+                        {isInserted ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                      </Button>
+                    </>
+                  ) : (
+                    <span className="text-[9px] text-muted-foreground animate-pulse">Generating...</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+    );
+  };
 
   return (
     <div className="flex h-full flex-col border-l border-border bg-card">
@@ -367,7 +452,10 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
             </span>
           </div>
           {cuts.length === 0 && (
-            <p className="p-3 text-center text-xs text-muted-foreground">No pauses detected</p>
+            <div className="p-3 text-center text-xs text-muted-foreground space-y-1">
+              <p>No pauses detected.</p>
+              <p>You can still add manual cuts using the razor tool on the timeline.</p>
+            </div>
           )}
           {cuts.map((cut) => (
             <div
@@ -401,6 +489,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                 <>
                   {thumbnailSpriteUrl && renderPreview(cut.start, cut.end)}
                   {renderFillSelector(cut.id)}
+                  {renderFillsList(cut.id)}
                 </>
               )}
             </div>
@@ -454,6 +543,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                 <>
                   {thumbnailSpriteUrl && renderPreview(cut.start, cut.end)}
                   {renderFillSelector(cut.id)}
+                  {renderFillsList(cut.id)}
                 </>
               )}
             </div>
@@ -561,16 +651,16 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                                 className="rounded ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover:opacity-80 transition-opacity cursor-zoom-in"
                                 onClick={(e) => { e.stopPropagation(); setLightbox({ time: edit.start, label: `Before cut · ${formatTimestamp(edit.start)}` }); }}
                               >
-                                {videoUrl ? (
+                                {thumbnailSpriteUrl ? (
+                                  <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={edit.start} duration={duration} width={180} height={100} />
+                                ) : videoUrl ? (
                                   <ExactVideoFrame
                                     videoUrl={videoUrl}
                                     time={edit.start}
                                     label={`Before cut ${formatTimestamp(edit.start)}`}
                                     className="h-[100px] w-[180px]"
                                   />
-                                ) : (
-                                  <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={edit.start} duration={duration} width={180} height={100} />
-                                )}
+                                ) : null}
                               </button>
                               <span className="text-[10px] font-mono text-muted-foreground">{formatTimestamp(edit.start)}</span>
                             </div>
@@ -587,16 +677,16 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                                 className="rounded ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover:opacity-80 transition-opacity cursor-zoom-in"
                                 onClick={(e) => { e.stopPropagation(); setLightbox({ time: edit.end, label: `After cut · ${formatTimestamp(edit.end)}` }); }}
                               >
-                                {videoUrl ? (
+                                {thumbnailSpriteUrl ? (
+                                  <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={edit.end} duration={duration} width={180} height={100} />
+                                ) : videoUrl ? (
                                   <ExactVideoFrame
                                     videoUrl={videoUrl}
                                     time={edit.end}
                                     label={`After cut ${formatTimestamp(edit.end)}`}
                                     className="h-[100px] w-[180px]"
                                   />
-                                ) : (
-                                  <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={edit.end} duration={duration} width={180} height={100} />
-                                )}
+                                ) : null}
                               </button>
                               <span className="text-[10px] font-mono text-muted-foreground">{formatTimestamp(edit.end)}</span>
                             </div>

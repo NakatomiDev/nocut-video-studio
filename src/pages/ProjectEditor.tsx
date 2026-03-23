@@ -8,8 +8,10 @@ import WaveformTimeline from '@/components/editor/WaveformTimeline';
 import CutsPanel from '@/components/editor/CutsPanel';
 import FillPreviewPanel from '@/components/editor/FillPreviewPanel';
 import ExportProgress from '@/components/ExportProgress';
+import EditorSkeleton from '@/components/editor/EditorSkeleton';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Loader2, AlertTriangle } from 'lucide-react';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
 const ProjectEditor = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -25,6 +27,7 @@ const ProjectEditor = () => {
   const [thumbnailSpriteUrl, setThumbnailSpriteUrl] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [editingTitle, setEditingTitle] = useState(false);
+  useDocumentTitle(title || 'Editor');
 
   const extractSignedUrl = (response: unknown) => {
     if (!response || typeof response !== 'object') return null;
@@ -244,11 +247,7 @@ const ProjectEditor = () => {
   };
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <EditorSkeleton />;
   }
 
   if (showExportProgress && projectId) {
