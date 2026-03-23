@@ -26,6 +26,7 @@ const VideoPlayer = ({ videoUrl }: VideoPlayerProps) => {
   const {
     isPlaying, playheadPosition, setPlayhead, play, pause,
     showFills, aiFills, fillVideoUrls, setFillVideoUrl,
+    cuts, activeCuts, manualCuts, activeManualCuts,
   } = useEditorStore();
 
   const [volume, setVolume] = useState(1);
