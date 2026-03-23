@@ -623,21 +623,18 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
               {(() => {
                 const activeCutsList = cuts.filter((c) => activeCuts.has(c.id));
                 const activeManualList = manualCuts.filter((c) => activeManualCuts.has(c.id));
-                const aiFills = useEditorStore.getState().aiFills;
                 const allEdits = [
                   ...activeCutsList.map((c) => {
-                    const fill = fillDurations.get(c.id) || 0;
-                    const model = fillModels.get(c.id) ?? DEFAULT_AI_FILL_MODEL;
-                    const modelConfig = AI_FILL_MODELS.find((m) => m.id === model);
+                    const eff = getEffectiveFill(c.id, c);
+                    const modelConfig = AI_FILL_MODELS.find((m) => m.id === eff.model);
                     const existingFill = getFillsForCut(c, aiFills)[0] ?? null;
-                    return { id: c.id, start: c.start, end: c.end, duration: c.duration, type: c.type, fill, model, modelLabel: modelConfig?.label ?? model, existingFill };
+                    return { id: c.id, start: c.start, end: c.end, duration: c.duration, type: c.type, fill: eff.duration, model: eff.model, modelLabel: modelConfig?.label ?? eff.model, existingFill, isExisting: eff.isExisting };
                   }),
                   ...activeManualList.map((c) => {
-                    const fill = fillDurations.get(c.id) || 0;
-                    const model = fillModels.get(c.id) ?? DEFAULT_AI_FILL_MODEL;
-                    const modelConfig = AI_FILL_MODELS.find((m) => m.id === model);
+                    const eff = getEffectiveFill(c.id, c);
+                    const modelConfig = AI_FILL_MODELS.find((m) => m.id === eff.model);
                     const existingFill = getFillsForCut(c, aiFills)[0] ?? null;
-                    return { id: c.id, start: c.start, end: c.end, duration: c.duration, type: 'manual' as string, fill, model, modelLabel: modelConfig?.label ?? model, existingFill };
+                    return { id: c.id, start: c.start, end: c.end, duration: c.duration, type: 'manual' as string, fill: eff.duration, model: eff.model, modelLabel: modelConfig?.label ?? eff.model, existingFill, isExisting: eff.isExisting };
                   }),
                 ].sort((a, b) => a.start - b.start);
 
