@@ -91,6 +91,11 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   const [expandedReviewId, setExpandedReviewId] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{ time: number; label: string } | null>(null);
   const [expandedFillsCuts, setExpandedFillsCuts] = useState<Set<string>>(new Set());
+  const [inlineFillPreview, setInlineFillPreview] = useState<{ editId: string; fill: AiFill } | null>(null);
+  const [inlineFillVideoUrl, setInlineFillVideoUrl] = useState<string | null>(null);
+  const [inlineFillLoading, setInlineFillLoading] = useState(false);
+  const inlineFillVideoRef = useRef<HTMLVideoElement>(null);
+  const [inlineFillPlaying, setInlineFillPlaying] = useState(false);
 
   useEffect(() => {
     const fetchBalance = async () => {
