@@ -326,15 +326,14 @@ const ProjectEditor = () => {
             <VideoPlayer videoUrl={videoUrl} />
           </div>
 
-          {/* Waveform timeline — 40% (relative for fill preview popover) */}
-          <div className="h-[40%] relative">
+          {/* Waveform timeline — 40% */}
+          <div className="h-[40%]">
             <WaveformTimeline
               waveformUrl={waveformUrl}
               videoUrl={videoUrl}
               thumbnailSpriteUrl={thumbnailSpriteUrl}
               duration={video?.duration || 0}
             />
-            <FillPreviewPanel />
           </div>
         </div>
 
@@ -343,6 +342,9 @@ const ProjectEditor = () => {
           <CutsPanel thumbnailSpriteUrl={thumbnailSpriteUrl} videoUrl={videoUrl} duration={video?.duration || 0} />
         </div>
       </div>
+
+      {/* AI Fill preview — centered dialog */}
+      <FillPreviewPanel />
     </div>
   );
 };
