@@ -174,39 +174,15 @@ Deno.serve(async (req) => {
       return errorResponse("invalid_request", "Credit validation failed", 400);
     }
 
-    // Use server-calculated credits for deduction
-    const creditsToDeduct = serverCalculatedCredits;
+    // Credits were already deducted by preview-fill (or the initiating function).
+    // Do NOT deduct again here — just read the transaction ID from edit_decisions.
+    const creditTransactionId: string | null = (editDecision.credit_transaction_id as string) ?? null;
 
-    let creditTransactionId: string | null = null;
-    if (creditsToDeduct > 0) {
-      const { data: creditResult, error: creditError } = await serviceClient
-        .rpc("deduct_credits", {
-          p_user_id: user.id,
-          p_required_credits: creditsToDeduct,
-          p_project_id: project.id,
-          p_reason: "ai_fill",
-        });
-
-      if (creditError) {
-        console.error("Credit deduction RPC error:", creditError);
-        await failJob(serviceClient, job.id, editDecision.id, "Credit deduction failed", isPreview);
-        return errorResponse("internal_error", "Credit deduction failed", 500);
-      }
-
-      const result = creditResult?.[0] ?? creditResult;
-      if (!result?.out_success) {
-        await failJob(serviceClient, job.id, editDecision.id, result?.out_message || "Insufficient credits", isPreview);
-        return errorResponse("payment_required", result?.out_message || "Insufficient credits", 402);
-      }
-
-      creditTransactionId = result.out_transaction_id;
-    }
-
-    if (creditTransactionId) {
-      await serviceClient
-        .from("edit_decisions")
-        .update({ credit_transaction_id: creditTransactionId })
-        .eq("id", editDecision.id);
+    if (!creditTransactionId && serverCalculatedCredits > 0) {
+      // Safety: if somehow no transaction was recorded but credits are required, reject
+      console.error(`No credit_transaction_id on edit_decision ${editDecision.id} but ${serverCalculatedCredits} credits required`);
+      await failJob(serviceClient, job.id, editDecision.id, "Missing credit transaction — cannot proceed", isPreview);
+      return errorResponse("internal_error", "Credit accounting error", 500);
     }
 
     await serviceClient
@@ -294,20 +270,7 @@ Deno.serve(async (req) => {
           console.error(msg);
 
           // Refund credits since generation failed
-          if (creditTransactionId) {
-            try {
-              const { data: refundResult, error: refundError } = await serviceClient
-                .rpc("refund_credits", { p_transaction_id: creditTransactionId });
-              if (refundError) {
-                console.error("Credit refund RPC error:", refundError);
-              } else {
-                const r = refundResult?.[0] ?? refundResult;
-                console.log(`Refunded ${r?.out_credits_refunded ?? 0} credits for failed generation`);
-              }
-            } catch (refundErr) {
-              console.error("Credit refund failed:", refundErr);
-            }
-          }
+          await refundOnFailure(serviceClient, creditTransactionId);
 
           await failJob(serviceClient, job.id, editDecision.id, msg, isPreview);
           return errorResponse("ai_generation_failed", msg, 502);
@@ -340,6 +303,8 @@ Deno.serve(async (req) => {
       if (fillInsertError) {
         const msg = `Failed to persist ai_fill for gap ${gap.gap_index}: ${fillInsertError.message}`;
         console.error(msg);
+        // Refund credits since fill couldn't be persisted
+        await refundOnFailure(serviceClient, creditTransactionId);
         await failJob(serviceClient, job.id, editDecision.id, msg, isPreview);
         return errorResponse("internal_error", msg, 500);
       }
@@ -434,6 +399,8 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error("Unhandled error in process-ai-fill:", err);
+    // Best-effort refund on unexpected errors — we don't have creditTransactionId
+    // in scope here, but the edit_decision should have it if credits were taken
     return errorResponse("internal_error", "An unexpected error occurred", 500);
   }
 });
@@ -794,5 +761,28 @@ async function failJob(
         .update({ status: "failed", error_message: message })
         .eq("id", ed.project_id);
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Helper: refund credits on any failure path
+// ---------------------------------------------------------------------------
+
+async function refundOnFailure(
+  serviceClient: ReturnType<typeof createServiceClient>,
+  creditTransactionId: string | null,
+) {
+  if (!creditTransactionId) return;
+  try {
+    const { data: refundResult, error: refundError } = await serviceClient
+      .rpc("refund_credits", { p_transaction_id: creditTransactionId });
+    if (refundError) {
+      console.error("Credit refund RPC error:", refundError);
+    } else {
+      const r = refundResult?.[0] ?? refundResult;
+      console.log(`Refunded ${r?.out_credits_refunded ?? 0} credits for failed generation (txn: ${creditTransactionId})`);
+    }
+  } catch (refundErr) {
+    console.error("Credit refund failed:", refundErr);
   }
 }
