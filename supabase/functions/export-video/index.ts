@@ -578,9 +578,10 @@ async function processExport(
     const maxHeight = RESOLUTION_LIMITS[tier] ?? 1080;
     const targetHeight = maxHeight;
     const shouldWatermark = tier === "free";
-    const watermarkS3Uri = shouldWatermark
-      ? `s3://${bucket}/assets/watermark.png`
-      : undefined;
+    let watermarkS3Uri: string | undefined;
+    if (shouldWatermark) {
+      watermarkS3Uri = await ensureWatermarkInS3(bucket);
+    }
 
     const sourceVideoS3Uri = `s3://${bucket}/${sourceS3Key}`;
     const exportId = crypto.randomUUID();
