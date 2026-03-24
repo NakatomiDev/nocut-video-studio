@@ -206,6 +206,7 @@ interface PersistedEditorState {
   insertedFills: string[];
   fillDurations: [string, number][];
   fillModels: [string, string][];
+  fillOrder: [string, string[]][];
   showFills: boolean;
 }
 
