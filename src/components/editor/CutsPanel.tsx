@@ -1363,21 +1363,17 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
 
           <div className="shrink-0 space-y-2 border-t border-border px-6 py-3 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Cuts (removal)</span>
-              <span className="font-semibold">{activeCuts.size + activeManualCuts.size} — Free</span>
+              <span className="text-muted-foreground">Cuts</span>
+              <span className="font-semibold">{activeCuts.size + activeManualCuts.size}</span>
             </div>
-            {creditEstimate > 0 && (
-              <>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">AI fill transitions</span>
-                  <span className="font-semibold">{creditEstimate} credits</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Balance after export</span>
-                  <span className="font-semibold">{creditsAfterExport}</span>
-                </div>
-              </>
-            )}
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">AI fills included</span>
+              <span className="font-semibold">{cutsWithFills}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Cost</span>
+              <span className="font-semibold text-emerald-400">Free</span>
+            </div>
           </div>
           <DialogFooter className="shrink-0 border-t border-border px-6 py-3">
             <Button variant="ghost" onClick={() => setShowExportDialog(false)}>Cancel</Button>
