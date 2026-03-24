@@ -259,13 +259,13 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
       const allCuts = [
         ...activeCutsList.map((c) => {
           const eff = getEffectiveFill(c.id, c);
-          const existingFill = eff.isExisting ? getInsertedFillForCut(c) : null;
-          return { start: c.start, end: c.end, type: c.type, fill_duration: eff.duration, model: eff.model, isExisting: eff.isExisting, existing_fill_s3_key: existingFill?.s3Key ?? undefined };
+          const existingFills = eff.isExisting ? getInsertedFillsForCut(c) : [];
+          return { start: c.start, end: c.end, type: c.type, fill_duration: eff.duration, model: eff.model, isExisting: eff.isExisting, existing_fill_s3_key: existingFills[0]?.s3Key ?? undefined };
         }),
         ...activeManualList.map((c) => {
           const eff = getEffectiveFill(c.id, c);
-          const existingFill = eff.isExisting ? getInsertedFillForCut(c) : null;
-          return { start: c.start, end: c.end, type: 'manual', fill_duration: eff.duration, model: eff.model, isExisting: eff.isExisting, existing_fill_s3_key: existingFill?.s3Key ?? undefined };
+          const existingFills = eff.isExisting ? getInsertedFillsForCut(c) : [];
+          return { start: c.start, end: c.end, type: 'manual', fill_duration: eff.duration, model: eff.model, isExisting: eff.isExisting, existing_fill_s3_key: existingFills[0]?.s3Key ?? undefined };
         }),
       ].sort((a, b) => a.start - b.start);
 
