@@ -347,7 +347,7 @@ const ProjectEditor = () => {
         <ResizableHandle withHandle />
 
         {/* Right sidebar — cuts panel (resizable) */}
-        <ResizablePanel defaultSize={25} minSize={18} maxSize={50}>
+        <ResizablePanel defaultSize={25} minSize={22} maxSize={50}>
           <CutsPanel thumbnailSpriteUrl={thumbnailSpriteUrl} videoUrl={videoUrl} duration={video?.duration || 0} />
         </ResizablePanel>
       </ResizablePanelGroup>
