@@ -225,6 +225,7 @@ function saveEditorState(state: EditorState) {
       fillDurations: Array.from(state.fillDurations.entries()),
       fillModels: Array.from(state.fillModels.entries()),
       fillOrder: Array.from(state.fillOrder.entries()),
+      fillNames: Array.from(state.fillNames.entries()),
       showFills: state.showFills,
     };
     localStorage.setItem(storageKey(cm.id), JSON.stringify(data));
