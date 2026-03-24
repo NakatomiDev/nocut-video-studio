@@ -1087,7 +1087,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground">AI fills</span>
           <span className="text-sm font-semibold text-foreground">
-            {cutsWithFills > 0 ? `${cutsWithFills} selected` : 'None'}
+            {totalInsertedFills > 0 ? `${totalInsertedFills} selected` : 'None'}
           </span>
         </div>
         <Button
