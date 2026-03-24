@@ -44,6 +44,7 @@ Deno.serve(async (req) => {
         fill_duration?: number;
         model?: string;
         type?: string;
+        existing_fill_s3_key?: string;
       }>;
       output_format?: string;
       output_resolution?: string;
