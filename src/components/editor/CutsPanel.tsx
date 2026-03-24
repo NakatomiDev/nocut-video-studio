@@ -253,8 +253,6 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   const { getFrame } = useFrameCache(videoUrl ?? null, allCutTimestamps, priorityCutTimestamps);
 
   const hasActiveCuts = activeCuts.size > 0 || activeManualCuts.size > 0;
-  const insufficientCredits = creditEstimate > creditBalance.total;
-  const creditsAfterExport = creditBalance.total - creditEstimate;
   const cutsWithFills = fillDurations.size;
 
   const getInsertedFillsForCut = useCallback((cutObj: { end: number }) => {
