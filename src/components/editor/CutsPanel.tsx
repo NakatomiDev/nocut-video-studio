@@ -222,9 +222,9 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   const creditsAfterExport = creditBalance.total - creditEstimate;
   const cutsWithFills = fillDurations.size;
 
-  const getInsertedFillForCut = useCallback((cutObj: { end: number }) => {
+  const getInsertedFillsForCut = useCallback((cutObj: { end: number }) => {
     const fills = getFillsForCut(cutObj, aiFills);
-    return fills.find((fill) => insertedFills.has(fill.id)) ?? null;
+    return fills.filter((fill) => insertedFills.has(fill.id));
   }, [aiFills, insertedFills]);
 
   const getPreviewFillForCut = useCallback((cutObj: { end: number }) => {
