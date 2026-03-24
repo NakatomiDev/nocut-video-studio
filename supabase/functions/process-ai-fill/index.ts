@@ -763,3 +763,26 @@ async function failJob(
     }
   }
 }
+
+// ---------------------------------------------------------------------------
+// Helper: refund credits on any failure path
+// ---------------------------------------------------------------------------
+
+async function refundOnFailure(
+  serviceClient: ReturnType<typeof createServiceClient>,
+  creditTransactionId: string | null,
+) {
+  if (!creditTransactionId) return;
+  try {
+    const { data: refundResult, error: refundError } = await serviceClient
+      .rpc("refund_credits", { p_transaction_id: creditTransactionId });
+    if (refundError) {
+      console.error("Credit refund RPC error:", refundError);
+    } else {
+      const r = refundResult?.[0] ?? refundResult;
+      console.log(`Refunded ${r?.out_credits_refunded ?? 0} credits for failed generation (txn: ${creditTransactionId})`);
+    }
+  } catch (refundErr) {
+    console.error("Credit refund failed:", refundErr);
+  }
+}
