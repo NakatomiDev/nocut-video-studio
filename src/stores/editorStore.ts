@@ -182,6 +182,7 @@ interface EditorState {
   removeFill: (fillId: string) => void;
   setFillVideoUrl: (fillId: string, url: string) => void;
   setFillOrder: (cutId: string, orderedFillIds: string[]) => void;
+  setFillName: (fillId: string, name: string) => void;
   startPreviewGeneration: (cutId: string, jobId: string) => void;
   clearPreviewGeneration: () => void;
   reset: () => void;
