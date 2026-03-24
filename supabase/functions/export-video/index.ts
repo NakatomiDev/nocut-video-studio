@@ -416,17 +416,19 @@ function buildMediaConvertJob(params: {
     AntiAlias: "ENABLED",
   };
 
-  // Add watermark for free tier
+  // Add watermark for free tier (embedded 300×60 "nocut.ai" PNG)
   if (watermark && watermarkS3Uri) {
+    const wmWidth = 300;
+    const wmHeight = 60;
     videoDescription.VideoPreprocessors = {
       ImageInserter: {
         InsertableImages: [
           {
             ImageInserterInput: watermarkS3Uri,
             Layer: 1,
-            ImageX: targetWidth - 220,
-            ImageY: targetHeight - 50,
-            Opacity: 50,
+            ImageX: targetWidth - wmWidth - 20,
+            ImageY: targetHeight - wmHeight - 20,
+            Opacity: 40,
           },
         ],
       },
