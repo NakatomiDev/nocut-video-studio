@@ -324,11 +324,14 @@ const ProjectEditor = () => {
         )}
 
         {/* Credits indicator */}
-        <div className="ml-auto flex items-center gap-1.5 text-sm text-muted-foreground">
-          <Coins className="h-3.5 w-3.5 text-primary" />
-          <span className="font-medium tabular-nums text-foreground">{balance?.total ?? '—'}</span>
-          <span className="hidden sm:inline">credits</span>
-        </div>
+        <button
+          onClick={() => navigate('/credits')}
+          className="ml-auto flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-sm transition-colors hover:bg-primary/20"
+        >
+          <Coins className="h-4 w-4 text-primary" />
+          <span className="font-semibold tabular-nums text-foreground">{balance?.total ?? '—'}</span>
+          <span className="text-muted-foreground">credits</span>
+        </button>
       </div>
 
       {/* Main content */}
