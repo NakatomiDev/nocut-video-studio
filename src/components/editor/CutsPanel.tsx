@@ -1046,31 +1046,21 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground">Active cuts</span>
           <span className="text-sm font-semibold text-foreground">
-            {activeCuts.size + activeManualCuts.size} (free)
+            {activeCuts.size + activeManualCuts.size}
           </span>
         </div>
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground">AI fills</span>
           <span className="text-sm font-semibold text-foreground">
-            {cutsWithFills > 0 ? `${creditEstimate} credit${creditEstimate !== 1 ? 's' : ''}` : 'None'}
+            {cutsWithFills > 0 ? `${cutsWithFills} selected` : 'None'}
           </span>
         </div>
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">Your balance</span>
-          <span className="text-sm font-semibold text-foreground">{creditBalance.total} credits</span>
-        </div>
-        {insufficientCredits && (
-          <div className="flex items-center gap-1.5 text-destructive">
-            <AlertTriangle className="h-3.5 w-3.5" />
-            <span className="text-xs font-medium">Insufficient credits for AI fills</span>
-          </div>
-        )}
         <Button
           className="w-full"
-          disabled={!hasActiveCuts || insufficientCredits || !!previewGeneratingCutId}
+          disabled={!hasActiveCuts || !!previewGeneratingCutId}
           onClick={() => setShowExportDialog(true)}
         >
-          {creditEstimate > 0 ? `Export (${creditEstimate} credits)` : 'Export (free)'}
+          Export (free)
         </Button>
       </div>
 
