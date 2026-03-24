@@ -78,15 +78,12 @@ const ExportComplete = () => {
       if (exp) {
         setExportData(exp as unknown as ExportData);
 
-        if (exp.download_url) {
-          setVideoUrl(exp.download_url);
-        } else {
-          const result = await supabase.functions.invoke('get-signed-url', {
-            body: { s3_key: exp.s3_key },
-          });
-          const url = result.data?.url || result.data?.data?.url || null;
-          if (url) setVideoUrl(url);
-        }
+        // Always get a signed URL for playback (direct S3 URLs may not be publicly accessible)
+        const result = await supabase.functions.invoke('get-signed-url', {
+          body: { s3_key: exp.s3_key },
+        });
+        const url = result.data?.url || result.data?.data?.url || null;
+        if (url) setVideoUrl(url);
       }
 
       if (proj) setProjectTitle(proj.title);
