@@ -181,7 +181,6 @@ const FillPreviewPanel = () => {
                 ref={videoRef}
                 className="w-full h-full object-contain"
                 preload="auto"
-                crossOrigin="anonymous"
                 onTimeUpdate={updateProgress}
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
