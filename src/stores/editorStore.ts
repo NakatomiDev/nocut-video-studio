@@ -552,13 +552,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       const next = new Set(state.insertedFills);
       next.add(fillId);
-      return { insertedFills: next };
+      return {
+        insertedFills: next,
+        creditEstimate: calcCredits(state.fillDurations, state.fillModels, state.cuts, state.manualCuts, state.aiFills, next),
+      };
     }),
   removeFill: (fillId) =>
     set((state) => {
       const next = new Set(state.insertedFills);
       next.delete(fillId);
-      return { insertedFills: next };
+      return {
+        insertedFills: next,
+        creditEstimate: calcCredits(state.fillDurations, state.fillModels, state.cuts, state.manualCuts, state.aiFills, next),
+      };
     }),
   setFillVideoUrl: (fillId, url) =>
     set((state) => {
