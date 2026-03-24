@@ -53,6 +53,7 @@ const ExportComplete = () => {
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [allExports, setAllExports] = useState<ExportData[]>([]);
   useDocumentTitle(projectTitle ? `${projectTitle} — Export` : 'Export');
 
   useEffect(() => {
@@ -61,7 +62,7 @@ const ExportComplete = () => {
     const load = async () => {
       setLoading(true);
 
-      const [{ data: exp }, { data: proj }] = await Promise.all([
+      const [{ data: exp }, { data: proj }, { data: exports }] = await Promise.all([
         supabase
           .from('exports')
           .select('*')
@@ -73,12 +74,16 @@ const ExportComplete = () => {
           .select('title')
           .eq('id', projectId)
           .single(),
+        supabase
+          .from('exports')
+          .select('*')
+          .eq('project_id', projectId)
+          .order('created_at', { ascending: false }),
       ]);
 
       if (exp) {
         setExportData(exp as unknown as ExportData);
 
-        // Always get a signed URL for playback (direct S3 URLs may not be publicly accessible)
         const result = await supabase.functions.invoke('get-signed-url', {
           body: { s3_key: exp.s3_key },
         });
@@ -87,6 +92,7 @@ const ExportComplete = () => {
       }
 
       if (proj) setProjectTitle(proj.title);
+      if (exports) setAllExports(exports as unknown as ExportData[]);
       setLoading(false);
     };
 
@@ -240,6 +246,46 @@ const ExportComplete = () => {
                   </div>
                 )}
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Export history */}
+        {allExports.length > 1 && (
+          <Card className="border-border">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Export History</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {allExports.map((exp) => {
+                const isActive = exp.id === exportId;
+                const date = exp.created_at ? new Date(exp.created_at) : null;
+                return (
+                  <button
+                    key={exp.id}
+                    onClick={() => {
+                      if (!isActive) navigate(`/project/${projectId}/export/${exp.id}`);
+                    }}
+                    className={`w-full flex items-center justify-between rounded-md px-3 py-2 text-sm transition-colors ${
+                      isActive
+                        ? 'bg-primary/10 border border-primary/30 text-foreground'
+                        : 'bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground border border-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Film className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">
+                        {date ? date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : exp.id.slice(0, 8)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs">
+                      {exp.resolution && <span>{exp.resolution}</span>}
+                      <span>{formatBytes(exp.file_size_bytes)}</span>
+                      {isActive && <Badge className="bg-primary/20 text-primary border-primary/30 text-[9px]">Viewing</Badge>}
+                    </div>
+                  </button>
+                );
+              })}
             </CardContent>
           </Card>
         )}
