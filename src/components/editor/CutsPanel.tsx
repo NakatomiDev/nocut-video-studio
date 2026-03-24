@@ -401,8 +401,8 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
             </SelectContent>
           </Select>
           {generatedFill && (
-            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[9px] shrink-0">
-              ✓
+            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[9px] shrink-0 self-start">
+              ✓ Generated
             </Badge>
           )}
         </div>
