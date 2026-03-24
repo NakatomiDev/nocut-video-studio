@@ -239,15 +239,16 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     if (explicit > 0) {
       return { duration: explicit, model: fillModels.get(cutId) ?? DEFAULT_AI_FILL_MODEL, isExisting: false };
     }
-    const inserted = getInsertedFillForCut(cutObj);
-    if (inserted && inserted.duration) {
-      const m = (inserted.provider && inserted.provider in MODEL_CREDITS_PER_SEC)
-        ? inserted.provider as AiFillModel
+    const inserted = getInsertedFillsForCut(cutObj);
+    if (inserted.length > 0 && inserted[0].duration) {
+      const first = inserted[0];
+      const m = (first.provider && first.provider in MODEL_CREDITS_PER_SEC)
+        ? first.provider as AiFillModel
         : DEFAULT_AI_FILL_MODEL;
-      return { duration: inserted.duration, model: m, isExisting: true, fillId: inserted.id };
+      return { duration: first.duration, model: m, isExisting: true, fillId: first.id };
     }
     return { duration: 0, model: fillModels.get(cutId) ?? DEFAULT_AI_FILL_MODEL, isExisting: false };
-  }, [fillDurations, fillModels, getInsertedFillForCut]);
+  }, [fillDurations, fillModels, getInsertedFillsForCut]);
 
   const handleExport = useCallback(async () => {
     if (!project) return;
