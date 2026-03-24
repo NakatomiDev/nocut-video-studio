@@ -556,6 +556,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       fillDurations: new Map(),
       fillModels: new Map(),
       fillOrder: new Map(),
+      fillNames: new Map(),
       playheadPosition: 0,
       isPlaying: false,
       zoomLevel: 1,
