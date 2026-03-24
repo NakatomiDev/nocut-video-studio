@@ -147,15 +147,19 @@ const ProjectEditor = () => {
           .order('created_at', { ascending: false });
 
         if (editDecisions && editDecisions.length > 0) {
-          const latestEd = editDecisions[0];
+          // Gather all AI fills across all relevant edit decisions
+          const allEdIds = editDecisions.map((ed) => ed.id);
           const { data: fills } = await supabase
             .from('ai_fills')
             .select('*')
-            .eq('edit_decision_id', latestEd.id);
+            .in('edit_decision_id', allEdIds);
 
           if (fills && fills.length > 0) {
-            const edlJson = latestEd.edl_json as Array<{ start: number; end: number; fill_duration: number }>;
+            const edlByEdId = new Map(
+              editDecisions.map((ed) => [ed.id, ed.edl_json as Array<{ start: number; end: number; fill_duration: number }>])
+            );
             const mappedFills: AiFill[] = fills.map((f) => {
+              const edlJson = edlByEdId.get(f.edit_decision_id) ?? [];
               const gapEntry = edlJson[f.gap_index];
               return {
                 id: f.id,
