@@ -138,13 +138,13 @@ const ProjectEditor = () => {
         if (cm) setCutMap(cm);
 
         // Fetch completed edit decisions and their AI fills
+        // Fetch edit decisions that have AI fills (complete or pending preview)
         const { data: editDecisions } = await supabase
           .from('edit_decisions')
           .select('id, edl_json, status')
           .eq('project_id', projectId)
-          .eq('status', 'complete')
-          .order('created_at', { ascending: false })
-          .limit(1);
+          .in('status', ['complete', 'pending'])
+          .order('created_at', { ascending: false });
 
         if (editDecisions && editDecisions.length > 0) {
           const latestEd = editDecisions[0];
