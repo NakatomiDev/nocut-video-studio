@@ -53,6 +53,7 @@ const ExportComplete = () => {
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [allExports, setAllExports] = useState<ExportData[]>([]);
   useDocumentTitle(projectTitle ? `${projectTitle} — Export` : 'Export');
 
   useEffect(() => {
@@ -61,7 +62,7 @@ const ExportComplete = () => {
     const load = async () => {
       setLoading(true);
 
-      const [{ data: exp }, { data: proj }] = await Promise.all([
+      const [{ data: exp }, { data: proj }, { data: exports }] = await Promise.all([
         supabase
           .from('exports')
           .select('*')
@@ -73,12 +74,16 @@ const ExportComplete = () => {
           .select('title')
           .eq('id', projectId)
           .single(),
+        supabase
+          .from('exports')
+          .select('*')
+          .eq('project_id', projectId)
+          .order('created_at', { ascending: false }),
       ]);
 
       if (exp) {
         setExportData(exp as unknown as ExportData);
 
-        // Always get a signed URL for playback (direct S3 URLs may not be publicly accessible)
         const result = await supabase.functions.invoke('get-signed-url', {
           body: { s3_key: exp.s3_key },
         });
@@ -87,6 +92,7 @@ const ExportComplete = () => {
       }
 
       if (proj) setProjectTitle(proj.title);
+      if (exports) setAllExports(exports as unknown as ExportData[]);
       setLoading(false);
     };
 
