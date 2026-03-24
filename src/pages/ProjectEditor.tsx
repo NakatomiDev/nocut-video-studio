@@ -1,5 +1,5 @@
 // @refresh reset
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,8 +20,8 @@ const ProjectEditor = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { project, video, setProject, setVideo, setCutMap, setAiFills, reset } = useEditorStore();
-  const { balance } = useCreditsBalance();
+  const { project, video, setProject, setVideo, setCutMap, setAiFills, reset, creditBalance, previewGeneratingCutId } = useEditorStore();
+  const { balance, refetch: refetchBalance } = useCreditsBalance();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [processingStatus, setProcessingStatus] = useState<string | null>(null);
@@ -47,6 +47,24 @@ const ProjectEditor = () => {
 
     return payload.data?.url || payload.data?.data?.url || null;
   };
+
+  // Sync useCreditsBalance into the editor store so CutsPanel/usePreviewFill see it
+  const setCreditBalance = useEditorStore((s) => s.setCreditBalance);
+  useEffect(() => {
+    if (balance) {
+      setCreditBalance({ total: balance.total, monthly: balance.monthly, topup: balance.topup });
+    }
+  }, [balance, setCreditBalance]);
+
+  // Refetch credit balance when preview generation completes (cutId clears to null)
+  const prevGeneratingRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (prevGeneratingRef.current && !previewGeneratingCutId) {
+      // Generation just finished — refetch authoritative balance
+      refetchBalance();
+    }
+    prevGeneratingRef.current = previewGeneratingCutId ?? null;
+  }, [previewGeneratingCutId, refetchBalance]);
 
   useEffect(() => {
     return () => reset();
@@ -329,7 +347,7 @@ const ProjectEditor = () => {
           className="ml-auto flex items-center gap-2 rounded-full border-2 border-primary bg-primary/15 px-4 py-1.5 text-base transition-colors hover:bg-primary/25"
         >
           <Coins className="h-5 w-5 text-primary" />
-          <span className="font-bold tabular-nums text-foreground text-lg">{balance?.total ?? '—'}</span>
+          <span className="font-bold tabular-nums text-foreground text-lg">{creditBalance.total > 0 ? creditBalance.total : (balance?.total ?? '—')}</span>
           <span className="font-medium text-muted-foreground">credits</span>
         </button>
       </div>
