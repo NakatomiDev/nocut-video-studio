@@ -32,6 +32,7 @@ import { downloadFile, uploadFile, generateSignedDownloadUrl } from "./s3.js";
 import { extractSegments, concatenateSegments, probeVideo, parseResolution } from "./assembler.js";
 import { normalizeAudio } from "./audio.js";
 import { applyWatermark } from "./watermark.js";
+import { isCutBasedEdl, convertCutBasedEdl } from "./edl-converter.js";
 
 function log(level: string, msg: string, extra: Record<string, unknown> = {}): void {
   console.log(JSON.stringify({ level, msg, ts: new Date().toISOString(), ...extra }));
@@ -97,18 +98,43 @@ async function processJob(job: ExportJobRow): Promise<void> {
     // Step 1: Fetch edit decision and related data (5%)
     log("info", "Fetching edit decision and metadata", ctx);
     const editDecision = await getEditDecision(editDecisionId);
-    const edl = editDecision.edl_json;
+    const rawEdl = editDecision.edl_json;
     const aiFills = await getAiFills(editDecisionId);
     const tier = await getUserTier(userId);
     const sourceS3Key = await getSourceVideoS3Key(projectId);
     await updateJobProgress(jobId, 5);
 
-    // Step 2: Download source video and fill segments (20%)
-    log("info", "Downloading source video and fill segments", ctx);
+    // Step 2: Download source video and probe for duration (10%)
+    log("info", "Downloading source video", ctx);
     const ext = extname(sourceS3Key) || ".mp4";
     const sourcePath = join(tmpDir, `source${ext}`);
     await downloadFile(sourceS3Key, sourcePath);
+    await updateJobProgress(jobId, 10);
 
+    // Determine output resolution
+    const maxHeight = config.resolutionLimits[tier] ?? 1080;
+    const sourceProbe = await probeVideo(sourcePath);
+    const targetHeight = Math.min(sourceProbe.height, maxHeight);
+    const targetFps = 30;
+
+    // Step 2b: Convert cut-based EDL to segment-based if needed
+    let edl: EdlEntry[];
+    if (isCutBasedEdl(rawEdl)) {
+      log("info", "Detected cut-based EDL, converting to segment-based", ctx);
+      const aiFillsByGapIndex = new Map<number, string>();
+      for (const fill of aiFills) {
+        if (fill.s3_key) {
+          aiFillsByGapIndex.set(fill.gap_index, fill.s3_key);
+        }
+      }
+      edl = convertCutBasedEdl(rawEdl, aiFillsByGapIndex, sourceProbe.duration);
+      log("info", `Converted ${rawEdl.length} cuts into ${edl.length} segments`, ctx);
+    } else {
+      edl = rawEdl as EdlEntry[];
+    }
+
+    // Step 2c: Download fill segments (20%)
+    log("info", "Downloading fill segments", ctx);
     const fillPaths = new Map<string, string>();
     const fillS3Keys = edl
       .filter((e): e is EdlEntry & { s3_key: string } => e.type === "fill" && !!e.s3_key)
@@ -121,12 +147,6 @@ async function processJob(job: ExportJobRow): Promise<void> {
       fillPaths.set(key, localPath);
     }
     await updateJobProgress(jobId, 20);
-
-    // Determine output resolution
-    const maxHeight = config.resolutionLimits[tier] ?? 1080;
-    const sourceProbe = await probeVideo(sourcePath);
-    const targetHeight = Math.min(sourceProbe.height, maxHeight);
-    const targetFps = 30;
 
     // Step 3: Extract and re-encode segments (50%)
     log("info", `Extracting ${edl.length} segments (target: ${targetHeight}p)`, ctx);

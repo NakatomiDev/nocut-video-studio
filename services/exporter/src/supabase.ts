@@ -105,7 +105,7 @@ export async function failJob(jobId: string, errorMessage: string): Promise<void
 export interface EditDecisionRow {
   id: string;
   project_id: string;
-  edl_json: EdlEntry[];
+  edl_json: EdlEntry[] | CutBasedEdlEntry[];
   total_fill_seconds: number;
   credits_charged: number;
   status: string;
@@ -118,6 +118,18 @@ export interface EdlEntry {
   end?: number;
   s3_key?: string;
   duration?: number;
+}
+
+/** Cut-based EDL entry as stored by project-edl: describes a cut in the original video. */
+export interface CutBasedEdlEntry {
+  start: number;
+  end: number;
+  type: string;            // "silence", "manual", "gap", etc.
+  fill_duration: number;
+  model?: string;
+  existing_fill_s3_key?: string;
+  existing_fill_s3_keys?: string[];
+  prompt?: string;
 }
 
 export async function getEditDecision(editDecisionId: string): Promise<EditDecisionRow> {
