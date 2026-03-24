@@ -228,10 +228,10 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   }, [aiFills, insertedFills]);
 
   const getPreviewFillForCut = useCallback((cutObj: { end: number }) => {
-    const insertedFill = getInsertedFillForCut(cutObj);
-    if (insertedFill) return insertedFill;
+    const inserted = getInsertedFillsForCut(cutObj);
+    if (inserted.length > 0) return inserted[0];
     return getFillsForCut(cutObj, aiFills)[0] ?? null;
-  }, [aiFills, getInsertedFillForCut]);
+  }, [aiFills, getInsertedFillsForCut]);
 
   /** Resolve the effective fill for a cut: explicit fillDuration, or an inserted existing fill */
   const getEffectiveFill = useCallback((cutId: string, cutObj: { end: number }) => {
