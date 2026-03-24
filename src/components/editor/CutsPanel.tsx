@@ -490,67 +490,95 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
       orderedFills = [...sorted, ...extra];
     }
 
+    // When 3+ fills, switch to a wrapped grid layout
+    const useGridLayout = orderedFills.length >= 3;
+
     return (
-      <div className="flex items-center gap-1 pl-2 pr-1 overflow-hidden">
-        <button
-          className="flex flex-col items-center gap-0.5 shrink-0 min-w-0 cursor-zoom-in hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background"
-          onClick={(e) => handleFrameClick(start, `Start frame · ${formatTimestamp(start)}`, e)}
-        >
-          {videoUrl ? (
-            <ExactVideoFrame
-              videoUrl={videoUrl}
-              time={start}
-              label={`Start frame ${formatTimestamp(start)}`}
-              className="h-10 w-[72px]"
-              cachedFrame={getFrame(start)}
-            />
-          ) : thumbnailSpriteUrl ? (
-            <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={start} duration={duration} width={72} height={40} />
-          ) : null}
-          <span className="text-[9px] text-muted-foreground font-mono">Start</span>
-        </button>
+      <div className="flex flex-col gap-1 pl-2 pr-1">
+        {/* Start + End frames row */}
+        <div className="flex items-center gap-1">
+          <button
+            className="flex flex-col items-center gap-0.5 shrink-0 min-w-0 cursor-zoom-in hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background"
+            onClick={(e) => handleFrameClick(start, `Start frame · ${formatTimestamp(start)}`, e)}
+          >
+            {videoUrl ? (
+              <ExactVideoFrame
+                videoUrl={videoUrl}
+                time={start}
+                label={`Start frame ${formatTimestamp(start)}`}
+                className="h-10 w-[72px]"
+                cachedFrame={getFrame(start)}
+              />
+            ) : thumbnailSpriteUrl ? (
+              <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={start} duration={duration} width={72} height={40} />
+            ) : null}
+            <span className="text-[9px] text-muted-foreground font-mono">Start</span>
+          </button>
 
-        {orderedFills.length > 0 ? (
-          <>
-            <div className="border-t border-dashed border-muted-foreground/30 w-2 shrink-0" />
+          {!useGridLayout && orderedFills.length > 0 ? (
+            <>
+              <div className="border-t border-dashed border-muted-foreground/30 w-2 shrink-0" />
+              {orderedFills.map((fill, i) => (
+                <div key={fill.id} className="flex items-center gap-0 shrink-0">
+                  {i > 0 && <div className="border-t border-dashed border-primary/40 w-1.5 shrink-0" />}
+                  <button
+                    className="cursor-pointer hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      selectFill(orderedFills.length > 1 ? orderedFills : fill);
+                    }}
+                  >
+                    <FillThumbnailInline fill={fill} isInserted={true} />
+                  </button>
+                </div>
+              ))}
+              <div className="border-t border-dashed border-muted-foreground/30 w-2 shrink-0" />
+            </>
+          ) : orderedFills.length === 0 ? (
+            <div className="flex-1 border-t border-dashed border-muted-foreground/30 min-w-1" />
+          ) : (
+            <div className="flex-1 border-t border-dashed border-muted-foreground/30 min-w-1" />
+          )}
+
+          <button
+            className="flex flex-col items-center gap-0.5 shrink-0 min-w-0 cursor-zoom-in hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background"
+            onClick={(e) => handleFrameClick(end, `End frame · ${formatTimestamp(end)}`, e)}
+          >
+            {videoUrl ? (
+              <ExactVideoFrame
+                videoUrl={videoUrl}
+                time={end}
+                label={`End frame ${formatTimestamp(end)}`}
+                className="h-10 w-[72px]"
+                cachedFrame={getFrame(end)}
+              />
+            ) : thumbnailSpriteUrl ? (
+              <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={end} duration={duration} width={72} height={40} />
+            ) : null}
+            <span className="text-[9px] text-muted-foreground font-mono">End</span>
+          </button>
+        </div>
+
+        {/* Wrapped fill thumbnails grid for 3+ fills */}
+        {useGridLayout && orderedFills.length > 0 && (
+          <div className="flex flex-wrap gap-1 pl-1">
             {orderedFills.map((fill, i) => (
-              <div key={fill.id} className="flex items-center gap-0">
-                {i > 0 && <div className="border-t border-dashed border-primary/40 w-1.5 shrink-0" />}
-                <button
-                  className="cursor-pointer hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // Open chained preview with all fills
-                    selectFill(orderedFills.length > 1 ? orderedFills : fill);
-                  }}
-                >
-                  <FillThumbnailInline fill={fill} isInserted={true} />
-                </button>
-              </div>
+              <button
+                key={fill.id}
+                className="cursor-pointer hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background relative"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  selectFill(orderedFills.length > 1 ? orderedFills : fill);
+                }}
+              >
+                <FillThumbnailInline fill={fill} isInserted={true} />
+                <span className="absolute -top-1 -left-1 bg-primary text-primary-foreground text-[7px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center">
+                  {i + 1}
+                </span>
+              </button>
             ))}
-            <div className="border-t border-dashed border-muted-foreground/30 w-2 shrink-0" />
-          </>
-        ) : (
-          <div className="flex-1 border-t border-dashed border-muted-foreground/30 min-w-1" />
+          </div>
         )}
-
-        <button
-          className="flex flex-col items-center gap-0.5 shrink-0 min-w-0 cursor-zoom-in hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background"
-          onClick={(e) => handleFrameClick(end, `End frame · ${formatTimestamp(end)}`, e)}
-        >
-          {videoUrl ? (
-            <ExactVideoFrame
-              videoUrl={videoUrl}
-              time={end}
-              label={`End frame ${formatTimestamp(end)}`}
-              className="h-10 w-[72px]"
-              cachedFrame={getFrame(end)}
-            />
-          ) : thumbnailSpriteUrl ? (
-            <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={end} duration={duration} width={72} height={40} />
-          ) : null}
-          <span className="text-[9px] text-muted-foreground font-mono">End</span>
-        </button>
       </div>
     );
   };
