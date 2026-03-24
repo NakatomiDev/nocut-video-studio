@@ -250,6 +250,46 @@ const ExportComplete = () => {
           </Card>
         )}
 
+        {/* Export history */}
+        {allExports.length > 1 && (
+          <Card className="border-border">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Export History</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {allExports.map((exp) => {
+                const isActive = exp.id === exportId;
+                const date = exp.created_at ? new Date(exp.created_at) : null;
+                return (
+                  <button
+                    key={exp.id}
+                    onClick={() => {
+                      if (!isActive) navigate(`/project/${projectId}/export/${exp.id}`);
+                    }}
+                    className={`w-full flex items-center justify-between rounded-md px-3 py-2 text-sm transition-colors ${
+                      isActive
+                        ? 'bg-primary/10 border border-primary/30 text-foreground'
+                        : 'bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground border border-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Film className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">
+                        {date ? date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : exp.id.slice(0, 8)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs">
+                      {exp.resolution && <span>{exp.resolution}</span>}
+                      <span>{formatBytes(exp.file_size_bytes)}</span>
+                      {isActive && <Badge className="bg-primary/20 text-primary border-primary/30 text-[9px]">Viewing</Badge>}
+                    </div>
+                  </button>
+                );
+              })}
+            </CardContent>
+          </Card>
+        )}
+
         <div className="flex gap-3">
           <Button variant="outline" onClick={() => navigate(`/project/${projectId}`)}>
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Editor
