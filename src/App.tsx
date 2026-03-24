@@ -20,6 +20,7 @@ const ProjectEditor = lazy(() => import("@/pages/ProjectEditor"));
 const ExportComplete = lazy(() => import("@/pages/ExportComplete"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const CommercialDisclosure = lazy(() => import("@/pages/CommercialDisclosure"));
+const TestTransition = lazy(() => import("@/pages/TestTransition"));
 
 const queryClient = new QueryClient();
 
@@ -67,6 +68,7 @@ const App = () => (
               <Route path="/project/:projectId/export/:exportId" element={<ProtectedRoute><ExportComplete /></ProtectedRoute>} />
               <Route path="/editor/:projectId" element={<ProtectedRoute><ProjectEditor /></ProtectedRoute>} />
               <Route path="/commercial-disclosure" element={<CommercialDisclosure />} />
+              <Route path="/test-transition" element={<ProtectedRoute><TestTransition /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
