@@ -647,11 +647,10 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
     sampleCount: 1,
     durationSeconds: request.duration,
     aspectRatio: "16:9",
+    // Explicitly control audio — Veo 3.x models generate audio by default
+    // which can trigger safety filters even when we only pass images
+    generateAudio: includeAudio,
   };
-
-  if (includeAudio) {
-    parameters.generateAudio = true;
-  }
 
   // Always use Gemini API — it supports API keys and image conditioning
   const generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/${apiModelId}:predictLongRunning`;
