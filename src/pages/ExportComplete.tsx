@@ -157,7 +157,7 @@ const ExportComplete = () => {
       <div className="mx-auto max-w-4xl p-6 space-y-6">
         <div className="rounded-lg overflow-hidden bg-black aspect-video">
           {videoUrl ? (
-            <video src={videoUrl} controls className="w-full h-full" preload="metadata" />
+            <video src={videoUrl} controls className="w-full h-full" preload="auto" />
           ) : (
             <div className="flex items-center justify-center h-full">
               <Film className="h-12 w-12 text-muted-foreground" />
