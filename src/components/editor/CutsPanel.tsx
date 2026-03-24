@@ -1236,18 +1236,16 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                                       setInlineFillPreview({ editId: edit.id, fills: edit.fills, currentIndex: 0 });
                                       setInlineFillVideoUrl(null);
                                       setInlineFillPlaying(false);
-                                      // Load first fill URL
+                                      // Load first fill URL + pre-cache all others
                                       const firstFill = edit.fills[0];
                                       if (firstFill?.s3Key) {
                                         setInlineFillLoading(true);
-                                        supabase.functions
-                                          .invoke('get-signed-url', { body: { s3_key: firstFill.s3Key } })
-                                          .then(({ data, error: fnErr }) => {
-                                            if (fnErr) { setInlineFillLoading(false); return; }
-                                            const url = data?.url || data?.data?.url;
-                                            setInlineFillVideoUrl(url || null);
-                                            setInlineFillLoading(false);
-                                          });
+                                        prefetchFillUrl(firstFill).then((url) => {
+                                          setInlineFillVideoUrl(url);
+                                          setInlineFillLoading(false);
+                                        });
+                                        // Pre-fetch remaining fills in background
+                                        edit.fills.slice(1).forEach((f) => prefetchFillUrl(f));
                                       }
                                     }
                                   }}
