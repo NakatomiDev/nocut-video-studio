@@ -323,30 +323,34 @@ const ProjectEditor = () => {
       </div>
 
       {/* Main content */}
-      <div className="flex flex-1 overflow-hidden">
+      <ResizablePanelGroup direction="horizontal" className="flex-1">
         {/* Left: video + timeline */}
-        <div className="flex flex-1 flex-col">
-          {/* Video preview — 60% */}
-          <div className="h-[60%] p-2">
-            <VideoPlayer videoUrl={videoUrl} />
-          </div>
+        <ResizablePanel defaultSize={75} minSize={50}>
+          <div className="flex h-full flex-col">
+            {/* Video preview — 60% */}
+            <div className="h-[60%] p-2">
+              <VideoPlayer videoUrl={videoUrl} />
+            </div>
 
-          {/* Waveform timeline — 40% */}
-          <div className="h-[40%]">
-            <WaveformTimeline
-              waveformUrl={waveformUrl}
-              videoUrl={videoUrl}
-              thumbnailSpriteUrl={thumbnailSpriteUrl}
-              duration={video?.duration || 0}
-            />
+            {/* Waveform timeline — 40% */}
+            <div className="h-[40%]">
+              <WaveformTimeline
+                waveformUrl={waveformUrl}
+                videoUrl={videoUrl}
+                thumbnailSpriteUrl={thumbnailSpriteUrl}
+                duration={video?.duration || 0}
+              />
+            </div>
           </div>
-        </div>
+        </ResizablePanel>
 
-        {/* Right sidebar — cuts panel */}
-        <div className="w-[320px] shrink-0">
+        <ResizableHandle withHandle />
+
+        {/* Right sidebar — cuts panel (resizable) */}
+        <ResizablePanel defaultSize={25} minSize={18} maxSize={50}>
           <CutsPanel thumbnailSpriteUrl={thumbnailSpriteUrl} videoUrl={videoUrl} duration={video?.duration || 0} />
-        </div>
-      </div>
+        </ResizablePanel>
+      </ResizablePanelGroup>
 
       {/* AI Fill preview — centered dialog */}
       <FillPreviewPanel />
