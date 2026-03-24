@@ -503,7 +503,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         fillDurations: nextFills,
         fillModels: nextModels,
         fillPrompts: nextPrompts,
-        creditEstimate: calcCredits(nextFills, nextModels),
+        creditEstimate: calcCredits(nextFills, nextModels, state.cuts, state.manualCuts, state.aiFills, state.insertedFills),
       };
     }),
   setFillDuration: (cutId, seconds) =>
