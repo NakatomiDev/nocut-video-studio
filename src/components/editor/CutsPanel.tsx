@@ -293,18 +293,19 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
         ...activeCutsList.map((c) => {
           const eff = getEffectiveFill(c.id, c);
           const existingFills = eff.isExisting ? getInsertedFillsForCut(c) : [];
-          return { start: c.start, end: c.end, type: c.type, fill_duration: eff.duration, model: eff.model, isExisting: eff.isExisting, existing_fill_s3_key: existingFills[0]?.s3Key ?? undefined, prompt: resolvePrompt(fillPrompts.get(c.id)) };
+          // Only include fill if it's an existing pre-generated fill
+          const s3Key = eff.isExisting ? (existingFills[0]?.s3Key ?? undefined) : undefined;
+          return { start: c.start, end: c.end, type: c.type, fill_duration: s3Key ? eff.duration : 0, model: eff.model, existing_fill_s3_key: s3Key };
         }),
         ...activeManualList.map((c) => {
           const eff = getEffectiveFill(c.id, c);
           const existingFills = eff.isExisting ? getInsertedFillsForCut(c) : [];
-          return { start: c.start, end: c.end, type: 'manual', fill_duration: eff.duration, model: eff.model, isExisting: eff.isExisting, existing_fill_s3_key: existingFills[0]?.s3Key ?? undefined, prompt: resolvePrompt(fillPrompts.get(c.id)) };
+          const s3Key = eff.isExisting ? (existingFills[0]?.s3Key ?? undefined) : undefined;
+          return { start: c.start, end: c.end, type: 'manual', fill_duration: s3Key ? eff.duration : 0, model: eff.model, existing_fill_s3_key: s3Key };
         }),
       ].sort((a, b) => a.start - b.start);
 
-      const totalFill = allCuts.reduce((s, c) => s + c.fill_duration, 0);
-
-      // Build gaps array for the project-edl edge function
+      // Build gaps array for the project-edl edge function (assembly only)
       const gaps = allCuts.map((c) => ({
         pre_cut_timestamp: c.start,
         post_cut_timestamp: c.end,
@@ -312,10 +313,8 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
         model: c.model,
         type: c.type,
         existing_fill_s3_key: c.existing_fill_s3_key,
-        ...(c.prompt ? { prompt: c.prompt } : {}),
       }));
 
-      // Call project-edl: handles credit deduction, edit_decisions, and job_queue server-side
       const { data: edlData, error: edlError } = await supabase.functions.invoke('project-edl', {
         body: { project_id: project.id, gaps },
       });
@@ -329,28 +328,14 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
 
       setShowExportDialog(false);
       navigate(`/project/${project.id}?exporting=true`);
-      toast.success(
-        totalFill > 0
-          ? `Export submitted — generating ${totalFill}s of AI fill`
-          : 'Export submitted — processing your edits'
-      );
-
-      // Invoke process-ai-fill to start generation (fire-and-forget)
-      supabase.functions.invoke('process-ai-fill', {
-        body: { job_id: response.job_id },
-      }).then(({ error: invokeError }) => {
-        if (invokeError) {
-          console.error('Failed to invoke process-ai-fill:', invokeError);
-          toast.error('AI fill processing failed to start');
-        }
-      });
+      toast.success('Export submitted — assembling your video');
     } catch (err: any) {
       console.error('Export failed:', err);
       toast.error('Export failed — please try again');
     } finally {
       setExporting(false);
     }
-  }, [project, cuts, activeCuts, manualCuts, activeManualCuts, fillDurations, fillModels, fillPrompts, creditEstimate, getEffectiveFill]);
+  }, [project, cuts, activeCuts, manualCuts, activeManualCuts, fillDurations, fillModels, getEffectiveFill, getInsertedFillsForCut, navigate]);
 
   const renderFillSelector = (cutId: string) => {
     const currentFill = fillDurations.get(cutId) || 0;
