@@ -369,6 +369,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const fillOrder = saved?.fillOrder
       ? new Map(saved.fillOrder)
       : new Map<string, string[]>();
+    const fillNames = saved?.fillNames
+      ? new Map(saved.fillNames)
+      : new Map<string, string>();
     const showFills = saved?.showFills ?? false;
 
     set({
