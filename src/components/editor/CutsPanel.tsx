@@ -1309,15 +1309,17 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                               <X className="h-3 w-3" />
                             </Button>
                           </div>
-                          {/* Fill index indicators */}
+                          {/* Fill segment indicators — clickable */}
                           {inlineFillPreview.fills.length > 1 && (
                             <div className="flex gap-1 mb-2">
-                              {inlineFillPreview.fills.map((_, fi) => (
-                                <div
+                              {inlineFillPreview.fills.map((f, fi) => (
+                                <button
                                   key={fi}
-                                  className={`h-1 flex-1 rounded-full transition-colors ${
+                                  onClick={() => jumpToFillSegment(inlineFillPreview.fills, fi, inlineFillPreview.editId)}
+                                  className={`h-1.5 flex-1 rounded-full transition-colors cursor-pointer hover:opacity-80 ${
                                     fi <= inlineFillPreview.currentIndex ? 'bg-primary' : 'bg-muted'
                                   }`}
+                                  title={`Fill ${fi + 1} · ${f.duration ?? 0}s`}
                                 />
                               ))}
                             </div>
@@ -1335,28 +1337,39 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                                   src={inlineFillVideoUrl}
                                   className="w-full h-full object-contain"
                                   preload="auto"
-                                  crossOrigin="anonymous"
                                   onPlay={() => setInlineFillPlaying(true)}
                                   onPause={() => setInlineFillPlaying(false)}
                                   onEnded={() => {
-                                    setInlineFillPlaying(false);
-                                    // Chain to next fill
+                                    // Seamless chain to next fill using pre-cached URL
                                     if (inlineFillPreview && inlineFillPreview.currentIndex < inlineFillPreview.fills.length - 1) {
                                       const nextIdx = inlineFillPreview.currentIndex + 1;
                                       const nextFill = inlineFillPreview.fills[nextIdx];
+                                      const cachedUrl = nextFill?.s3Key ? inlineFillUrlCache.current.get(nextFill.s3Key) : null;
                                       setInlineFillPreview({ ...inlineFillPreview, currentIndex: nextIdx });
-                                      if (nextFill?.s3Key) {
+                                      if (cachedUrl) {
+                                        // Seamless — URL already cached
+                                        setInlineFillVideoUrl(cachedUrl);
+                                        // Auto-play will happen via effect below
+                                      } else if (nextFill?.s3Key) {
                                         setInlineFillLoading(true);
                                         setInlineFillVideoUrl(null);
-                                        supabase.functions
-                                          .invoke('get-signed-url', { body: { s3_key: nextFill.s3Key } })
-                                          .then(({ data, error: fnErr }) => {
-                                            if (fnErr) { setInlineFillLoading(false); return; }
-                                            const url = data?.url || data?.data?.url;
-                                            setInlineFillVideoUrl(url || null);
-                                            setInlineFillLoading(false);
-                                          });
+                                        prefetchFillUrl(nextFill).then((url) => {
+                                          setInlineFillVideoUrl(url);
+                                          setInlineFillLoading(false);
+                                        });
                                       }
+                                      // Pre-fetch the one after next
+                                      if (nextIdx + 1 < inlineFillPreview.fills.length) {
+                                        prefetchFillUrl(inlineFillPreview.fills[nextIdx + 1]);
+                                      }
+                                    } else {
+                                      setInlineFillPlaying(false);
+                                    }
+                                  }}
+                                  onLoadedData={() => {
+                                    // Auto-play when URL changes during chained playback
+                                    if (inlineFillPreview && inlineFillPreview.currentIndex > 0) {
+                                      inlineFillVideoRef.current?.play().catch(() => {});
                                     }
                                   }}
                                 />
