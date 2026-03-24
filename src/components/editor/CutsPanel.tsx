@@ -188,6 +188,42 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   const [inlineFillLoading, setInlineFillLoading] = useState(false);
   const inlineFillVideoRef = useRef<HTMLVideoElement>(null);
   const [inlineFillPlaying, setInlineFillPlaying] = useState(false);
+  const inlineFillUrlCache = useRef<Map<string, string>>(new Map());
+
+  /** Pre-fetch a signed URL for a fill and cache it */
+  const prefetchFillUrl = useCallback(async (fill: AiFill): Promise<string | null> => {
+    if (!fill.s3Key) return null;
+    const cached = inlineFillUrlCache.current.get(fill.s3Key);
+    if (cached) return cached;
+    const cachedSigned = fillSignedUrlCache.get(fill.s3Key);
+    if (cachedSigned) { inlineFillUrlCache.current.set(fill.s3Key, cachedSigned); return cachedSigned; }
+    const { data, error: fnErr } = await supabase.functions.invoke('get-signed-url', { body: { s3_key: fill.s3Key } });
+    if (fnErr) return null;
+    const url = data?.url || data?.data?.url;
+    if (url) { inlineFillUrlCache.current.set(fill.s3Key, url); fillSignedUrlCache.set(fill.s3Key, url); }
+    return url || null;
+  }, []);
+
+  /** Jump to a specific fill segment by index */
+  const jumpToFillSegment = useCallback(async (fills: AiFill[], idx: number, editId: string) => {
+    const fill = fills[idx];
+    if (!fill) return;
+    setInlineFillPlaying(false);
+    setInlineFillPreview({ editId, fills, currentIndex: idx });
+    const cached = fill.s3Key ? inlineFillUrlCache.current.get(fill.s3Key) : null;
+    if (cached) {
+      setInlineFillVideoUrl(cached);
+      setInlineFillLoading(false);
+    } else {
+      setInlineFillLoading(true);
+      setInlineFillVideoUrl(null);
+      const url = await prefetchFillUrl(fill);
+      setInlineFillVideoUrl(url);
+      setInlineFillLoading(false);
+    }
+    // Pre-fetch next
+    if (idx + 1 < fills.length) prefetchFillUrl(fills[idx + 1]);
+  }, [prefetchFillUrl]);
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const [previewWidth, setPreviewWidth] = useState(0);
 
@@ -1200,18 +1236,16 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                                       setInlineFillPreview({ editId: edit.id, fills: edit.fills, currentIndex: 0 });
                                       setInlineFillVideoUrl(null);
                                       setInlineFillPlaying(false);
-                                      // Load first fill URL
+                                      // Load first fill URL + pre-cache all others
                                       const firstFill = edit.fills[0];
                                       if (firstFill?.s3Key) {
                                         setInlineFillLoading(true);
-                                        supabase.functions
-                                          .invoke('get-signed-url', { body: { s3_key: firstFill.s3Key } })
-                                          .then(({ data, error: fnErr }) => {
-                                            if (fnErr) { setInlineFillLoading(false); return; }
-                                            const url = data?.url || data?.data?.url;
-                                            setInlineFillVideoUrl(url || null);
-                                            setInlineFillLoading(false);
-                                          });
+                                        prefetchFillUrl(firstFill).then((url) => {
+                                          setInlineFillVideoUrl(url);
+                                          setInlineFillLoading(false);
+                                        });
+                                        // Pre-fetch remaining fills in background
+                                        edit.fills.slice(1).forEach((f) => prefetchFillUrl(f));
                                       }
                                     }
                                   }}
@@ -1275,15 +1309,17 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                               <X className="h-3 w-3" />
                             </Button>
                           </div>
-                          {/* Fill index indicators */}
+                          {/* Fill segment indicators — clickable */}
                           {inlineFillPreview.fills.length > 1 && (
                             <div className="flex gap-1 mb-2">
-                              {inlineFillPreview.fills.map((_, fi) => (
-                                <div
+                              {inlineFillPreview.fills.map((f, fi) => (
+                                <button
                                   key={fi}
-                                  className={`h-1 flex-1 rounded-full transition-colors ${
+                                  onClick={() => jumpToFillSegment(inlineFillPreview.fills, fi, inlineFillPreview.editId)}
+                                  className={`h-1.5 flex-1 rounded-full transition-colors cursor-pointer hover:opacity-80 ${
                                     fi <= inlineFillPreview.currentIndex ? 'bg-primary' : 'bg-muted'
                                   }`}
+                                  title={`Fill ${fi + 1} · ${f.duration ?? 0}s`}
                                 />
                               ))}
                             </div>
@@ -1301,28 +1337,39 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                                   src={inlineFillVideoUrl}
                                   className="w-full h-full object-contain"
                                   preload="auto"
-                                  crossOrigin="anonymous"
                                   onPlay={() => setInlineFillPlaying(true)}
                                   onPause={() => setInlineFillPlaying(false)}
                                   onEnded={() => {
-                                    setInlineFillPlaying(false);
-                                    // Chain to next fill
+                                    // Seamless chain to next fill using pre-cached URL
                                     if (inlineFillPreview && inlineFillPreview.currentIndex < inlineFillPreview.fills.length - 1) {
                                       const nextIdx = inlineFillPreview.currentIndex + 1;
                                       const nextFill = inlineFillPreview.fills[nextIdx];
+                                      const cachedUrl = nextFill?.s3Key ? inlineFillUrlCache.current.get(nextFill.s3Key) : null;
                                       setInlineFillPreview({ ...inlineFillPreview, currentIndex: nextIdx });
-                                      if (nextFill?.s3Key) {
+                                      if (cachedUrl) {
+                                        // Seamless — URL already cached
+                                        setInlineFillVideoUrl(cachedUrl);
+                                        // Auto-play will happen via effect below
+                                      } else if (nextFill?.s3Key) {
                                         setInlineFillLoading(true);
                                         setInlineFillVideoUrl(null);
-                                        supabase.functions
-                                          .invoke('get-signed-url', { body: { s3_key: nextFill.s3Key } })
-                                          .then(({ data, error: fnErr }) => {
-                                            if (fnErr) { setInlineFillLoading(false); return; }
-                                            const url = data?.url || data?.data?.url;
-                                            setInlineFillVideoUrl(url || null);
-                                            setInlineFillLoading(false);
-                                          });
+                                        prefetchFillUrl(nextFill).then((url) => {
+                                          setInlineFillVideoUrl(url);
+                                          setInlineFillLoading(false);
+                                        });
                                       }
+                                      // Pre-fetch the one after next
+                                      if (nextIdx + 1 < inlineFillPreview.fills.length) {
+                                        prefetchFillUrl(inlineFillPreview.fills[nextIdx + 1]);
+                                      }
+                                    } else {
+                                      setInlineFillPlaying(false);
+                                    }
+                                  }}
+                                  onLoadedData={() => {
+                                    // Auto-play when URL changes during chained playback
+                                    if (inlineFillPreview && inlineFillPreview.currentIndex > 0) {
+                                      inlineFillVideoRef.current?.play().catch(() => {});
                                     }
                                   }}
                                 />
