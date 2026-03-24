@@ -20,7 +20,7 @@ const ProjectEditor = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { project, video, setProject, setVideo, setCutMap, setAiFills, reset, creditBalance } = useEditorStore();
+  const { project, video, setProject, setVideo, setCutMap, setAiFills, reset, creditBalance, previewGeneratingCutId } = useEditorStore();
   const { balance, refetch: refetchBalance } = useCreditsBalance();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,12 +49,22 @@ const ProjectEditor = () => {
   };
 
   // Sync useCreditsBalance into the editor store so CutsPanel/usePreviewFill see it
-  const { setCreditBalance } = useEditorStore.getState();
+  const setCreditBalance = useEditorStore((s) => s.setCreditBalance);
   useEffect(() => {
     if (balance) {
       setCreditBalance({ total: balance.total, monthly: balance.monthly, topup: balance.topup });
     }
   }, [balance, setCreditBalance]);
+
+  // Refetch credit balance when preview generation completes (cutId clears to null)
+  const prevGeneratingRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (prevGeneratingRef.current && !previewGeneratingCutId) {
+      // Generation just finished — refetch authoritative balance
+      refetchBalance();
+    }
+    prevGeneratingRef.current = previewGeneratingCutId ?? null;
+  }, [previewGeneratingCutId, refetchBalance]);
 
   useEffect(() => {
     return () => reset();
