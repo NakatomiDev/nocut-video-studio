@@ -136,8 +136,8 @@ interface EditorState {
   insertedFills: Set<string>;
   /** Signed URLs for fill video clips, keyed by fill ID */
   fillVideoUrls: Map<string, string>;
-  /** Currently selected fill for preview (null = none) */
-  selectedFill: AiFill | null;
+  /** Currently selected fill(s) for preview (null = none, array = chained playback) */
+  selectedFill: AiFill | AiFill[] | null;
   /** Maps cutId → selected AI fill duration in seconds (0 = no fill, just cut) */
   fillDurations: Map<string, number>;
   /** Maps cutId → selected AI fill model */
@@ -146,6 +146,8 @@ interface EditorState {
   fillPrompts: Map<string, string>;
   /** Maps cutId → ordered list of fill IDs (user-defined sequence) */
   fillOrder: Map<string, string[]>;
+  /** Maps fillId → user-defined custom name */
+  fillNames: Map<string, string>;
   playheadPosition: number;
   isPlaying: boolean;
   zoomLevel: number;
@@ -178,11 +180,12 @@ interface EditorState {
   setRazorStart: (time: number | null) => void;
   setAiFills: (fills: AiFill[]) => void;
   toggleShowFills: () => void;
-  selectFill: (fill: AiFill | null) => void;
+  selectFill: (fill: AiFill | AiFill[] | null) => void;
   insertFill: (fillId: string) => void;
   removeFill: (fillId: string) => void;
   setFillVideoUrl: (fillId: string, url: string) => void;
   setFillOrder: (cutId: string, orderedFillIds: string[]) => void;
+  setFillName: (fillId: string, name: string) => void;
   startPreviewGeneration: (cutId: string, jobId: string) => void;
   clearPreviewGeneration: () => void;
   reset: () => void;
@@ -211,6 +214,7 @@ interface PersistedEditorState {
   fillModels: [string, string][];
   fillPrompts: [string, string][];
   fillOrder: [string, string[]][];
+  fillNames: [string, string][];
   showFills: boolean;
 }
 
@@ -226,6 +230,7 @@ function saveEditorState(state: EditorState) {
       fillModels: Array.from(state.fillModels.entries()),
       fillPrompts: Array.from(state.fillPrompts.entries()),
       fillOrder: Array.from(state.fillOrder.entries()),
+      fillNames: Array.from(state.fillNames.entries()),
       showFills: state.showFills,
     };
     localStorage.setItem(storageKey(cm.id), JSON.stringify(data));
@@ -302,6 +307,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   fillModels: new Map<string, AiFillModel>(),
   fillPrompts: new Map<string, string>(),
   fillOrder: new Map<string, string[]>(),
+  fillNames: new Map<string, string>(),
   playheadPosition: 0,
   isPlaying: false,
   zoomLevel: 1,
@@ -372,6 +378,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const fillOrder = saved?.fillOrder
       ? new Map(saved.fillOrder)
       : new Map<string, string[]>();
+    const fillNames = saved?.fillNames
+      ? new Map(saved.fillNames)
+      : new Map<string, string>();
     const showFills = saved?.showFills ?? false;
 
     set({
@@ -384,6 +393,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       fillModels,
       fillPrompts,
       fillOrder,
+      fillNames,
       insertedFills,
       showFills,
       creditEstimate: calcCredits(fillDurations, fillModels),
@@ -544,6 +554,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       next.set(cutId, orderedFillIds);
       return { fillOrder: next };
     }),
+  setFillName: (fillId, name) =>
+    set((state) => {
+      const next = new Map(state.fillNames);
+      if (name.trim()) {
+        next.set(fillId, name.trim());
+      } else {
+        next.delete(fillId);
+      }
+      return { fillNames: next };
+    }),
   startPreviewGeneration: (cutId, jobId) =>
     set({ previewGeneratingCutId: cutId, previewJobId: jobId }),
   clearPreviewGeneration: () =>
@@ -566,6 +586,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       fillModels: new Map(),
       fillPrompts: new Map(),
       fillOrder: new Map(),
+      fillNames: new Map(),
       playheadPosition: 0,
       isPlaying: false,
       zoomLevel: 1,
@@ -591,6 +612,7 @@ useEditorStore.subscribe((state, prev) => {
     state.fillModels === prev.fillModels &&
     state.fillPrompts === prev.fillPrompts &&
     state.fillOrder === prev.fillOrder &&
+    state.fillNames === prev.fillNames &&
     state.showFills === prev.showFills
   ) return;
   // Debounce to avoid excessive writes

@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { X, AlertTriangle, Sparkles, CheckCircle2, Eye, RefreshCw, Loader2, ChevronRight, Plus, Minus, Play, Pause, GripVertical } from 'lucide-react';
+import { X, AlertTriangle, Sparkles, CheckCircle2, Eye, RefreshCw, Loader2, ChevronRight, ChevronDown, Plus, Minus, Play, Pause, GripVertical, Pencil } from 'lucide-react';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import CutThumbnail from './CutThumbnail';
 import ExactVideoFrame from './ExactVideoFrame';
@@ -153,6 +153,8 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     previewGeneratingCutId,
     fillOrder,
     setFillOrder,
+    fillNames,
+    setFillName,
   } = useEditorStore();
 
   const { generatePreview } = usePreviewFill();
@@ -162,6 +164,8 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   const [expandedReviewId, setExpandedReviewId] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{ time: number; label: string } | null>(null);
   const [expandedFillsCuts, setExpandedFillsCuts] = useState<Set<string>>(new Set());
+  const [expandedFillDetails, setExpandedFillDetails] = useState<Set<string>>(new Set());
+  const [editingFillName, setEditingFillName] = useState<string | null>(null);
   const [inlineFillPreview, setInlineFillPreview] = useState<{ editId: string; fill: AiFill } | null>(null);
   const [inlineFillVideoUrl, setInlineFillVideoUrl] = useState<string | null>(null);
   const [inlineFillLoading, setInlineFillLoading] = useState(false);
@@ -222,16 +226,16 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   const creditsAfterExport = creditBalance.total - creditEstimate;
   const cutsWithFills = fillDurations.size;
 
-  const getInsertedFillForCut = useCallback((cutObj: { end: number }) => {
+  const getInsertedFillsForCut = useCallback((cutObj: { end: number }) => {
     const fills = getFillsForCut(cutObj, aiFills);
-    return fills.find((fill) => insertedFills.has(fill.id)) ?? null;
+    return fills.filter((fill) => insertedFills.has(fill.id));
   }, [aiFills, insertedFills]);
 
   const getPreviewFillForCut = useCallback((cutObj: { end: number }) => {
-    const insertedFill = getInsertedFillForCut(cutObj);
-    if (insertedFill) return insertedFill;
+    const inserted = getInsertedFillsForCut(cutObj);
+    if (inserted.length > 0) return inserted[0];
     return getFillsForCut(cutObj, aiFills)[0] ?? null;
-  }, [aiFills, getInsertedFillForCut]);
+  }, [aiFills, getInsertedFillsForCut]);
 
   /** Resolve the effective fill for a cut: explicit fillDuration, or an inserted existing fill */
   const getEffectiveFill = useCallback((cutId: string, cutObj: { end: number }) => {
@@ -239,15 +243,16 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     if (explicit > 0) {
       return { duration: explicit, model: fillModels.get(cutId) ?? DEFAULT_AI_FILL_MODEL, isExisting: false };
     }
-    const inserted = getInsertedFillForCut(cutObj);
-    if (inserted && inserted.duration) {
-      const m = (inserted.provider && inserted.provider in MODEL_CREDITS_PER_SEC)
-        ? inserted.provider as AiFillModel
+    const inserted = getInsertedFillsForCut(cutObj);
+    if (inserted.length > 0 && inserted[0].duration) {
+      const first = inserted[0];
+      const m = (first.provider && first.provider in MODEL_CREDITS_PER_SEC)
+        ? first.provider as AiFillModel
         : DEFAULT_AI_FILL_MODEL;
-      return { duration: inserted.duration, model: m, isExisting: true, fillId: inserted.id };
+      return { duration: first.duration, model: m, isExisting: true, fillId: first.id };
     }
     return { duration: 0, model: fillModels.get(cutId) ?? DEFAULT_AI_FILL_MODEL, isExisting: false };
-  }, [fillDurations, fillModels, getInsertedFillForCut]);
+  }, [fillDurations, fillModels, getInsertedFillsForCut]);
 
   const handleExport = useCallback(async () => {
     if (!project) return;
@@ -258,13 +263,13 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
       const allCuts = [
         ...activeCutsList.map((c) => {
           const eff = getEffectiveFill(c.id, c);
-          const existingFill = eff.isExisting ? getInsertedFillForCut(c) : null;
-          return { start: c.start, end: c.end, type: c.type, fill_duration: eff.duration, model: eff.model, isExisting: eff.isExisting, existing_fill_s3_key: existingFill?.s3Key ?? undefined, prompt: resolvePrompt(fillPrompts.get(c.id)) };
+          const existingFills = eff.isExisting ? getInsertedFillsForCut(c) : [];
+          return { start: c.start, end: c.end, type: c.type, fill_duration: eff.duration, model: eff.model, isExisting: eff.isExisting, existing_fill_s3_key: existingFills[0]?.s3Key ?? undefined, prompt: resolvePrompt(fillPrompts.get(c.id)) };
         }),
         ...activeManualList.map((c) => {
           const eff = getEffectiveFill(c.id, c);
-          const existingFill = eff.isExisting ? getInsertedFillForCut(c) : null;
-          return { start: c.start, end: c.end, type: 'manual', fill_duration: eff.duration, model: eff.model, isExisting: eff.isExisting, existing_fill_s3_key: existingFill?.s3Key ?? undefined, prompt: resolvePrompt(fillPrompts.get(c.id)) };
+          const existingFills = eff.isExisting ? getInsertedFillsForCut(c) : [];
+          return { start: c.start, end: c.end, type: 'manual', fill_duration: eff.duration, model: eff.model, isExisting: eff.isExisting, existing_fill_s3_key: existingFills[0]?.s3Key ?? undefined, prompt: resolvePrompt(fillPrompts.get(c.id)) };
         }),
       ].sort((a, b) => a.start - b.start);
 
@@ -328,7 +333,8 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     const allCutsArr = [...cuts, ...manualCuts.map((c) => ({ ...c, type: 'manual' }))];
     const cutObj = allCutsArr.find((c) => c.id === cutId);
     const generatedFill = cutObj ? getPreviewFillForCut(cutObj) : null;
-    const selectedExistingFill = cutObj ? getInsertedFillForCut(cutObj) : null;
+    const selectedExistingFills = cutObj ? getInsertedFillsForCut(cutObj) : [];
+    const selectedExistingFill = selectedExistingFills[0] ?? null;
     const selectedExistingIdentity = selectedExistingFill ? formatFillIdentity(selectedExistingFill) : null;
 
     const rawPrompt = fillPrompts.get(cutId) ?? DEFAULT_FILL_PROMPT_ID;
@@ -524,60 +530,109 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   };
 
   const renderPreview = (start: number, end: number, cutId?: string) => {
-    // Find selected/inserted fill for this cut
+    // Get all explicitly inserted fills for this cut
     const allCutsArr = [...cuts, ...manualCuts.map((c) => ({ ...c, type: 'manual' }))];
     const cutObj = cutId ? allCutsArr.find((c) => c.id === cutId) : null;
-    const insertedFill = cutObj ? getInsertedFillForCut(cutObj) : null;
-    const previewFill = cutObj ? getPreviewFillForCut(cutObj) : null;
-    const activeFill = insertedFill ?? previewFill;
+    const insertedFillsList = cutObj ? getInsertedFillsForCut(cutObj) : [];
+    // Apply user ordering if available
+    const order = cutId ? fillOrder.get(cutId) : undefined;
+    let orderedFills = insertedFillsList.filter((f) => f.s3Key);
+    if (order && order.length > 0) {
+      const byId = new Map(orderedFills.map((f) => [f.id, f]));
+      const sorted = order.map((id) => byId.get(id)).filter(Boolean) as typeof orderedFills;
+      const extra = orderedFills.filter((f) => !order.includes(f.id));
+      orderedFills = [...sorted, ...extra];
+    }
+
+    // When 3+ fills, switch to a wrapped grid layout
+    const useGridLayout = orderedFills.length >= 3;
 
     return (
-      <div className="flex items-center gap-1 pl-2 pr-1 overflow-hidden">
-        <button
-          className="flex flex-col items-center gap-0.5 shrink-0 min-w-0 cursor-zoom-in hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background"
-          onClick={(e) => handleFrameClick(start, `Start frame · ${formatTimestamp(start)}`, e)}
-        >
-          {videoUrl ? (
-            <ExactVideoFrame
-              videoUrl={videoUrl}
-              time={start}
-              label={`Start frame ${formatTimestamp(start)}`}
-              className="h-10 w-[72px]"
-              cachedFrame={getFrame(start)}
-            />
-          ) : thumbnailSpriteUrl ? (
-            <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={start} duration={duration} width={72} height={40} />
-          ) : null}
-          <span className="text-[9px] text-muted-foreground font-mono">Start</span>
-        </button>
+      <div className="flex flex-col gap-1 pl-2 pr-1">
+        {/* Start + End frames row */}
+        <div className="flex items-center gap-1">
+          <button
+            className="flex flex-col items-center gap-0.5 shrink-0 min-w-0 cursor-zoom-in hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background"
+            onClick={(e) => handleFrameClick(start, `Start frame · ${formatTimestamp(start)}`, e)}
+          >
+            {videoUrl ? (
+              <ExactVideoFrame
+                videoUrl={videoUrl}
+                time={start}
+                label={`Start frame ${formatTimestamp(start)}`}
+                className="h-10 w-[72px]"
+                cachedFrame={getFrame(start)}
+              />
+            ) : thumbnailSpriteUrl ? (
+              <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={start} duration={duration} width={72} height={40} />
+            ) : null}
+            <span className="text-[9px] text-muted-foreground font-mono">Start</span>
+          </button>
 
-        {activeFill && activeFill.s3Key ? (
-          <>
-            <div className="border-t border-dashed border-muted-foreground/30 w-2 shrink-0" />
-            <FillThumbnailInline fill={activeFill} isInserted={insertedFill?.id === activeFill.id} />
-            <div className="border-t border-dashed border-muted-foreground/30 w-2 shrink-0" />
-          </>
-        ) : (
-          <div className="flex-1 border-t border-dashed border-muted-foreground/30 min-w-1" />
+          {!useGridLayout && orderedFills.length > 0 ? (
+            <>
+              <div className="border-t border-dashed border-muted-foreground/30 w-2 shrink-0" />
+              {orderedFills.map((fill, i) => (
+                <div key={fill.id} className="flex items-center gap-0 shrink-0">
+                  {i > 0 && <div className="border-t border-dashed border-primary/40 w-1.5 shrink-0" />}
+                  <button
+                    className="cursor-pointer hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      selectFill(orderedFills.length > 1 ? orderedFills : fill);
+                    }}
+                  >
+                    <FillThumbnailInline fill={fill} isInserted={true} />
+                  </button>
+                </div>
+              ))}
+              <div className="border-t border-dashed border-muted-foreground/30 w-2 shrink-0" />
+            </>
+          ) : orderedFills.length === 0 ? (
+            <div className="flex-1 border-t border-dashed border-muted-foreground/30 min-w-1" />
+          ) : (
+            <div className="flex-1 border-t border-dashed border-muted-foreground/30 min-w-1" />
+          )}
+
+          <button
+            className="flex flex-col items-center gap-0.5 shrink-0 min-w-0 cursor-zoom-in hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background"
+            onClick={(e) => handleFrameClick(end, `End frame · ${formatTimestamp(end)}`, e)}
+          >
+            {videoUrl ? (
+              <ExactVideoFrame
+                videoUrl={videoUrl}
+                time={end}
+                label={`End frame ${formatTimestamp(end)}`}
+                className="h-10 w-[72px]"
+                cachedFrame={getFrame(end)}
+              />
+            ) : thumbnailSpriteUrl ? (
+              <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={end} duration={duration} width={72} height={40} />
+            ) : null}
+            <span className="text-[9px] text-muted-foreground font-mono">End</span>
+          </button>
+        </div>
+
+        {/* Wrapped fill thumbnails grid for 3+ fills */}
+        {useGridLayout && orderedFills.length > 0 && (
+          <div className="flex flex-wrap gap-1 pl-1">
+            {orderedFills.map((fill, i) => (
+              <button
+                key={fill.id}
+                className="cursor-pointer hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background relative"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  selectFill(orderedFills.length > 1 ? orderedFills : fill);
+                }}
+              >
+                <FillThumbnailInline fill={fill} isInserted={true} />
+                <span className="absolute -top-1 -left-1 bg-primary text-primary-foreground text-[7px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center">
+                  {i + 1}
+                </span>
+              </button>
+            ))}
+          </div>
         )}
-
-        <button
-          className="flex flex-col items-center gap-0.5 shrink-0 min-w-0 cursor-zoom-in hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background"
-          onClick={(e) => handleFrameClick(end, `End frame · ${formatTimestamp(end)}`, e)}
-        >
-          {videoUrl ? (
-            <ExactVideoFrame
-              videoUrl={videoUrl}
-              time={end}
-              label={`End frame ${formatTimestamp(end)}`}
-              className="h-10 w-[72px]"
-              cachedFrame={getFrame(end)}
-            />
-          ) : thumbnailSpriteUrl ? (
-            <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={end} duration={duration} width={72} height={40} />
-          ) : null}
-          <span className="text-[9px] text-muted-foreground font-mono">End</span>
-        </button>
       </div>
     );
   };
@@ -656,68 +711,167 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
               const hasVideo = !!fill.s3Key;
               const identity = formatFillIdentity(fill);
               const isDragOver = dragState?.cutId === cutId && dragState.overIdx === idx && dragState.dragIdx !== idx;
+              const customName = fillNames.get(fill.id);
+              const displayName = customName || `AI Fill ${idx + 1}`;
+              const isEditingName = editingFillName === fill.id;
+              const isDetailsOpen = expandedFillDetails.has(fill.id);
+              const toggleDetails = (e: React.MouseEvent) => {
+                e.stopPropagation();
+                setExpandedFillDetails((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(fill.id)) next.delete(fill.id);
+                  else next.add(fill.id);
+                  return next;
+                });
+              };
+
               return (
                 <div
                   key={fill.id}
-                  draggable
+                  draggable={!isEditingName}
                   onDragStart={() => handleDragStart(idx)}
                   onDragOver={(e) => handleDragOver(e, idx)}
                   onDrop={() => handleDrop(idx)}
                   onDragEnd={handleDragEnd}
-                  className={`flex items-start gap-1 rounded px-1.5 py-1.5 text-[10px] transition-colors cursor-grab active:cursor-grabbing ${
+                  className={`flex flex-col rounded text-[10px] transition-colors ${
                     isInserted ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-secondary/50'
                   } ${isDragOver ? 'ring-2 ring-primary/50' : ''}`}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {/* Drag handle + sequence number */}
-                  <div className="flex flex-col items-center gap-0.5 shrink-0 self-center select-none">
-                    <GripVertical className="h-3.5 w-3.5 text-muted-foreground/50" />
-                    <span className="text-[8px] font-mono text-muted-foreground/70">{idx + 1}</span>
-                  </div>
-                  {/* First-frame thumbnail */}
-                  {hasVideo && (
-                    <FillThumbnailInline fill={fill} isInserted={isInserted} />
-                  )}
-                  {/* Info column */}
-                  <div className="flex flex-col gap-0.5 flex-1 min-w-0 justify-center">
-                    <div className="flex items-center gap-1 flex-wrap">
-                      <span className="font-mono text-[9px] text-muted-foreground shrink-0">#{identity.shortId}</span>
-                      <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[9px] shrink-0">
-                        {fill.duration}s
-                      </Badge>
-                      {isInserted && (
-                        <Badge className="bg-primary/15 text-primary border-primary/30 text-[9px] shrink-0">
-                          Selected
+                  {/* Main row */}
+                  <div className="flex items-center gap-1 px-1.5 py-1.5 cursor-grab active:cursor-grabbing">
+                    {/* Drag handle + sequence */}
+                    <div className="flex flex-col items-center gap-0.5 shrink-0 select-none">
+                      <GripVertical className="h-3.5 w-3.5 text-muted-foreground/50" />
+                      <span className="text-[8px] font-mono text-muted-foreground/70">{idx + 1}</span>
+                    </div>
+                    {/* Thumbnail */}
+                    {hasVideo && (
+                      <FillThumbnailInline fill={fill} isInserted={isInserted} />
+                    )}
+                    {/* Name + meta */}
+                    <div className="flex flex-col gap-0.5 flex-1 min-w-0 justify-center">
+                      <div className="flex items-center gap-1 min-w-0">
+                        {isEditingName ? (
+                          <input
+                            autoFocus
+                            defaultValue={customName || ''}
+                            placeholder={`AI Fill ${idx + 1}`}
+                            className="bg-transparent border-b border-primary text-foreground text-[11px] font-medium outline-none px-0.5 w-full min-w-0"
+                            onBlur={(e) => {
+                              setFillName(fill.id, e.target.value);
+                              setEditingFillName(null);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                setFillName(fill.id, (e.target as HTMLInputElement).value);
+                                setEditingFillName(null);
+                              }
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        ) : (
+                          <button
+                            className="text-[11px] font-medium text-foreground hover:text-primary transition-colors truncate text-left flex items-center gap-1 min-w-0"
+                            onClick={(e) => { e.stopPropagation(); setEditingFillName(fill.id); }}
+                          >
+                            <span className="truncate">{displayName}</span>
+                            <Pencil className="h-2.5 w-2.5 text-muted-foreground/50 shrink-0" />
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[9px] shrink-0">
+                          {fill.duration}s
                         </Badge>
+                        {isInserted && (
+                          <Badge className="bg-primary/15 text-primary border-primary/30 text-[9px] shrink-0">
+                            Selected
+                          </Badge>
+                        )}
+                        <span className="font-mono text-[8px] text-muted-foreground/60 shrink-0">#{identity.shortId}</span>
+                      </div>
+                    </div>
+                    {/* Actions */}
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <Button variant="ghost" size="icon" className="h-5 w-5" onClick={toggleDetails}>
+                        <ChevronDown className={`h-3 w-3 transition-transform ${isDetailsOpen ? 'rotate-180' : ''}`} />
+                      </Button>
+                      {hasVideo ? (
+                        <>
+                          <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => selectFill(fill)}>
+                            <Eye className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={`h-5 w-5 ${isInserted ? 'text-emerald-400' : 'text-muted-foreground'}`}
+                            onClick={() => isInserted ? removeFill(fill.id) : insertFill(fill.id)}
+                          >
+                            {isInserted ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                          </Button>
+                        </>
+                      ) : (
+                        <span className="text-[9px] text-muted-foreground animate-pulse">Generating...</span>
                       )}
                     </div>
-                    <span className="text-muted-foreground truncate text-[9px]">
-                      {identity.modelLabel}
-                      {fill.qualityScore !== null && ` · ${Math.round(fill.qualityScore * 100)}%`}
-                    </span>
                   </div>
-                  {/* Actions */}
-                  {hasVideo ? (
-                    <div className="flex items-center gap-0.5 shrink-0 self-center">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-5 w-5"
-                        onClick={() => selectFill(fill)}
-                      >
-                        <Eye className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className={`h-5 w-5 ${isInserted ? 'text-emerald-400' : 'text-muted-foreground'}`}
-                        onClick={() => isInserted ? removeFill(fill.id) : insertFill(fill.id)}
-                      >
-                        {isInserted ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
-                      </Button>
+
+                  {/* Expandable details */}
+                  {isDetailsOpen && (
+                    <div className="border-t border-border/50 px-2 py-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                      {/* First & last frame of the cut gap */}
+                      {cutObj && videoUrl && (
+                        <div className="space-y-1">
+                          <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wide">Gap Boundary Frames</span>
+                          <div className="flex items-center gap-2">
+                            <div className="flex flex-col items-center gap-0.5">
+                              <ExactVideoFrame
+                                videoUrl={videoUrl}
+                                time={cutObj.start}
+                                label="First frame"
+                                className="h-12 w-[86px]"
+                                cachedFrame={getFrame(cutObj.start)}
+                              />
+                              <span className="text-[8px] text-muted-foreground font-mono">{formatTimestamp(cutObj.start)}</span>
+                            </div>
+                            <div className="border-t border-dashed border-muted-foreground/30 flex-1" />
+                            <div className="flex flex-col items-center gap-0.5">
+                              <ExactVideoFrame
+                                videoUrl={videoUrl}
+                                time={cutObj.end}
+                                label="Last frame"
+                                className="h-12 w-[86px]"
+                                cachedFrame={getFrame(cutObj.end)}
+                              />
+                              <span className="text-[8px] text-muted-foreground font-mono">{formatTimestamp(cutObj.end)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {/* Generation details */}
+                      <div className="space-y-1">
+                        <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wide">Generation Details</span>
+                        <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-[9px]">
+                          <span className="text-muted-foreground">Model</span>
+                          <span className="text-foreground">{identity.modelLabel}</span>
+                          <span className="text-muted-foreground">Method</span>
+                          <span className="text-foreground">{fill.method || '—'}</span>
+                          <span className="text-muted-foreground">Duration</span>
+                          <span className="text-foreground">{fill.duration}s</span>
+                          <span className="text-muted-foreground">Provider</span>
+                          <span className="text-foreground">{fill.provider || '—'}</span>
+                          {fill.qualityScore !== null && (
+                            <>
+                              <span className="text-muted-foreground">Quality</span>
+                              <span className="text-foreground">{Math.round(fill.qualityScore * 100)}%</span>
+                            </>
+                          )}
+                          <span className="text-muted-foreground">Fill ID</span>
+                          <span className="text-foreground font-mono">{fill.id.slice(0, 12)}…</span>
+                        </div>
+                      </div>
                     </div>
-                  ) : (
-                    <span className="text-[9px] text-muted-foreground animate-pulse self-center">Generating...</span>
                   )}
                 </div>
               );
@@ -899,7 +1053,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                   ...activeCutsList.map((c) => {
                     const eff = getEffectiveFill(c.id, c);
                     const modelConfig = AI_FILL_MODELS.find((m) => m.id === eff.model);
-                    const existingFill = eff.isExisting ? getInsertedFillForCut(c) : null;
+                    const existingFill = eff.isExisting ? (getInsertedFillsForCut(c)[0] ?? null) : null;
                     return {
                       id: c.id,
                       start: c.start,
@@ -917,7 +1071,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                   ...activeManualList.map((c) => {
                     const eff = getEffectiveFill(c.id, c);
                     const modelConfig = AI_FILL_MODELS.find((m) => m.id === eff.model);
-                    const existingFill = eff.isExisting ? getInsertedFillForCut(c) : null;
+                    const existingFill = eff.isExisting ? (getInsertedFillsForCut(c)[0] ?? null) : null;
                     return {
                       id: c.id,
                       start: c.start,
