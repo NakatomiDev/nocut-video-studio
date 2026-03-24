@@ -1108,6 +1108,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
 
                 return allEdits.map((edit, idx) => {
                   const isExpanded = expandedReviewId === edit.id;
+                  const hasFills = edit.fills.length > 0;
                   return (
                     <div
                       key={edit.id}
@@ -1132,15 +1133,10 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                           {formatTimestamp(edit.start)} → {formatTimestamp(edit.end)}
                         </span>
                         <span className="text-xs text-muted-foreground">{edit.duration.toFixed(1)}s</span>
-                        {edit.fill > 0 ? (
-                          <Badge className="border-primary/30 bg-primary/20 text-[10px] text-primary">
-                            <Sparkles className="mr-1 h-2.5 w-2.5" />
-                            {edit.fill}s fill
-                          </Badge>
-                        ) : edit.existingFill ? (
+                        {hasFills ? (
                           <Badge className="border-emerald-500/30 bg-emerald-500/20 text-[10px] text-emerald-400">
                             <Sparkles className="mr-1 h-2.5 w-2.5" />
-                            {edit.existingFill.duration}s fill
+                            {edit.fills.length} fill{edit.fills.length > 1 ? 's' : ''} · {edit.totalFillDuration.toFixed(1)}s
                           </Badge>
                         ) : (
                           <Badge variant="outline" className="border-border text-[10px] text-muted-foreground">
@@ -1149,28 +1145,19 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                         )}
                       </div>
 
-                      {(edit.fill > 0 || edit.existingFill) && (
+                      {hasFills && (
                         <div className="-mt-1 flex flex-wrap items-center gap-2 px-3 pb-2">
                           <span className="hidden w-5 md:block" />
-                          <span className="text-[10px] text-muted-foreground">
-                            Model:{' '}
-                            <span className="font-medium text-foreground">
-                              {edit.existingFill
-                                ? (AI_FILL_MODELS.find((m) => m.id === edit.existingFill!.provider)?.label ?? edit.existingFill.provider ?? edit.modelLabel)
-                                : edit.modelLabel}
-                            </span>
-                          </span>
-                          {edit.existingFill && (
-                            <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-[10px] text-emerald-400">
-                              <CheckCircle2 className="mr-1 h-2.5 w-2.5" />
-                              Generated
-                            </Badge>
-                          )}
-                          {edit.existingFillIdentity && (
-                            <span className="basis-full text-[10px] text-foreground/90 md:pl-5">
-                              AI fill selected for this cut
-                            </span>
-                          )}
+                          {edit.fills.map((f, fi) => {
+                            const identity = formatFillIdentity(f);
+                            const modelLabel = AI_FILL_MODELS.find((m) => m.id === f.provider)?.label ?? f.provider ?? 'AI Fill';
+                            return (
+                              <Badge key={f.id} variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-[10px] text-emerald-400">
+                                <CheckCircle2 className="mr-1 h-2.5 w-2.5" />
+                                {fi + 1}. {modelLabel} · {f.duration}s
+                              </Badge>
+                            );
+                          })}
                         </div>
                       )}
 
@@ -1200,47 +1187,48 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
 
                             <div className="flex flex-col items-center justify-center gap-1 lg:min-w-[96px]">
                               <div className="hidden h-px w-8 bg-muted-foreground/30 lg:block" />
-                              {edit.existingFill && (
-                                  <button
-                                    className="group/fill flex w-full max-w-[320px] flex-col items-center gap-1 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 transition-colors hover:bg-primary/10 lg:w-auto lg:max-w-none"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const fill = edit.existingFill!;
-                                      if (inlineFillPreview?.editId === edit.id) {
-                                        setInlineFillPreview(null);
-                                        setInlineFillVideoUrl(null);
-                                        setInlineFillPlaying(false);
-                                      } else {
-                                        setInlineFillPreview({ editId: edit.id, fill });
-                                        setInlineFillVideoUrl(null);
-                                        setInlineFillPlaying(false);
-                                        if (fill.s3Key) {
-                                          setInlineFillLoading(true);
-                                          supabase.functions
-                                            .invoke('get-signed-url', { body: { s3_key: fill.s3Key } })
-                                            .then(({ data, error: fnErr }) => {
-                                              if (fnErr) { setInlineFillLoading(false); return; }
-                                              const url = data?.url || data?.data?.url;
-                                              setInlineFillVideoUrl(url || null);
-                                              setInlineFillLoading(false);
-                                            });
-                                        }
+                              {hasFills && (
+                                <button
+                                  className="group/fill flex w-full max-w-[320px] flex-col items-center gap-1 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 transition-colors hover:bg-primary/10 lg:w-auto lg:max-w-none"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (inlineFillPreview?.editId === edit.id) {
+                                      setInlineFillPreview(null);
+                                      setInlineFillVideoUrl(null);
+                                      setInlineFillPlaying(false);
+                                    } else {
+                                      setInlineFillPreview({ editId: edit.id, fills: edit.fills, currentIndex: 0 });
+                                      setInlineFillVideoUrl(null);
+                                      setInlineFillPlaying(false);
+                                      // Load first fill URL
+                                      const firstFill = edit.fills[0];
+                                      if (firstFill?.s3Key) {
+                                        setInlineFillLoading(true);
+                                        supabase.functions
+                                          .invoke('get-signed-url', { body: { s3_key: firstFill.s3Key } })
+                                          .then(({ data, error: fnErr }) => {
+                                            if (fnErr) { setInlineFillLoading(false); return; }
+                                            const url = data?.url || data?.data?.url;
+                                            setInlineFillVideoUrl(url || null);
+                                            setInlineFillLoading(false);
+                                          });
                                       }
-                                    }}
-                                  >
-                                    <div className="relative flex h-14 w-full items-center justify-center overflow-hidden rounded border border-border bg-muted/60 lg:h-12 lg:w-20">
-                                      <Sparkles className="h-4 w-4 text-primary/60" />
-                                      <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover/fill:opacity-100">
-                                        <Play className="h-4 w-4 text-white" />
-                                      </div>
+                                    }
+                                  }}
+                                >
+                                  <div className="relative flex h-14 w-full items-center justify-center overflow-hidden rounded border border-border bg-muted/60 lg:h-12 lg:w-20">
+                                    <Sparkles className="h-4 w-4 text-primary/60" />
+                                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover/fill:opacity-100">
+                                      <Play className="h-4 w-4 text-white" />
                                     </div>
-                                    <span className="text-[9px] font-semibold text-primary">
-                                      {edit.existingFill.duration}s AI Fill
-                                    </span>
-                                    <span className="text-[8px] text-muted-foreground">
-                                      {inlineFillPreview?.editId === edit.id ? 'Click to close' : 'Click to preview'}
-                                    </span>
-                                  </button>
+                                  </div>
+                                  <span className="text-[9px] font-semibold text-primary">
+                                    {edit.fills.length} fill{edit.fills.length > 1 ? 's' : ''} · {edit.totalFillDuration.toFixed(1)}s
+                                  </span>
+                                  <span className="text-[8px] text-muted-foreground">
+                                    {inlineFillPreview?.editId === edit.id ? 'Click to close' : 'Click to preview'}
+                                  </span>
+                                </button>
                               )}
                               <div className="hidden h-px w-8 bg-muted-foreground/30 lg:block" />
                             </div>
@@ -1269,13 +1257,14 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                         </div>
                       )}
 
-                      {/* Inline AI Fill video player */}
+                      {/* Inline AI Fill chained video player */}
                       {inlineFillPreview?.editId === edit.id && (
                         <div className="border-t border-border/50 p-3" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-[10px] font-semibold text-primary uppercase tracking-wider flex items-center gap-1.5">
                               <Sparkles className="h-3 w-3" />
-                              AI Fill Preview — {inlineFillPreview.fill.duration}s
+                              AI Fill Preview — {inlineFillPreview.currentIndex + 1}/{inlineFillPreview.fills.length}
+                              {' · '}{inlineFillPreview.fills[inlineFillPreview.currentIndex]?.duration}s
                             </span>
                             <Button
                               variant="ghost"
@@ -1286,6 +1275,19 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                               <X className="h-3 w-3" />
                             </Button>
                           </div>
+                          {/* Fill index indicators */}
+                          {inlineFillPreview.fills.length > 1 && (
+                            <div className="flex gap-1 mb-2">
+                              {inlineFillPreview.fills.map((_, fi) => (
+                                <div
+                                  key={fi}
+                                  className={`h-1 flex-1 rounded-full transition-colors ${
+                                    fi <= inlineFillPreview.currentIndex ? 'bg-primary' : 'bg-muted'
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                          )}
                           <div className="relative bg-black rounded-lg overflow-hidden aspect-video flex items-center justify-center group/video">
                             {inlineFillLoading && <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
                             {!inlineFillLoading && !inlineFillVideoUrl && (
@@ -1302,7 +1304,27 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                                   crossOrigin="anonymous"
                                   onPlay={() => setInlineFillPlaying(true)}
                                   onPause={() => setInlineFillPlaying(false)}
-                                  onEnded={() => setInlineFillPlaying(false)}
+                                  onEnded={() => {
+                                    setInlineFillPlaying(false);
+                                    // Chain to next fill
+                                    if (inlineFillPreview && inlineFillPreview.currentIndex < inlineFillPreview.fills.length - 1) {
+                                      const nextIdx = inlineFillPreview.currentIndex + 1;
+                                      const nextFill = inlineFillPreview.fills[nextIdx];
+                                      setInlineFillPreview({ ...inlineFillPreview, currentIndex: nextIdx });
+                                      if (nextFill?.s3Key) {
+                                        setInlineFillLoading(true);
+                                        setInlineFillVideoUrl(null);
+                                        supabase.functions
+                                          .invoke('get-signed-url', { body: { s3_key: nextFill.s3Key } })
+                                          .then(({ data, error: fnErr }) => {
+                                            if (fnErr) { setInlineFillLoading(false); return; }
+                                            const url = data?.url || data?.data?.url;
+                                            setInlineFillVideoUrl(url || null);
+                                            setInlineFillLoading(false);
+                                          });
+                                      }
+                                    }
+                                  }}
                                 />
                                 <button
                                   className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover/video:opacity-100 transition-opacity cursor-pointer"
