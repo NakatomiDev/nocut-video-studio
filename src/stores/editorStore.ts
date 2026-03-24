@@ -142,6 +142,8 @@ interface EditorState {
   fillDurations: Map<string, number>;
   /** Maps cutId → selected AI fill model */
   fillModels: Map<string, AiFillModel>;
+  /** Maps cutId → ordered list of fill IDs (user-defined sequence) */
+  fillOrder: Map<string, string[]>;
   playheadPosition: number;
   isPlaying: boolean;
   zoomLevel: number;
