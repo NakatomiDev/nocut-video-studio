@@ -382,15 +382,19 @@ function buildMediaConvertJob(params: {
 
   // Add watermark for free tier
   if (watermark && watermarkS3Uri) {
-    videoDescription.InsertableImages = [
-      {
-        ImageInserterInput: watermarkS3Uri,
-        Layer: 1,
-        ImageX: targetWidth - 220,
-        ImageY: targetHeight - 50,
-        Opacity: 50,
+    videoDescription.VideoPreprocessors = {
+      ImageInserter: {
+        InsertableImages: [
+          {
+            ImageInserterInput: watermarkS3Uri,
+            Layer: 1,
+            ImageX: targetWidth - 220,
+            ImageY: targetHeight - 50,
+            Opacity: 50,
+          },
+        ],
       },
-    ];
+    };
   }
 
   return {
