@@ -326,11 +326,11 @@ const ProjectEditor = () => {
         {/* Credits indicator */}
         <button
           onClick={() => navigate('/credits')}
-          className="ml-auto flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-sm transition-colors hover:bg-primary/20"
+          className="ml-auto flex items-center gap-2 rounded-full border-2 border-primary bg-primary/15 px-4 py-1.5 text-base transition-colors hover:bg-primary/25"
         >
-          <Coins className="h-4 w-4 text-primary" />
-          <span className="font-semibold tabular-nums text-foreground">{balance?.total ?? '—'}</span>
-          <span className="text-muted-foreground">credits</span>
+          <Coins className="h-5 w-5 text-primary" />
+          <span className="font-bold tabular-nums text-foreground text-lg">{balance?.total ?? '—'}</span>
+          <span className="font-medium text-muted-foreground">credits</span>
         </button>
       </div>
 
