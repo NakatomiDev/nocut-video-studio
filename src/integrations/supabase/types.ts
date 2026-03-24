@@ -424,6 +424,7 @@ export type Database = {
       projects: {
         Row: {
           created_at: string | null
+          deleted_at: string | null
           error_message: string | null
           id: string
           status: string
@@ -433,6 +434,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          deleted_at?: string | null
           error_message?: string | null
           id?: string
           status?: string
@@ -442,6 +444,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          deleted_at?: string | null
           error_message?: string | null
           id?: string
           status?: string
