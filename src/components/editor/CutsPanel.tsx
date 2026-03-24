@@ -379,162 +379,157 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
             </Button>
           </div>
         )}
-        {/* Model selector — stacked layout to prevent overflow */}
-        <div className="flex flex-col gap-1 min-w-0">
-          <div className="flex items-center gap-1.5 min-w-0">
-            {generatedFill ? (
-              <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
-            ) : (
-              <Sparkles className="h-3 w-3 text-primary shrink-0" />
+        {/* Collapsible fill configuration */}
+        <Collapsible>
+          <CollapsibleTrigger
+            className="flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground hover:text-foreground transition-colors w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {({ 'data-state': state } = {}) => null}
+            <ChevronRight className="h-3 w-3 transition-transform [[data-state=open]>&]:rotate-90" />
+            <Sparkles className="h-3 w-3 text-primary shrink-0" />
+            <span>Fill Configuration</span>
+            {generatedFill && (
+              <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[9px] shrink-0 ml-auto">
+                ✓ Generated
+              </Badge>
             )}
-            <span className="text-[10px] text-muted-foreground shrink-0">Model:</span>
-          </div>
-          <Select
-            value={currentModel}
-            onValueChange={(val) => {
-              const newModel = val as AiFillModel;
-              setFillModel(cutId, newModel);
-              const newDurations = getModelDurations(newModel, userTier);
-              if (currentFill > 0 && !newDurations.includes(currentFill)) {
-                setFillDuration(cutId, newDurations[0] ?? 0);
-              }
-            }}
-          >
-            <SelectTrigger
-              className="h-6 w-full text-[10px] px-2 truncate"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {availableModels.map((m) => (
-                <SelectItem key={m.id} value={m.id}>
-                  {m.label} ({m.creditsPerSec}cr/s){m.audio ? ' 🔊' : ''}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {generatedFill && (
-            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[9px] shrink-0 self-start">
-              ✓ Generated
-            </Badge>
-          )}
-        </div>
-        {/* Duration selector */}
-        <div className="flex items-center gap-1.5 pl-4 min-w-0">
-          <span className="text-[10px] text-muted-foreground shrink-0">Duration:</span>
-          <Select
-            value={currentFill > 0 ? String(currentFill) : 'none'}
-            onValueChange={(val) => {
-              setFillDuration(cutId, val === 'none' ? 0 : Number(val));
-            }}
-          >
-            <SelectTrigger
-              className="h-6 min-w-0 flex-1 text-[10px] px-2"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">None (free)</SelectItem>
-              {modelDurations.map((sec) => {
-                const credits = sec * creditsPerSec;
-                return (
-                  <SelectItem key={sec} value={String(sec)}>
-                    {sec}s ({credits} credit{credits > 1 ? 's' : ''})
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-          {modelConfig && !modelConfig.audio && (
-            <span className="text-[9px] text-muted-foreground shrink-0">Silent</span>
-          )}
-        </div>
-        {/* Prompt selector */}
-        {currentFill > 0 && (
-          <div className="flex flex-col gap-1 pl-4 min-w-0">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-[10px] text-muted-foreground shrink-0">Prompt:</span>
-              <Select
-                value={currentPromptId}
-                onValueChange={(val) => {
-                  if (val === "custom") {
-                    setFillPrompt(cutId, `custom:${customPromptText}`);
-                  } else {
-                    setFillPrompt(cutId, val);
-                  }
-                }}
-              >
-                <SelectTrigger
-                  className="h-6 min-w-0 flex-1 text-[10px] px-2 truncate"
-                  onClick={(e) => e.stopPropagation()}
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="flex flex-col gap-1.5 mt-1.5 pl-2">
+              {/* Model selector */}
+              <div className="flex flex-col gap-1 min-w-0">
+                <span className="text-[10px] text-muted-foreground">Model:</span>
+                <Select
+                  value={currentModel}
+                  onValueChange={(val) => {
+                    const newModel = val as AiFillModel;
+                    setFillModel(cutId, newModel);
+                    const newDurations = getModelDurations(newModel, userTier);
+                    if (currentFill > 0 && !newDurations.includes(currentFill)) {
+                      setFillDuration(cutId, newDurations[0] ?? 0);
+                    }
+                  }}
                 >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {FILL_PROMPT_PRESETS.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
-                  ))}
-                  <SelectItem value="custom">Custom...</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {currentPromptId === "custom" && (
-              <div className="flex flex-col gap-0.5">
-                <Textarea
-                  className="min-h-[40px] h-10 text-[10px] px-2 py-1 resize-none"
-                  placeholder="Describe the transition style..."
-                  maxLength={MAX_CUSTOM_PROMPT_LENGTH}
-                  value={customPromptText}
-                  onChange={(e) => setFillPrompt(cutId, `custom:${e.target.value}`)}
-                  onClick={(e) => e.stopPropagation()}
-                />
-                <span className="text-[9px] text-muted-foreground text-right">{customPromptText.length}/{MAX_CUSTOM_PROMPT_LENGTH}</span>
+                  <SelectTrigger
+                    className="h-6 w-full text-[10px] px-2 truncate"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableModels.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.label} ({m.creditsPerSec}cr/s){m.audio ? ' 🔊' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            )}
-          </div>
-        )}
-        {/* Preview fill button */}
-        {currentFill > 0 && (
-          <div className="flex items-center gap-1.5 pl-4 flex-wrap">
-            {generatedFill ? (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-6 text-[10px] px-2"
-                  onClick={(e) => { e.stopPropagation(); selectFill(generatedFill); }}
+              {/* Duration selector */}
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="text-[10px] text-muted-foreground shrink-0">Duration:</span>
+                <Select
+                  value={currentFill > 0 ? String(currentFill) : 'none'}
+                  onValueChange={(val) => {
+                    setFillDuration(cutId, val === 'none' ? 0 : Number(val));
+                  }}
                 >
-                  <Eye className="h-3 w-3 mr-1" /> View
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 text-[10px] px-2"
-                  disabled={!!previewGeneratingCutId}
-                  onClick={(e) => { e.stopPropagation(); generatePreview(cutId); }}
-                >
-                  <RefreshCw className="h-3 w-3 mr-1" /> Redo
-                </Button>
-              </>
-            ) : previewGeneratingCutId === cutId ? (
-              <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" disabled>
-                <Loader2 className="h-3 w-3 mr-1 animate-spin" /> Generating...
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-6 text-[10px] px-2"
-                disabled={!!previewGeneratingCutId}
-                onClick={(e) => { e.stopPropagation(); generatePreview(cutId); }}
-              >
-                <Eye className="h-3 w-3 mr-1" /> Preview
-              </Button>
-            )}
-          </div>
-        )}
+                  <SelectTrigger
+                    className="h-6 min-w-0 flex-1 text-[10px] px-2"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None (free)</SelectItem>
+                    {modelDurations.map((sec) => {
+                      const credits = sec * creditsPerSec;
+                      return (
+                        <SelectItem key={sec} value={String(sec)}>
+                          {sec}s ({credits} credit{credits > 1 ? 's' : ''})
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+                {modelConfig && !modelConfig.audio && (
+                  <span className="text-[9px] text-muted-foreground shrink-0">Silent</span>
+                )}
+              </div>
+              {/* Prompt selector */}
+              {currentFill > 0 && (
+                <div className="flex flex-col gap-1 min-w-0">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-[10px] text-muted-foreground shrink-0">Prompt:</span>
+                    <Select
+                      value={currentPromptId}
+                      onValueChange={(val) => {
+                        if (val === "custom") {
+                          setFillPrompt(cutId, `custom:${customPromptText}`);
+                        } else {
+                          setFillPrompt(cutId, val);
+                        }
+                      }}
+                    >
+                      <SelectTrigger
+                        className="h-6 min-w-0 flex-1 text-[10px] px-2 truncate"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {FILL_PROMPT_PRESETS.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
+                        ))}
+                        <SelectItem value="custom">Custom...</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {currentPromptId === "custom" && (
+                    <div className="flex flex-col gap-0.5">
+                      <Textarea
+                        className="min-h-[40px] h-10 text-[10px] px-2 py-1 resize-none"
+                        placeholder="Describe the transition style..."
+                        maxLength={MAX_CUSTOM_PROMPT_LENGTH}
+                        value={customPromptText}
+                        onChange={(e) => setFillPrompt(cutId, `custom:${e.target.value}`)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <span className="text-[9px] text-muted-foreground text-right">{customPromptText.length}/{MAX_CUSTOM_PROMPT_LENGTH}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              {/* Generate New Fill button */}
+              {currentFill > 0 && (
+                <div className="flex items-center gap-1.5">
+                  {previewGeneratingCutId === cutId ? (
+                    <Button variant="outline" size="sm" className="h-7 text-[10px] px-3" disabled>
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" /> Generating...
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-[10px] px-3"
+                      disabled={!!previewGeneratingCutId}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const cost = currentFill * creditsPerSec;
+                        if (window.confirm(`Generate a new AI fill?\n\nThis will cost ${cost} credit${cost > 1 ? 's' : ''}.\nYour balance: ${creditBalance.total} credits.`)) {
+                          generatePreview(cutId);
+                        }
+                      }}
+                    >
+                      <Sparkles className="h-3 w-3 mr-1" /> Generate New Fill ({currentFill * creditsPerSec} cr)
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       </div>
     );
   };
