@@ -204,6 +204,28 @@ Deno.serve(async (req) => {
       .update({ status: "exporting" })
       .eq("id", project_id);
 
+    // 7. Invoke export-video edge function to process the assembly job
+    if (jobRow?.id) {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      try {
+        const exportRes = await fetch(`${supabaseUrl}/functions/v1/export-video`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${serviceRoleKey}`,
+          },
+          body: JSON.stringify({ job_id: jobRow.id }),
+        });
+        if (!exportRes.ok) {
+          const body = await exportRes.text();
+          console.error(`export-video returned ${exportRes.status}: ${body}`);
+        }
+      } catch (err) {
+        console.error("Failed to invoke export-video:", err);
+      }
+    }
+
     return successResponse({
       edit_decision_id: editDecision.id,
       job_id: jobRow.id,
