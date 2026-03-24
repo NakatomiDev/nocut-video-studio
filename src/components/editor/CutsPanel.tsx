@@ -474,12 +474,10 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   };
 
   const renderPreview = (start: number, end: number, cutId?: string) => {
-    // Find selected/inserted fill for this cut
+    // Only show fill thumbnails for explicitly inserted fills
     const allCutsArr = [...cuts, ...manualCuts.map((c) => ({ ...c, type: 'manual' }))];
     const cutObj = cutId ? allCutsArr.find((c) => c.id === cutId) : null;
     const insertedFill = cutObj ? getInsertedFillForCut(cutObj) : null;
-    const previewFill = cutObj ? getPreviewFillForCut(cutObj) : null;
-    const activeFill = insertedFill ?? previewFill;
 
     return (
       <div className="flex items-center gap-1 pl-2 pr-1 overflow-hidden">
@@ -501,10 +499,15 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
           <span className="text-[9px] text-muted-foreground font-mono">Start</span>
         </button>
 
-        {activeFill && activeFill.s3Key ? (
+        {insertedFill && insertedFill.s3Key ? (
           <>
             <div className="border-t border-dashed border-muted-foreground/30 w-2 shrink-0" />
-            <FillThumbnailInline fill={activeFill} isInserted={insertedFill?.id === activeFill.id} />
+            <button
+              className="cursor-pointer hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background"
+              onClick={(e) => { e.stopPropagation(); selectFill(insertedFill); }}
+            >
+              <FillThumbnailInline fill={insertedFill} isInserted={true} />
+            </button>
             <div className="border-t border-dashed border-muted-foreground/30 w-2 shrink-0" />
           </>
         ) : (
