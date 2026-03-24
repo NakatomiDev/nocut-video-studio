@@ -557,39 +557,47 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="flex flex-col gap-1 pl-7 mt-1">
-            {fills.map((fill) => {
+            {fills.map((fill, idx) => {
               const isInserted = insertedFills.has(fill.id);
               const hasVideo = !!fill.s3Key;
+              const identity = formatFillIdentity(fill);
               return (
                 <div
                   key={fill.id}
-                  className={`flex items-center gap-1.5 rounded px-2 py-1 text-[10px] transition-colors ${
+                  className={`flex items-start gap-1.5 rounded px-2 py-1.5 text-[10px] transition-colors ${
                     isInserted ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-secondary/50'
                   }`}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[9px] shrink-0">
-                    {fill.duration}s
-                  </Badge>
-                  {isInserted && (
-                    <Badge className="bg-primary/15 text-primary border-primary/30 text-[9px] shrink-0">
-                      Selected
-                    </Badge>
+                  {/* First-frame thumbnail */}
+                  {hasVideo && (
+                    <FillThumbnailInline fill={fill} isInserted={isInserted} />
                   )}
-                  <span className="text-muted-foreground truncate flex-1">
-                    {fill.method || fill.provider || 'AI Fill'}
-                  </span>
-                  {fill.qualityScore !== null && (
-                    <span className="text-[9px] text-muted-foreground shrink-0">
-                      {Math.round(fill.qualityScore * 100)}%
+                  {/* Info column */}
+                  <div className="flex flex-col gap-0.5 flex-1 min-w-0 justify-center">
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span className="font-mono text-[9px] text-muted-foreground shrink-0">#{identity.shortId}</span>
+                      <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[9px] shrink-0">
+                        {fill.duration}s
+                      </Badge>
+                      {isInserted && (
+                        <Badge className="bg-primary/15 text-primary border-primary/30 text-[9px] shrink-0">
+                          Selected
+                        </Badge>
+                      )}
+                    </div>
+                    <span className="text-muted-foreground truncate text-[9px]">
+                      {identity.modelLabel}
+                      {fill.qualityScore !== null && ` · ${Math.round(fill.qualityScore * 100)}%`}
                     </span>
-                  )}
+                  </div>
+                  {/* Actions */}
                   {hasVideo ? (
-                    <>
+                    <div className="flex items-center gap-0.5 shrink-0 self-center">
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-5 w-5 shrink-0"
+                        className="h-5 w-5"
                         onClick={() => selectFill(fill)}
                       >
                         <Eye className="h-3 w-3" />
@@ -597,14 +605,14 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                       <Button
                         variant="ghost"
                         size="icon"
-                        className={`h-5 w-5 shrink-0 ${isInserted ? 'text-emerald-400' : 'text-muted-foreground'}`}
+                        className={`h-5 w-5 ${isInserted ? 'text-emerald-400' : 'text-muted-foreground'}`}
                         onClick={() => isInserted ? removeFill(fill.id) : insertFill(fill.id)}
                       >
                         {isInserted ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
                       </Button>
-                    </>
+                    </div>
                   ) : (
-                    <span className="text-[9px] text-muted-foreground animate-pulse">Generating...</span>
+                    <span className="text-[9px] text-muted-foreground animate-pulse self-center">Generating...</span>
                   )}
                 </div>
               );
