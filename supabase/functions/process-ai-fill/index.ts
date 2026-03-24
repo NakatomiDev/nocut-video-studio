@@ -575,12 +575,19 @@ async function requestTranscoderFrameExtraction(
   while (Date.now() - startTime < MAX_WAIT_MS) {
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
 
-    const { data: jobStatus } = await serviceClient
+    const { data: jobStatus, error: statusError } = await serviceClient
       .from("job_queue")
       .select("status, error_message")
       .eq("id", frameJob.id)
       .single();
 
+    if (statusError) {
+      console.error(
+        `Error while polling transcoder job status for job ${frameJob.id}:`,
+        statusError.message ?? statusError,
+      );
+      return false;
+    }
     if (jobStatus?.status === "complete") {
       console.log(`Frame extraction completed via transcoder (job ${frameJob.id})`);
       return true;
