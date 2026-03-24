@@ -222,16 +222,16 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   const creditsAfterExport = creditBalance.total - creditEstimate;
   const cutsWithFills = fillDurations.size;
 
-  const getInsertedFillForCut = useCallback((cutObj: { end: number }) => {
+  const getInsertedFillsForCut = useCallback((cutObj: { end: number }) => {
     const fills = getFillsForCut(cutObj, aiFills);
-    return fills.find((fill) => insertedFills.has(fill.id)) ?? null;
+    return fills.filter((fill) => insertedFills.has(fill.id));
   }, [aiFills, insertedFills]);
 
   const getPreviewFillForCut = useCallback((cutObj: { end: number }) => {
-    const insertedFill = getInsertedFillForCut(cutObj);
-    if (insertedFill) return insertedFill;
+    const inserted = getInsertedFillsForCut(cutObj);
+    if (inserted.length > 0) return inserted[0];
     return getFillsForCut(cutObj, aiFills)[0] ?? null;
-  }, [aiFills, getInsertedFillForCut]);
+  }, [aiFills, getInsertedFillsForCut]);
 
   /** Resolve the effective fill for a cut: explicit fillDuration, or an inserted existing fill */
   const getEffectiveFill = useCallback((cutId: string, cutObj: { end: number }) => {
@@ -239,15 +239,16 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     if (explicit > 0) {
       return { duration: explicit, model: fillModels.get(cutId) ?? DEFAULT_AI_FILL_MODEL, isExisting: false };
     }
-    const inserted = getInsertedFillForCut(cutObj);
-    if (inserted && inserted.duration) {
-      const m = (inserted.provider && inserted.provider in MODEL_CREDITS_PER_SEC)
-        ? inserted.provider as AiFillModel
+    const inserted = getInsertedFillsForCut(cutObj);
+    if (inserted.length > 0 && inserted[0].duration) {
+      const first = inserted[0];
+      const m = (first.provider && first.provider in MODEL_CREDITS_PER_SEC)
+        ? first.provider as AiFillModel
         : DEFAULT_AI_FILL_MODEL;
-      return { duration: inserted.duration, model: m, isExisting: true, fillId: inserted.id };
+      return { duration: first.duration, model: m, isExisting: true, fillId: first.id };
     }
     return { duration: 0, model: fillModels.get(cutId) ?? DEFAULT_AI_FILL_MODEL, isExisting: false };
-  }, [fillDurations, fillModels, getInsertedFillForCut]);
+  }, [fillDurations, fillModels, getInsertedFillsForCut]);
 
   const handleExport = useCallback(async () => {
     if (!project) return;
@@ -258,13 +259,13 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
       const allCuts = [
         ...activeCutsList.map((c) => {
           const eff = getEffectiveFill(c.id, c);
-          const existingFill = eff.isExisting ? getInsertedFillForCut(c) : null;
-          return { start: c.start, end: c.end, type: c.type, fill_duration: eff.duration, model: eff.model, isExisting: eff.isExisting, existing_fill_s3_key: existingFill?.s3Key ?? undefined };
+          const existingFills = eff.isExisting ? getInsertedFillsForCut(c) : [];
+          return { start: c.start, end: c.end, type: c.type, fill_duration: eff.duration, model: eff.model, isExisting: eff.isExisting, existing_fill_s3_key: existingFills[0]?.s3Key ?? undefined };
         }),
         ...activeManualList.map((c) => {
           const eff = getEffectiveFill(c.id, c);
-          const existingFill = eff.isExisting ? getInsertedFillForCut(c) : null;
-          return { start: c.start, end: c.end, type: 'manual', fill_duration: eff.duration, model: eff.model, isExisting: eff.isExisting, existing_fill_s3_key: existingFill?.s3Key ?? undefined };
+          const existingFills = eff.isExisting ? getInsertedFillsForCut(c) : [];
+          return { start: c.start, end: c.end, type: 'manual', fill_duration: eff.duration, model: eff.model, isExisting: eff.isExisting, existing_fill_s3_key: existingFills[0]?.s3Key ?? undefined };
         }),
       ].sort((a, b) => a.start - b.start);
 
@@ -327,7 +328,8 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     const allCutsArr = [...cuts, ...manualCuts.map((c) => ({ ...c, type: 'manual' }))];
     const cutObj = allCutsArr.find((c) => c.id === cutId);
     const generatedFill = cutObj ? getPreviewFillForCut(cutObj) : null;
-    const selectedExistingFill = cutObj ? getInsertedFillForCut(cutObj) : null;
+    const selectedExistingFills = cutObj ? getInsertedFillsForCut(cutObj) : [];
+    const selectedExistingFill = selectedExistingFills[0] ?? null;
     const selectedExistingIdentity = selectedExistingFill ? formatFillIdentity(selectedExistingFill) : null;
 
     return (
@@ -474,10 +476,19 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   };
 
   const renderPreview = (start: number, end: number, cutId?: string) => {
-    // Only show fill thumbnails for explicitly inserted fills
+    // Get all explicitly inserted fills for this cut
     const allCutsArr = [...cuts, ...manualCuts.map((c) => ({ ...c, type: 'manual' }))];
     const cutObj = cutId ? allCutsArr.find((c) => c.id === cutId) : null;
-    const insertedFill = cutObj ? getInsertedFillForCut(cutObj) : null;
+    const insertedFillsList = cutObj ? getInsertedFillsForCut(cutObj) : [];
+    // Apply user ordering if available
+    const order = cutId ? fillOrder.get(cutId) : undefined;
+    let orderedFills = insertedFillsList.filter((f) => f.s3Key);
+    if (order && order.length > 0) {
+      const byId = new Map(orderedFills.map((f) => [f.id, f]));
+      const sorted = order.map((id) => byId.get(id)).filter(Boolean) as typeof orderedFills;
+      const extra = orderedFills.filter((f) => !order.includes(f.id));
+      orderedFills = [...sorted, ...extra];
+    }
 
     return (
       <div className="flex items-center gap-1 pl-2 pr-1 overflow-hidden">
@@ -499,15 +510,24 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
           <span className="text-[9px] text-muted-foreground font-mono">Start</span>
         </button>
 
-        {insertedFill && insertedFill.s3Key ? (
+        {orderedFills.length > 0 ? (
           <>
             <div className="border-t border-dashed border-muted-foreground/30 w-2 shrink-0" />
-            <button
-              className="cursor-pointer hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background"
-              onClick={(e) => { e.stopPropagation(); selectFill(insertedFill); }}
-            >
-              <FillThumbnailInline fill={insertedFill} isInserted={true} />
-            </button>
+            {orderedFills.map((fill, i) => (
+              <div key={fill.id} className="flex items-center gap-0">
+                {i > 0 && <div className="border-t border-dashed border-primary/40 w-1.5 shrink-0" />}
+                <button
+                  className="cursor-pointer hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Open chained preview with all fills
+                    selectFill(orderedFills.length > 1 ? orderedFills : fill);
+                  }}
+                >
+                  <FillThumbnailInline fill={fill} isInserted={true} />
+                </button>
+              </div>
+            ))}
             <div className="border-t border-dashed border-muted-foreground/30 w-2 shrink-0" />
           </>
         ) : (
@@ -951,7 +971,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                   ...activeCutsList.map((c) => {
                     const eff = getEffectiveFill(c.id, c);
                     const modelConfig = AI_FILL_MODELS.find((m) => m.id === eff.model);
-                    const existingFill = eff.isExisting ? getInsertedFillForCut(c) : null;
+                    const existingFill = eff.isExisting ? (getInsertedFillsForCut(c)[0] ?? null) : null;
                     return {
                       id: c.id,
                       start: c.start,
@@ -969,7 +989,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                   ...activeManualList.map((c) => {
                     const eff = getEffectiveFill(c.id, c);
                     const modelConfig = AI_FILL_MODELS.find((m) => m.id === eff.model);
-                    const existingFill = eff.isExisting ? getInsertedFillForCut(c) : null;
+                    const existingFill = eff.isExisting ? (getInsertedFillsForCut(c)[0] ?? null) : null;
                     return {
                       id: c.id,
                       start: c.start,

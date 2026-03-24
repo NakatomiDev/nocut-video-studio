@@ -136,8 +136,8 @@ interface EditorState {
   insertedFills: Set<string>;
   /** Signed URLs for fill video clips, keyed by fill ID */
   fillVideoUrls: Map<string, string>;
-  /** Currently selected fill for preview (null = none) */
-  selectedFill: AiFill | null;
+  /** Currently selected fill(s) for preview (null = none, array = chained playback) */
+  selectedFill: AiFill | AiFill[] | null;
   /** Maps cutId → selected AI fill duration in seconds (0 = no fill, just cut) */
   fillDurations: Map<string, number>;
   /** Maps cutId → selected AI fill model */
@@ -177,7 +177,7 @@ interface EditorState {
   setRazorStart: (time: number | null) => void;
   setAiFills: (fills: AiFill[]) => void;
   toggleShowFills: () => void;
-  selectFill: (fill: AiFill | null) => void;
+  selectFill: (fill: AiFill | AiFill[] | null) => void;
   insertFill: (fillId: string) => void;
   removeFill: (fillId: string) => void;
   setFillVideoUrl: (fillId: string, url: string) => void;
