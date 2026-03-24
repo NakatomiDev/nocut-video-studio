@@ -765,6 +765,9 @@ Deno.serve(async (req) => {
     "AWS_ACCESS_KEY_ID",
     "AWS_SECRET_ACCESS_KEY",
     "AWS_S3_BUCKET",
+    "SUPABASE_URL",
+    "SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
   ];
   for (const envVar of requiredEnvVars) {
     if (!Deno.env.get(envVar)) {
@@ -776,19 +779,28 @@ Deno.serve(async (req) => {
   const bucket = Deno.env.get("AWS_S3_BUCKET")!;
   const roleArn = Deno.env.get("AWS_MEDIACONVERT_ROLE_ARN")!;
 
-  // Authenticate the caller
-  let user;
   try {
-    const auth = await getAuthenticatedUser(req);
-    user = auth.user;
-  } catch (err) {
-    if (err instanceof AuthError) {
-      return errorResponse("unauthorized", err.message, 401);
-    }
-    throw err;
-  }
+    // Authenticate the caller — allow internal service-role invocations
+    // (e.g. from process-ai-fill) alongside user JWT requests.
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const isServiceRoleRequest =
+      authHeader.toLowerCase().startsWith("bearer ") &&
+      authHeader.slice(7).trim() === serviceRoleKey;
 
-  try {
+    let userId: string | null = null;
+    if (!isServiceRoleRequest) {
+      try {
+        const auth = await getAuthenticatedUser(req);
+        userId = auth.user.id;
+      } catch (err) {
+        if (err instanceof AuthError) {
+          return errorResponse("unauthorized", err.message, 401);
+        }
+        throw err;
+      }
+    }
+
     const body = await req.json();
     const { job_id } = body;
 
@@ -809,7 +821,9 @@ Deno.serve(async (req) => {
       return errorResponse("not_found", "Job not found", 404);
     }
 
-    if (job.user_id !== user.id) {
+    // For user JWT requests, verify the caller owns the job.
+    // Service-role requests (internal) skip this check.
+    if (!isServiceRoleRequest && job.user_id !== userId) {
       return errorResponse("forbidden", "You do not own this job", 403);
     }
 
