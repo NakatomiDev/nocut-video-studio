@@ -544,8 +544,6 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
       orderedFills = [...sorted, ...extra];
     }
 
-    // When 3+ fills, switch to a wrapped grid layout
-    const useGridLayout = orderedFills.length >= 3;
 
     return (
       <div className="flex flex-col gap-1 pl-2 pr-1">
@@ -569,30 +567,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
             <span className="text-[9px] text-muted-foreground font-mono">Start</span>
           </button>
 
-          {!useGridLayout && orderedFills.length > 0 ? (
-            <>
-              <div className="border-t border-dashed border-muted-foreground/30 w-2 shrink-0" />
-              {orderedFills.map((fill, i) => (
-                <div key={fill.id} className="flex items-center gap-0 shrink-0">
-                  {i > 0 && <div className="border-t border-dashed border-primary/40 w-1.5 shrink-0" />}
-                  <button
-                    className="cursor-pointer hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      selectFill(orderedFills.length > 1 ? orderedFills : fill);
-                    }}
-                  >
-                    <FillThumbnailInline fill={fill} isInserted={true} />
-                  </button>
-                </div>
-              ))}
-              <div className="border-t border-dashed border-muted-foreground/30 w-2 shrink-0" />
-            </>
-          ) : orderedFills.length === 0 ? (
-            <div className="flex-1 border-t border-dashed border-muted-foreground/30 min-w-1" />
-          ) : (
-            <div className="flex-1 border-t border-dashed border-muted-foreground/30 min-w-1" />
-          )}
+          <div className="flex-1 border-t border-dashed border-muted-foreground/30 min-w-1" />
 
           <button
             className="flex flex-col items-center gap-0.5 shrink-0 min-w-0 cursor-zoom-in hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background"
@@ -613,9 +588,9 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
           </button>
         </div>
 
-        {/* Wrapped fill thumbnails grid for 3+ fills */}
-        {useGridLayout && orderedFills.length > 0 && (
-          <div className="flex flex-wrap gap-1 pl-1">
+        {/* Fill thumbnails — always wrapping grid */}
+        {orderedFills.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 pl-1">
             {orderedFills.map((fill, i) => (
               <button
                 key={fill.id}
@@ -626,9 +601,11 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                 }}
               >
                 <FillThumbnailInline fill={fill} isInserted={true} />
-                <span className="absolute -top-1 -left-1 bg-primary text-primary-foreground text-[7px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center">
-                  {i + 1}
-                </span>
+                {orderedFills.length > 1 && (
+                  <span className="absolute -top-1 -left-1 bg-primary text-primary-foreground text-[7px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center">
+                    {i + 1}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -741,8 +718,11 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                   {/* Main row */}
                   <div className="flex items-center gap-1 px-1.5 py-1.5 cursor-grab active:cursor-grabbing">
                     {/* Drag handle + sequence */}
-                    <div className="flex flex-col items-center gap-0.5 shrink-0 select-none">
-                      <GripVertical className="h-3.5 w-3.5 text-muted-foreground/50" />
+                    <div className="flex flex-col items-center gap-0.5 shrink-0 select-none mr-0.5">
+                      <div className="flex flex-col items-center rounded bg-muted/50 hover:bg-muted px-0.5 py-1 transition-colors">
+                        <GripVertical className="h-4 w-4 text-muted-foreground/70" />
+                        <GripVertical className="h-4 w-4 -mt-2 text-muted-foreground/70" />
+                      </div>
                       <span className="text-[8px] font-mono text-muted-foreground/70">{idx + 1}</span>
                     </div>
                     {/* Thumbnail */}
