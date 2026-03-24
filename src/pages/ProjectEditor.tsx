@@ -322,6 +322,13 @@ const ProjectEditor = () => {
             {title || 'Untitled Project'}
           </button>
         )}
+
+        {/* Credits indicator */}
+        <div className="ml-auto flex items-center gap-1.5 text-sm text-muted-foreground">
+          <Coins className="h-3.5 w-3.5 text-primary" />
+          <span className="font-medium tabular-nums text-foreground">{balance?.total ?? '—'}</span>
+          <span className="hidden sm:inline">credits</span>
+        </div>
       </div>
 
       {/* Main content */}
