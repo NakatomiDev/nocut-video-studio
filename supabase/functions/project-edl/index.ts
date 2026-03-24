@@ -45,6 +45,7 @@ Deno.serve(async (req) => {
         model?: string;
         type?: string;
         existing_fill_s3_key?: string;
+        prompt?: string;
       }>;
       output_format?: string;
       output_resolution?: string;
@@ -103,6 +104,7 @@ Deno.serve(async (req) => {
       fill_duration: number;
       model: string;
       existing_fill_s3_key?: string;
+      prompt?: string;
     }> = [];
 
     for (let i = 0; i < gaps.length; i++) {
@@ -148,6 +150,9 @@ Deno.serve(async (req) => {
       };
       if (isReuse) {
         entry.existing_fill_s3_key = gap.existing_fill_s3_key;
+      }
+      if (gap.prompt) {
+        entry.prompt = gap.prompt.slice(0, 200).trim();
       }
       edlJson.push(entry);
     }

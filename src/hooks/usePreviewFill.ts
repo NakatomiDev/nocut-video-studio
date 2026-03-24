@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useEditorStore, DEFAULT_AI_FILL_MODEL, type AiFill } from '@/stores/editorStore';
+import { resolvePrompt } from '@/constants/fillPrompts';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -37,6 +38,7 @@ export function usePreviewFill() {
     }
 
     const model = state.fillModels.get(cutId) ?? DEFAULT_AI_FILL_MODEL;
+    const prompt = resolvePrompt(state.fillPrompts.get(cutId));
     const project = state.project;
     if (!project) {
       toast.error('No project loaded');
@@ -64,6 +66,7 @@ export function usePreviewFill() {
           type: cut.type,
           fill_duration: duration,
           model,
+          ...(prompt ? { prompt } : {}),
         },
       });
 

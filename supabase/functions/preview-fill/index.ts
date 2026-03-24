@@ -38,14 +38,17 @@ Deno.serve(async (req) => {
 
     // 2. Parse request
     const body = await req.json();
-    const { project_id, start, end, type, fill_duration, model: requestedModel } = body as {
+    const { project_id, start, end, type, fill_duration, model: requestedModel, prompt: rawPrompt } = body as {
       project_id: string;
       start: number;
       end: number;
       type: string;
       fill_duration: number;
       model?: string;
+      prompt?: string;
     };
+
+    const prompt = rawPrompt ? rawPrompt.slice(0, 200).trim() : undefined;
 
     if (!project_id || typeof start !== "number" || typeof end !== "number" || typeof fill_duration !== "number") {
       return errorResponse("invalid_request", "project_id, start, end, and fill_duration are required", 400);
@@ -135,6 +138,7 @@ Deno.serve(async (req) => {
       type: type ?? "gap",
       fill_duration,
       model,
+      ...(prompt ? { prompt } : {}),
     }];
 
     const { data: editDecision, error: edError } = await serviceClient
