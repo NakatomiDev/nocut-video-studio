@@ -1211,8 +1211,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
 
                             <div className="flex flex-col items-center justify-center gap-1 lg:min-w-[96px]">
                               <div className="hidden h-px w-8 bg-muted-foreground/30 lg:block" />
-                              {(edit.fill > 0 || edit.existingFill) && (
-                                edit.existingFill ? (
+                              {edit.existingFill && (
                                   <button
                                     className="group/fill flex w-full max-w-[320px] flex-col items-center gap-1 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 transition-colors hover:bg-primary/10 lg:w-auto lg:max-w-none"
                                     onClick={(e) => {
@@ -1253,17 +1252,6 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                                       {inlineFillPreview?.editId === edit.id ? 'Click to close' : 'Click to preview'}
                                     </span>
                                   </button>
-                                ) : (
-                                  <div className="flex w-full max-w-[320px] flex-col items-center gap-0.5 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 lg:w-auto lg:max-w-none">
-                                    <div className="flex h-14 w-full items-center justify-center rounded border border-dashed border-muted-foreground/30 bg-muted/60 lg:h-12 lg:w-20">
-                                      <Sparkles className="h-4 w-4 text-amber-400/60" />
-                                    </div>
-                                    <span className="text-[9px] font-semibold text-amber-400">
-                                      {edit.fill}s AI Fill
-                                    </span>
-                                    <span className="text-[8px] text-muted-foreground">Pending</span>
-                                  </div>
-                                )
                               )}
                               <div className="hidden h-px w-8 bg-muted-foreground/30 lg:block" />
                             </div>
