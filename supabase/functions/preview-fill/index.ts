@@ -184,6 +184,8 @@ Deno.serve(async (req) => {
 
     if (jobError || !jobRow) {
       console.error("Failed to create job:", jobError);
+      // Refund credits since we can't queue the job
+      await refundCredits(serviceClient, creditTransactionId);
       return errorResponse("internal_error", "Failed to queue preview job", 500);
     }
 
