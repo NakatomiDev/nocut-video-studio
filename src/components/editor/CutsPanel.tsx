@@ -54,63 +54,105 @@ const typeBadgeClass: Record<string, string> = {
   retake: 'bg-red-500/20 text-red-400 border-red-500/30',
 };
 
+/** Module-level caches for fill thumbnails — persist across re-mounts */
+const fillSignedUrlCache = new Map<string, string>();
+const fillFrameCache = new Map<string, string>();
+
 /** Inline fill thumbnail: shows a frozen first frame of the AI fill video */
 const FillThumbnailInline = ({ fill, isInserted }: { fill: AiFill; isInserted: boolean }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [url, setUrl] = useState<string | null>(null);
-  const [ready, setReady] = useState(false);
+  const [frameDataUrl, setFrameDataUrl] = useState<string | null>(() => fillFrameCache.get(fill.id) ?? null);
+  const [loading, setLoading] = useState(!frameDataUrl);
 
   useEffect(() => {
-    if (!fill.s3Key) return;
+    // Already cached — skip entirely
+    if (fillFrameCache.has(fill.id)) {
+      setFrameDataUrl(fillFrameCache.get(fill.id)!);
+      setLoading(false);
+      return;
+    }
+    if (!fill.s3Key) { setLoading(false); return; }
+
     let cancelled = false;
-    supabase.functions.invoke('get-signed-url', { body: { s3_key: fill.s3Key } })
-      .then(({ data }) => {
-        if (!cancelled) {
-          const signedUrl = data?.data?.url ?? data?.url;
-          if (signedUrl) setUrl(signedUrl);
-        }
-      });
+
+    const loadFrame = async () => {
+      // 1. Get signed URL (cached)
+      let signedUrl = fillSignedUrlCache.get(fill.s3Key!);
+      if (!signedUrl) {
+        const { data } = await supabase.functions.invoke('get-signed-url', { body: { s3_key: fill.s3Key } });
+        signedUrl = data?.data?.url ?? data?.url;
+        if (signedUrl) fillSignedUrlCache.set(fill.s3Key!, signedUrl);
+      }
+      if (cancelled || !signedUrl) { setLoading(false); return; }
+
+      // 2. Load video, seek to 0.1s, extract frame to canvas
+      const video = videoRef.current;
+      if (!video) return;
+
+      video.src = signedUrl;
+      video.load();
+
+      await new Promise<void>((resolve, reject) => {
+        const onLoaded = () => { video.currentTime = 0.1; };
+        const onSeeked = () => {
+          cleanup();
+          resolve();
+        };
+        const onError = () => { cleanup(); reject(); };
+        const cleanup = () => {
+          video.removeEventListener('loadedmetadata', onLoaded);
+          video.removeEventListener('seeked', onSeeked);
+          video.removeEventListener('error', onError);
+        };
+        video.addEventListener('loadedmetadata', onLoaded);
+        video.addEventListener('seeked', onSeeked);
+        video.addEventListener('error', onError);
+      }).catch(() => { if (!cancelled) setLoading(false); return; });
+
+      if (cancelled) return;
+
+      // 3. Draw to canvas and extract data URL
+      const canvas = canvasRef.current;
+      if (!canvas || !video.videoWidth) { setLoading(false); return; }
+      canvas.width = 144;
+      canvas.height = 80;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { setLoading(false); return; }
+      ctx.drawImage(video, 0, 0, 144, 80);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+
+      // Cache and display
+      fillFrameCache.set(fill.id, dataUrl);
+      if (!cancelled) {
+        setFrameDataUrl(dataUrl);
+        setLoading(false);
+      }
+
+      // Release video resources
+      video.removeAttribute('src');
+      video.load();
+    };
+
+    loadFrame();
     return () => { cancelled = true; };
-  }, [fill.s3Key]);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !url) return;
-    let cancelled = false;
-    const onLoaded = () => {
-      if (cancelled) return;
-      video.currentTime = 0.1;
-    };
-    const onSeeked = () => {
-      if (cancelled) return;
-      video.pause();
-      setReady(true);
-    };
-    video.addEventListener('loadedmetadata', onLoaded);
-    video.addEventListener('seeked', onSeeked);
-    video.src = url;
-    video.load();
-    return () => {
-      cancelled = true;
-      video.removeEventListener('loadedmetadata', onLoaded);
-      video.removeEventListener('seeked', onSeeked);
-    };
-  }, [url]);
+  }, [fill.id, fill.s3Key]);
 
   return (
     <div className="flex flex-col items-center gap-0.5 shrink-0">
       <div className={`relative h-10 w-[72px] rounded border overflow-hidden bg-muted/40 ${isInserted ? 'border-primary/50 ring-1 ring-primary/30' : 'border-border'}`}>
-        <video
-          ref={videoRef}
-          className={`h-full w-full object-contain transition-opacity duration-200 ${ready ? 'opacity-100' : 'opacity-0'}`}
-          muted
-          playsInline
-          preload="metadata"
-        />
-        {!ready && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Sparkles className="h-3 w-3 text-primary animate-pulse" />
-          </div>
+        {frameDataUrl ? (
+          <img src={frameDataUrl} alt="AI Fill" className="h-full w-full object-contain" />
+        ) : (
+          <>
+            <video ref={videoRef} className="hidden" muted playsInline preload="metadata" />
+            <canvas ref={canvasRef} className="hidden" />
+            {loading && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Sparkles className="h-3 w-3 text-primary animate-pulse" />
+              </div>
+            )}
+          </>
         )}
       </div>
       <span className="text-[9px] text-primary font-mono">AI Fill</span>
