@@ -403,45 +403,64 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     setLightbox({ time, label });
   };
 
-  const renderPreview = (start: number, end: number) => (
-    <div className="flex items-center gap-2 pl-2 pr-1 overflow-hidden">
-      <button
-        className="flex flex-col items-center gap-0.5 shrink-0 min-w-0 cursor-zoom-in hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background"
-        onClick={(e) => handleFrameClick(start, `Start frame · ${formatTimestamp(start)}`, e)}
-      >
-        {videoUrl ? (
-          <ExactVideoFrame
-            videoUrl={videoUrl}
-            time={start}
-            label={`Start frame ${formatTimestamp(start)}`}
-            className="h-10 w-[72px]"
-            cachedFrame={getFrame(start)}
-          />
-        ) : thumbnailSpriteUrl ? (
-          <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={start} duration={duration} width={72} height={40} />
-        ) : null}
-        <span className="text-[9px] text-muted-foreground font-mono">Start</span>
-      </button>
-      <div className="flex-1 border-t border-dashed border-muted-foreground/30 min-w-1" />
-      <button
-        className="flex flex-col items-center gap-0.5 shrink-0 min-w-0 cursor-zoom-in hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background"
-        onClick={(e) => handleFrameClick(end, `End frame · ${formatTimestamp(end)}`, e)}
-      >
-        {videoUrl ? (
-          <ExactVideoFrame
-            videoUrl={videoUrl}
-            time={end}
-            label={`End frame ${formatTimestamp(end)}`}
-            className="h-10 w-[72px]"
-            cachedFrame={getFrame(end)}
-          />
-        ) : thumbnailSpriteUrl ? (
-          <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={end} duration={duration} width={72} height={40} />
-        ) : null}
-        <span className="text-[9px] text-muted-foreground font-mono">End</span>
-      </button>
-    </div>
-  );
+  const renderPreview = (start: number, end: number, cutId?: string) => {
+    // Find selected/inserted fill for this cut
+    const allCutsArr = [...cuts, ...manualCuts.map((c) => ({ ...c, type: 'manual' }))];
+    const cutObj = cutId ? allCutsArr.find((c) => c.id === cutId) : null;
+    const insertedFill = cutObj ? getInsertedFillForCut(cutObj) : null;
+    const previewFill = cutObj ? getPreviewFillForCut(cutObj) : null;
+    const activeFill = insertedFill ?? previewFill;
+
+    return (
+      <div className="flex items-center gap-1 pl-2 pr-1 overflow-hidden">
+        <button
+          className="flex flex-col items-center gap-0.5 shrink-0 min-w-0 cursor-zoom-in hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background"
+          onClick={(e) => handleFrameClick(start, `Start frame · ${formatTimestamp(start)}`, e)}
+        >
+          {videoUrl ? (
+            <ExactVideoFrame
+              videoUrl={videoUrl}
+              time={start}
+              label={`Start frame ${formatTimestamp(start)}`}
+              className="h-10 w-[72px]"
+              cachedFrame={getFrame(start)}
+            />
+          ) : thumbnailSpriteUrl ? (
+            <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={start} duration={duration} width={72} height={40} />
+          ) : null}
+          <span className="text-[9px] text-muted-foreground font-mono">Start</span>
+        </button>
+
+        {activeFill && activeFill.s3Key ? (
+          <>
+            <div className="border-t border-dashed border-muted-foreground/30 w-2 shrink-0" />
+            <FillThumbnailInline fill={activeFill} isInserted={insertedFill?.id === activeFill.id} />
+            <div className="border-t border-dashed border-muted-foreground/30 w-2 shrink-0" />
+          </>
+        ) : (
+          <div className="flex-1 border-t border-dashed border-muted-foreground/30 min-w-1" />
+        )}
+
+        <button
+          className="flex flex-col items-center gap-0.5 shrink-0 min-w-0 cursor-zoom-in hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background"
+          onClick={(e) => handleFrameClick(end, `End frame · ${formatTimestamp(end)}`, e)}
+        >
+          {videoUrl ? (
+            <ExactVideoFrame
+              videoUrl={videoUrl}
+              time={end}
+              label={`End frame ${formatTimestamp(end)}`}
+              className="h-10 w-[72px]"
+              cachedFrame={getFrame(end)}
+            />
+          ) : thumbnailSpriteUrl ? (
+            <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={end} duration={duration} width={72} height={40} />
+          ) : null}
+          <span className="text-[9px] text-muted-foreground font-mono">End</span>
+        </button>
+      </div>
+    );
+  };
 
   const renderFillsList = (cutId: string) => {
     const allCutsArr = [...cuts, ...manualCuts.map((c) => ({ ...c, type: 'manual' }))];
