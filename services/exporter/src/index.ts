@@ -77,7 +77,10 @@ async function processJob(job: ExportJobRow): Promise<void> {
   const projectId = job.project_id;
   const userId = job.user_id;
   const editDecisionId = job.payload.edit_decision_id;
-  const crossfadeDuration = job.payload.crossfade_duration ?? 0;
+  const rawCrossfade = job.payload.crossfade_duration;
+  const crossfadeDuration = Number.isFinite(rawCrossfade) && rawCrossfade! > 0
+    ? Math.min(rawCrossfade!, 0.5)
+    : 0;
 
   const ctx = { job_id: jobId, project_id: projectId, edit_decision_id: editDecisionId };
   log("info", "Processing export job", ctx);

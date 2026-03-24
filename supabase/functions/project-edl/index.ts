@@ -54,6 +54,15 @@ Deno.serve(async (req) => {
       crossfade_duration?: number;
     };
 
+    // Validate and normalize crossfade_duration
+    const ALLOWED_CROSSFADE = [0, 0.1, 0.2, 0.3];
+    const useCrossfade = Number.isFinite(crossfade_duration) && crossfade_duration! > 0;
+    const clampedCrossfade = useCrossfade
+      ? ALLOWED_CROSSFADE.reduce((prev, curr) =>
+          Math.abs(curr - crossfade_duration!) < Math.abs(prev - crossfade_duration!) ? curr : prev
+        )
+      : 0;
+
     // Validate model selection
     const model: AiFillModel = (requestedModel && requestedModel in MODEL_CREDITS_PER_SEC)
       ? requestedModel as AiFillModel
@@ -185,7 +194,7 @@ Deno.serve(async (req) => {
           edit_decision_id: editDecision.id,
           output_format: output_format ?? "mp4",
           output_resolution: output_resolution ?? "1080p",
-          ...(crossfade_duration && crossfade_duration > 0 ? { crossfade_duration } : {}),
+          ...(clampedCrossfade > 0 ? { crossfade_duration: clampedCrossfade } : {}),
         },
         status: "queued",
         priority,
@@ -209,7 +218,7 @@ Deno.serve(async (req) => {
 
     // 7. Invoke export-video edge function to process the assembly job
     //    Skip for cross-fade exports — the FFmpeg-based exporter service handles those
-    if (jobRow?.id && !(crossfade_duration && crossfade_duration > 0)) {
+    if (jobRow?.id && clampedCrossfade === 0) {
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
       const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
       try {

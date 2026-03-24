@@ -134,7 +134,7 @@ export async function concatenateSegments(
 export async function concatenateWithCrossfade(
   segmentPaths: string[],
   outputPath: string,
-  tmpDir: string,
+  _tmpDir: string,
   crossfadeDuration: number,
 ): Promise<void> {
   if (segmentPaths.length === 0) {
@@ -177,21 +177,29 @@ export async function concatenateWithCrossfade(
   let prevAudioLabel = "[0:a]";
   let cumulativeOffset = durations[0];
 
+  const FADE_EPSILON = 1e-3;
+
   for (let i = 1; i < segmentPaths.length; i++) {
-    const offset = Math.max(0, cumulativeOffset - crossfadeDuration);
+    // Clamp fade duration so it doesn't exceed either adjacent segment
+    const minSegDuration = Math.min(durations[i - 1], durations[i]);
+    const fadeDuration = minSegDuration > 2 * FADE_EPSILON
+      ? Math.min(crossfadeDuration, minSegDuration - FADE_EPSILON)
+      : Math.min(crossfadeDuration, Math.max(0, minSegDuration));
+
+    const offset = Math.max(0, cumulativeOffset - fadeDuration);
     const outVideoLabel = i === segmentPaths.length - 1 ? "[vout]" : `[v${i}]`;
     const outAudioLabel = i === segmentPaths.length - 1 ? "[aout]" : `[a${i}]`;
 
     filterParts.push(
-      `${prevVideoLabel}[${i}:v]xfade=transition=fade:duration=${crossfadeDuration}:offset=${offset.toFixed(3)}${outVideoLabel}`
+      `${prevVideoLabel}[${i}:v]xfade=transition=fade:duration=${fadeDuration.toFixed(3)}:offset=${offset.toFixed(3)}${outVideoLabel}`
     );
     audioFilterParts.push(
-      `${prevAudioLabel}[${i}:a]acrossfade=d=${crossfadeDuration}:c1=tri:c2=tri${outAudioLabel}`
+      `${prevAudioLabel}[${i}:a]acrossfade=d=${fadeDuration.toFixed(3)}:c1=tri:c2=tri${outAudioLabel}`
     );
 
     prevVideoLabel = outVideoLabel;
     prevAudioLabel = outAudioLabel;
-    // Each xfade shortens the output by crossfadeDuration
+    // Each xfade shortens the output by the actual fade duration used
     cumulativeOffset = offset + durations[i];
   }
 

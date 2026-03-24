@@ -350,7 +350,8 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
         const s3Keys = inserted.filter(f => f.s3Key).map(f => f.s3Key!);
         const totalDuration = inserted.reduce((sum, f) => sum + (f.duration ?? 0), 0);
         const eff = getEffectiveFill(c.id, c);
-        const resolvedAudioPrompt = resolveAudioPrompt(audioPrompts.get(c.id));
+        const isEffModelAudio = eff.model.endsWith('-audio');
+        const resolvedAudioPrompt = isEffModelAudio ? resolveAudioPrompt(audioPrompts.get(c.id)) : undefined;
         return {
           pre_cut_timestamp: c.start,
           post_cut_timestamp: c.end,
