@@ -35,6 +35,7 @@ interface EdlEntry {
   type: string;
   fill_duration: number;
   model?: string;
+  existing_fill_s3_key?: string;
 }
 
 let _s3Client: S3Client | null = null;
