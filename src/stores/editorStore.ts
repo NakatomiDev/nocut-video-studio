@@ -525,7 +525,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       nextModels.set(cutId, model);
       return {
         fillModels: nextModels,
-        creditEstimate: calcCredits(state.fillDurations, nextModels),
+        creditEstimate: calcCredits(state.fillDurations, nextModels, state.cuts, state.manualCuts, state.aiFills, state.insertedFills),
       };
     }),
   setFillPrompt: (cutId, prompt) =>
