@@ -8,6 +8,7 @@ import {
 import {
   S3Client,
   HeadObjectCommand,
+  PutObjectCommand,
 } from "npm:@aws-sdk/client-s3";
 import { getSignedUrl } from "npm:@aws-sdk/cloudfront-signer";
 import { handleCors } from "../_shared/cors.ts";
@@ -97,6 +98,41 @@ function getS3Client(): S3Client {
     });
   }
   return _s3Client;
+}
+
+// ---------------------------------------------------------------------------
+// Embedded watermark — "nocut.ai" text on transparent background (300×60 PNG)
+// ---------------------------------------------------------------------------
+
+const WATERMARK_PNG_B64 =
+  "iVBORw0KGgoAAAANSUhEUgAAASwAAAA8CAYAAADc3IdaAAADM0lEQVR4nO3YT0hlVRzA8e95vua9SmeMEkYTyUU0TEOUIVgtYoZw0cYWhmGLCNw5EUhCEbRwaQwUbmphRNDCjbRpU8EDCwIniIYiKiiK1OZP4bUek6T+Wtz74M1jhNHFFPr9bO7vnHvOuedufvzOAUmSJEmSJEmSJEmSJEmSJEmSJEmSpJskIp6+gTF9EfHkzdiPJO0qIhb+6z1I+v9KexlcJJQPgZNAO/B+SunziLgDeBG4FbgKvAlsAy8AHcA/wLmU0npELKSUxprXTCmNRcSzwBjwVUrpbeDXiOgDzhbf+iil9EHTnOeBY8Da/n9f0oEVEYsR8VQRH4+Id4v4pYg4U8RnivZURDxe9D0REZNFvNCy5sJ14qGiPRkR90dER0S8d705kg6P0h7HJ+BjYCilVNnY2OgAHlpdXX0Q+BQ4Uq1Wf19dXR1YWVl5uFKpnAduKZfLa52dncvAqSzLGlXdUMseGu0+oA04BbwD9M7Ozj5Tr9fbgQHg7qb9DCHp0NhrwtpKKdWLeVtHjx7dAr5NKZWL9/3A5Z6enq22tjZSSv1A//b29qUsy84Dl0ulUltjsYi4HSi3fOMX8uPk18ArAHNzc1/u7OzsABe4NmFJOkT2mrB2muKLxfPvWq32M/AYcGx0dPQEcGF5efm7kZGRQaBzYmJiICKeAy5lWfZXcTcFcBqIIk5AKSJSe3v7kaLvXuCzarX6W6VSKQO95NWXpEOotbq5UQFsNRrT09OfjI+Pn15aWuqq1+tXgDempqaq8/Pzr05OTg5mWXYROAdEb2/vW8DLtVotgC/IL+TL5AnrG+C1xcXFO4eHh5fIL/hfn5mZ+WN9ff1qpVK5srm52b3/35V0GLXeHTXa9wFdRdxVtE8CdxV9x4F7ingQuK2Iu4FHm9Z7pHg2qqkh8qRWJa/kdtuHpANsvxXWbn4iP8Z1k99D/UB+7Gzu+74Y+yNwgrzC+pNrj5sb5ImuRH6XtQY8ANTJK7tSy3hJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJOiD+BZwyENWFRwCGAAAAAElFTkSuQmCC";
+
+const WATERMARK_S3_KEY = "assets/watermark.png";
+
+/**
+ * Ensure the embedded watermark PNG exists in S3.
+ * Uploads it once; subsequent calls are no-ops (checks via HeadObject).
+ */
+async function ensureWatermarkInS3(bucket: string): Promise<string> {
+  const s3 = getS3Client();
+  try {
+    await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: WATERMARK_S3_KEY }));
+    console.log("Watermark already exists in S3");
+  } catch {
+    console.log("Uploading embedded watermark to S3");
+    const raw = Uint8Array.from(atob(WATERMARK_PNG_B64), (c) => c.charCodeAt(0));
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: WATERMARK_S3_KEY,
+        Body: raw,
+        ContentType: "image/png",
+        CacheControl: "public, max-age=31536000",
+      }),
+    );
+    console.log("Watermark uploaded to S3");
+  }
+  return `s3://${bucket}/${WATERMARK_S3_KEY}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -380,17 +416,19 @@ function buildMediaConvertJob(params: {
     AntiAlias: "ENABLED",
   };
 
-  // Add watermark for free tier
+  // Add watermark for free tier (embedded 300×60 "nocut.ai" PNG)
   if (watermark && watermarkS3Uri) {
+    const wmWidth = 300;
+    const wmHeight = 60;
     videoDescription.VideoPreprocessors = {
       ImageInserter: {
         InsertableImages: [
           {
             ImageInserterInput: watermarkS3Uri,
             Layer: 1,
-            ImageX: targetWidth - 220,
-            ImageY: targetHeight - 50,
-            Opacity: 50,
+            ImageX: targetWidth - wmWidth - 20,
+            ImageY: targetHeight - wmHeight - 20,
+            Opacity: 40,
           },
         ],
       },
@@ -542,9 +580,10 @@ async function processExport(
     const maxHeight = RESOLUTION_LIMITS[tier] ?? 1080;
     const targetHeight = maxHeight;
     const shouldWatermark = tier === "free";
-    const watermarkS3Uri = shouldWatermark
-      ? `s3://${bucket}/assets/watermark.png`
-      : undefined;
+    let watermarkS3Uri: string | undefined;
+    if (shouldWatermark) {
+      watermarkS3Uri = await ensureWatermarkInS3(bucket);
+    }
 
     const sourceVideoS3Uri = `s3://${bucket}/${sourceS3Key}`;
     const exportId = crypto.randomUUID();
