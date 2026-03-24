@@ -188,6 +188,42 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   const [inlineFillLoading, setInlineFillLoading] = useState(false);
   const inlineFillVideoRef = useRef<HTMLVideoElement>(null);
   const [inlineFillPlaying, setInlineFillPlaying] = useState(false);
+  const inlineFillUrlCache = useRef<Map<string, string>>(new Map());
+
+  /** Pre-fetch a signed URL for a fill and cache it */
+  const prefetchFillUrl = useCallback(async (fill: AiFill): Promise<string | null> => {
+    if (!fill.s3Key) return null;
+    const cached = inlineFillUrlCache.current.get(fill.s3Key);
+    if (cached) return cached;
+    const cachedSigned = fillSignedUrlCache.get(fill.s3Key);
+    if (cachedSigned) { inlineFillUrlCache.current.set(fill.s3Key, cachedSigned); return cachedSigned; }
+    const { data, error: fnErr } = await supabase.functions.invoke('get-signed-url', { body: { s3_key: fill.s3Key } });
+    if (fnErr) return null;
+    const url = data?.url || data?.data?.url;
+    if (url) { inlineFillUrlCache.current.set(fill.s3Key, url); fillSignedUrlCache.set(fill.s3Key, url); }
+    return url || null;
+  }, []);
+
+  /** Jump to a specific fill segment by index */
+  const jumpToFillSegment = useCallback(async (fills: AiFill[], idx: number, editId: string) => {
+    const fill = fills[idx];
+    if (!fill) return;
+    setInlineFillPlaying(false);
+    setInlineFillPreview({ editId, fills, currentIndex: idx });
+    const cached = fill.s3Key ? inlineFillUrlCache.current.get(fill.s3Key) : null;
+    if (cached) {
+      setInlineFillVideoUrl(cached);
+      setInlineFillLoading(false);
+    } else {
+      setInlineFillLoading(true);
+      setInlineFillVideoUrl(null);
+      const url = await prefetchFillUrl(fill);
+      setInlineFillVideoUrl(url);
+      setInlineFillLoading(false);
+    }
+    // Pre-fetch next
+    if (idx + 1 < fills.length) prefetchFillUrl(fills[idx + 1]);
+  }, [prefetchFillUrl]);
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const [previewWidth, setPreviewWidth] = useState(0);
 
