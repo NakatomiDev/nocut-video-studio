@@ -44,6 +44,7 @@ Deno.serve(async (req) => {
         model?: string;
         type?: string;
         existing_fill_s3_key?: string;
+        existing_fill_s3_keys?: string[];
         prompt?: string;
       }>;
       output_format?: string;
@@ -98,32 +99,27 @@ Deno.serve(async (req) => {
       type: string;
       fill_duration: number;
       model: string;
-      existing_fill_s3_key?: string;
+      existing_fill_s3_keys?: string[];
       prompt?: string;
     }> = [];
 
     for (let i = 0; i < gaps.length; i++) {
       const gap = gaps[i];
-      const gapDuration = Math.abs(gap.post_cut_timestamp - gap.pre_cut_timestamp);
+
+      // Resolve fill S3 keys: prefer array, fall back to single key
+      const s3Keys: string[] = gap.existing_fill_s3_keys && gap.existing_fill_s3_keys.length > 0
+        ? gap.existing_fill_s3_keys
+        : gap.existing_fill_s3_key ? [gap.existing_fill_s3_key] : [];
 
       // Resolve fill duration
       let fillDuration = 0;
       if (typeof gap.fill_duration === "number") {
-        fillDuration = Math.min(Math.max(0, gap.fill_duration), maxFill);
+        fillDuration = Math.max(0, gap.fill_duration);
       }
 
-      // Only include fill if there's an existing fill to reuse
-      if (fillDuration > 0 && !gap.existing_fill_s3_key) {
-        // No pre-generated fill — treat as cut-only
+      // Only include fill if there are existing fills to reuse
+      if (fillDuration > 0 && s3Keys.length === 0) {
         fillDuration = 0;
-      }
-
-      if (fillDuration > maxFill) {
-        return errorResponse(
-          "tier_limit_exceeded",
-          `Gap at index ${i} fill_duration ${fillDuration}s exceeds ${tier} tier max of ${maxFill}s per gap.`,
-          403,
-        );
       }
 
       // Resolve per-gap model
@@ -140,8 +136,8 @@ Deno.serve(async (req) => {
         fill_duration: fillDuration,
         model: gapModel,
       };
-      if (gap.existing_fill_s3_key) {
-        entry.existing_fill_s3_key = gap.existing_fill_s3_key;
+      if (s3Keys.length > 0) {
+        entry.existing_fill_s3_keys = s3Keys;
       }
       if (gap.prompt) {
         entry.prompt = gap.prompt.slice(0, 200).trim();

@@ -27,7 +27,8 @@ interface EdlCutEntry {
   type: string;         // "manual", "silence", etc.
   fill_duration: number; // seconds of AI fill to bridge the gap
   model?: string;
-  existing_fill_s3_key?: string; // pre-generated fill clip S3 key
+  existing_fill_s3_key?: string;  // single pre-generated fill (legacy)
+  existing_fill_s3_keys?: string[]; // multiple chained fills per gap
 }
 
 interface AiFillRow {
@@ -298,17 +299,26 @@ function buildMediaConvertInputs(
       });
     }
 
-    // AI fill for this gap: prefer existing_fill_s3_key from EDL, fallback to ai_fills table
-    const fillS3Key = cut.existing_fill_s3_key || aiFillsByGapIndex.get(cut.originalIndex);
-    if (cut.fill_duration > 0 && fillS3Key) {
-      inputs.push({
-        FileInput: `s3://${bucket}/${fillS3Key}`,
-        VideoSelector: {},
-        AudioSelectors: {
-          "Audio Selector 1": { DefaultSelection: "DEFAULT" },
-        },
-        TimecodeSource: "ZEROBASED",
-      });
+    // AI fills for this gap: prefer existing_fill_s3_keys array, fall back to single key, then ai_fills table
+    const fillKeys: string[] = cut.existing_fill_s3_keys && cut.existing_fill_s3_keys.length > 0
+      ? cut.existing_fill_s3_keys
+      : cut.existing_fill_s3_key
+        ? [cut.existing_fill_s3_key]
+        : aiFillsByGapIndex.has(cut.originalIndex)
+          ? [aiFillsByGapIndex.get(cut.originalIndex)!]
+          : [];
+
+    if (cut.fill_duration > 0 && fillKeys.length > 0) {
+      for (const key of fillKeys) {
+        inputs.push({
+          FileInput: `s3://${bucket}/${key}`,
+          VideoSelector: {},
+          AudioSelectors: {
+            "Audio Selector 1": { DefaultSelection: "DEFAULT" },
+          },
+          TimecodeSource: "ZEROBASED",
+        });
+      }
     }
 
     cursor = cut.end;

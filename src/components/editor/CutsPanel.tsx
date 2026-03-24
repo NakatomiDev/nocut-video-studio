@@ -289,12 +289,24 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   const { getFrame } = useFrameCache(videoUrl ?? null, allCutTimestamps, priorityCutTimestamps);
 
   const hasActiveCuts = activeCuts.size > 0 || activeManualCuts.size > 0;
-  const cutsWithFills = fillDurations.size;
 
   const getInsertedFillsForCut = useCallback((cutObj: { end: number }) => {
     const fills = getFillsForCut(cutObj, aiFills);
     return fills.filter((fill) => insertedFills.has(fill.id));
   }, [aiFills, insertedFills]);
+
+  // Count actual inserted fills across all active cuts
+  const totalInsertedFills = useMemo(() => {
+    const allCutsArr = [
+      ...cuts.filter(c => activeCuts.has(c.id)),
+      ...manualCuts.filter(c => activeManualCuts.has(c.id)),
+    ];
+    let count = 0;
+    for (const c of allCutsArr) {
+      count += getInsertedFillsForCut(c).length;
+    }
+    return count;
+  }, [cuts, activeCuts, manualCuts, activeManualCuts, getInsertedFillsForCut]);
 
   const getPreviewFillForCut = useCallback((cutObj: { end: number }) => {
     const inserted = getInsertedFillsForCut(cutObj);
@@ -327,31 +339,26 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     try {
       const activeCutsList = cuts.filter((c) => activeCuts.has(c.id));
       const activeManualList = manualCuts.filter((c) => activeManualCuts.has(c.id));
-      const allCuts = [
-        ...activeCutsList.map((c) => {
-          const eff = getEffectiveFill(c.id, c);
-          const existingFills = eff.isExisting ? getInsertedFillsForCut(c) : [];
-          // Only include fill if it's an existing pre-generated fill
-          const s3Key = eff.isExisting ? (existingFills[0]?.s3Key ?? undefined) : undefined;
-          return { start: c.start, end: c.end, type: c.type, fill_duration: s3Key ? eff.duration : 0, model: eff.model, existing_fill_s3_key: s3Key };
-        }),
-        ...activeManualList.map((c) => {
-          const eff = getEffectiveFill(c.id, c);
-          const existingFills = eff.isExisting ? getInsertedFillsForCut(c) : [];
-          const s3Key = eff.isExisting ? (existingFills[0]?.s3Key ?? undefined) : undefined;
-          return { start: c.start, end: c.end, type: 'manual', fill_duration: s3Key ? eff.duration : 0, model: eff.model, existing_fill_s3_key: s3Key };
-        }),
-      ].sort((a, b) => a.start - b.start);
 
-      // Build gaps array for the project-edl edge function (assembly only)
-      const gaps = allCuts.map((c) => ({
-        pre_cut_timestamp: c.start,
-        post_cut_timestamp: c.end,
-        fill_duration: c.fill_duration,
-        model: c.model,
-        type: c.type,
-        existing_fill_s3_key: c.existing_fill_s3_key,
-      }));
+      const buildGap = (c: { id: string; start: number; end: number; type?: string }, type: string) => {
+        const inserted = getInsertedFillsForCut(c);
+        const s3Keys = inserted.filter(f => f.s3Key).map(f => f.s3Key!);
+        const totalDuration = inserted.reduce((sum, f) => sum + (f.duration ?? 0), 0);
+        const eff = getEffectiveFill(c.id, c);
+        return {
+          pre_cut_timestamp: c.start,
+          post_cut_timestamp: c.end,
+          fill_duration: s3Keys.length > 0 ? totalDuration : 0,
+          model: eff.model,
+          type,
+          existing_fill_s3_keys: s3Keys.length > 0 ? s3Keys : undefined,
+        };
+      };
+
+      const gaps = [
+        ...activeCutsList.map((c) => buildGap(c, c.type)),
+        ...activeManualList.map((c) => buildGap(c, 'manual')),
+      ].sort((a, b) => a.pre_cut_timestamp - b.pre_cut_timestamp);
 
       const { data: edlData, error: edlError } = await supabase.functions.invoke('project-edl', {
         body: { project_id: project.id, gaps },
@@ -1075,7 +1082,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground">AI fills</span>
           <span className="text-sm font-semibold text-foreground">
-            {cutsWithFills > 0 ? `${cutsWithFills} selected` : 'None'}
+            {totalInsertedFills > 0 ? `${totalInsertedFills} selected` : 'None'}
           </span>
         </div>
         <Button
@@ -1412,7 +1419,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">AI fills included</span>
-              <span className="font-semibold">{cutsWithFills}</span>
+              <span className="font-semibold">{totalInsertedFills}</span>
             </div>
           </div>
           <DialogFooter className="shrink-0 border-t border-border px-6 py-3">
