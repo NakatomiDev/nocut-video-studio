@@ -27,7 +27,8 @@ interface EdlCutEntry {
   type: string;         // "manual", "silence", etc.
   fill_duration: number; // seconds of AI fill to bridge the gap
   model?: string;
-  existing_fill_s3_key?: string; // pre-generated fill clip S3 key
+  existing_fill_s3_key?: string;  // single pre-generated fill (legacy)
+  existing_fill_s3_keys?: string[]; // multiple chained fills per gap
 }
 
 interface AiFillRow {
