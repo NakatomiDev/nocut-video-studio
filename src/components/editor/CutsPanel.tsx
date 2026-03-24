@@ -184,6 +184,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   const [expandedFillDetails, setExpandedFillDetails] = useState<Set<string>>(new Set());
   const [editingFillName, setEditingFillName] = useState<string | null>(null);
   const [inlineFillPreview, setInlineFillPreview] = useState<{ editId: string; fills: AiFill[]; currentIndex: number } | null>(null);
+  const [generateConfirm, setGenerateConfirm] = useState<{ cutId: string; cost: number } | null>(null);
   const [inlineFillVideoUrl, setInlineFillVideoUrl] = useState<string | null>(null);
   const [inlineFillLoading, setInlineFillLoading] = useState(false);
   const inlineFillVideoRef = useRef<HTMLVideoElement>(null);
@@ -562,9 +563,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                       onClick={(e) => {
                         e.stopPropagation();
                         const cost = currentFill * creditsPerSec;
-                        if (window.confirm(`Generate a new AI fill?\n\nThis will cost ${cost} credit${cost > 1 ? 's' : ''}.\nYour balance: ${creditBalance.total} credits.`)) {
-                          generatePreview(cutId);
-                        }
+                        setGenerateConfirm({ cutId, cost });
                       }}
                     >
                       <Sparkles className="h-3 w-3 mr-1" /> Generate New Fill ({currentFill * creditsPerSec} cr)
@@ -1451,6 +1450,43 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
               <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={lightbox.time} duration={duration} width={560} height={315} />
             ))}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Generate fill confirmation dialog */}
+      <Dialog open={!!generateConfirm} onOpenChange={(open) => !open && setGenerateConfirm(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+              <Sparkles className="h-6 w-6 text-primary" />
+            </div>
+            <DialogTitle className="text-center">Generate AI Fill?</DialogTitle>
+            <DialogDescription className="text-center">
+              This will cost{' '}
+              <span className="font-semibold text-foreground">
+                {generateConfirm?.cost ?? 0} credit{(generateConfirm?.cost ?? 0) !== 1 ? 's' : ''}
+              </span>
+              .<br />
+              Your balance:{' '}
+              <span className="font-semibold text-foreground">{creditBalance.total}</span> credits.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2 sm:justify-center">
+            <Button variant="outline" onClick={() => setGenerateConfirm(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (generateConfirm) {
+                  generatePreview(generateConfirm.cutId);
+                  setGenerateConfirm(null);
+                }
+              }}
+            >
+              <Sparkles className="h-4 w-4 mr-1.5" />
+              Generate
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
