@@ -366,13 +366,15 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
           </div>
         )}
         {/* Model selector — stacked layout to prevent overflow */}
-        <div className="flex items-center gap-1.5 min-w-0">
-          {generatedFill ? (
-            <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
-          ) : (
-            <Sparkles className="h-3 w-3 text-primary shrink-0" />
-          )}
-          <span className="text-[10px] text-muted-foreground shrink-0">Model:</span>
+        <div className="flex flex-col gap-1 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
+            {generatedFill ? (
+              <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
+            ) : (
+              <Sparkles className="h-3 w-3 text-primary shrink-0" />
+            )}
+            <span className="text-[10px] text-muted-foreground shrink-0">Model:</span>
+          </div>
           <Select
             value={currentModel}
             onValueChange={(val) => {
