@@ -8,6 +8,7 @@ import {
 import {
   S3Client,
   HeadObjectCommand,
+  PutObjectCommand,
 } from "npm:@aws-sdk/client-s3";
 import { getSignedUrl } from "npm:@aws-sdk/cloudfront-signer";
 import { handleCors } from "../_shared/cors.ts";
