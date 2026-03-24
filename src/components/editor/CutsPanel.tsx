@@ -147,6 +147,8 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     removeFill,
     insertedFills,
     previewGeneratingCutId,
+    fillOrder,
+    setFillOrder,
   } = useEditorStore();
 
   const { generatePreview } = usePreviewFill();
