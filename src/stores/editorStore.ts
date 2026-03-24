@@ -142,6 +142,8 @@ interface EditorState {
   fillDurations: Map<string, number>;
   /** Maps cutId → selected AI fill model */
   fillModels: Map<string, AiFillModel>;
+  /** Maps cutId → ordered list of fill IDs (user-defined sequence) */
+  fillOrder: Map<string, string[]>;
   playheadPosition: number;
   isPlaying: boolean;
   zoomLevel: number;
@@ -177,6 +179,7 @@ interface EditorState {
   insertFill: (fillId: string) => void;
   removeFill: (fillId: string) => void;
   setFillVideoUrl: (fillId: string, url: string) => void;
+  setFillOrder: (cutId: string, orderedFillIds: string[]) => void;
   startPreviewGeneration: (cutId: string, jobId: string) => void;
   clearPreviewGeneration: () => void;
   reset: () => void;
@@ -203,6 +206,7 @@ interface PersistedEditorState {
   insertedFills: string[];
   fillDurations: [string, number][];
   fillModels: [string, string][];
+  fillOrder: [string, string[]][];
   showFills: boolean;
 }
 
@@ -216,6 +220,7 @@ function saveEditorState(state: EditorState) {
       insertedFills: Array.from(state.insertedFills),
       fillDurations: Array.from(state.fillDurations.entries()),
       fillModels: Array.from(state.fillModels.entries()),
+      fillOrder: Array.from(state.fillOrder.entries()),
       showFills: state.showFills,
     };
     localStorage.setItem(storageKey(cm.id), JSON.stringify(data));
@@ -290,6 +295,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedFill: null,
   fillDurations: new Map<string, number>(),
   fillModels: new Map<string, AiFillModel>(),
+  fillOrder: new Map<string, string[]>(),
   playheadPosition: 0,
   isPlaying: false,
   zoomLevel: 1,
@@ -354,6 +360,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       ? new Map(saved.fillModels.filter(([id]) => cuts.some((c) => c.id === id) || manualCuts.some((c) => c.id === id))) as Map<string, AiFillModel>
       : new Map<string, AiFillModel>();
     const insertedFills = saved ? new Set(saved.insertedFills) : new Set<string>();
+    const fillOrder = saved?.fillOrder
+      ? new Map(saved.fillOrder)
+      : new Map<string, string[]>();
     const showFills = saved?.showFills ?? false;
 
     set({
@@ -364,6 +373,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       activeManualCuts,
       fillDurations,
       fillModels,
+      fillOrder,
       insertedFills,
       showFills,
       creditEstimate: calcCredits(fillDurations, fillModels),
@@ -499,6 +509,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       next.set(fillId, url);
       return { fillVideoUrls: next };
     }),
+  setFillOrder: (cutId, orderedFillIds) =>
+    set((state) => {
+      const next = new Map(state.fillOrder);
+      next.set(cutId, orderedFillIds);
+      return { fillOrder: next };
+    }),
   startPreviewGeneration: (cutId, jobId) =>
     set({ previewGeneratingCutId: cutId, previewJobId: jobId }),
   clearPreviewGeneration: () =>
@@ -519,6 +535,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedFill: null,
       fillDurations: new Map(),
       fillModels: new Map(),
+      fillOrder: new Map(),
       playheadPosition: 0,
       isPlaying: false,
       zoomLevel: 1,
@@ -542,6 +559,7 @@ useEditorStore.subscribe((state, prev) => {
     state.insertedFills === prev.insertedFills &&
     state.fillDurations === prev.fillDurations &&
     state.fillModels === prev.fillModels &&
+    state.fillOrder === prev.fillOrder &&
     state.showFills === prev.showFills
   ) return;
   // Debounce to avoid excessive writes
