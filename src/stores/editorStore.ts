@@ -503,6 +503,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       next.set(fillId, url);
       return { fillVideoUrls: next };
     }),
+  setFillOrder: (cutId, orderedFillIds) =>
+    set((state) => {
+      const next = new Map(state.fillOrder);
+      next.set(cutId, orderedFillIds);
+      return { fillOrder: next };
+    }),
   startPreviewGeneration: (cutId, jobId) =>
     set({ previewGeneratingCutId: cutId, previewJobId: jobId }),
   clearPreviewGeneration: () =>
