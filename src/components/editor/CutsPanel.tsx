@@ -302,12 +302,9 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     return getFillsForCut(cutObj, aiFills)[0] ?? null;
   }, [aiFills, getInsertedFillsForCut]);
 
-  /** Resolve the effective fill for a cut: explicit fillDuration, or an inserted existing fill */
+  /** Resolve the effective fill for a cut: prioritize inserted existing fills, then explicit fillDuration */
   const getEffectiveFill = useCallback((cutId: string, cutObj: { end: number }) => {
-    const explicit = fillDurations.get(cutId) || 0;
-    if (explicit > 0) {
-      return { duration: explicit, model: fillModels.get(cutId) ?? DEFAULT_AI_FILL_MODEL, isExisting: false };
-    }
+    // Always check for inserted fills first — they take priority
     const inserted = getInsertedFillsForCut(cutObj);
     if (inserted.length > 0 && inserted[0].duration) {
       const first = inserted[0];
@@ -315,6 +312,11 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
         ? first.provider as AiFillModel
         : DEFAULT_AI_FILL_MODEL;
       return { duration: first.duration, model: m, isExisting: true, fillId: first.id };
+    }
+    // Fall back to explicit slider value (for new generation config)
+    const explicit = fillDurations.get(cutId) || 0;
+    if (explicit > 0) {
+      return { duration: explicit, model: fillModels.get(cutId) ?? DEFAULT_AI_FILL_MODEL, isExisting: false };
     }
     return { duration: 0, model: fillModels.get(cutId) ?? DEFAULT_AI_FILL_MODEL, isExisting: false };
   }, [fillDurations, fillModels, getInsertedFillsForCut]);
