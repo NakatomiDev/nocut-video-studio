@@ -339,31 +339,26 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     try {
       const activeCutsList = cuts.filter((c) => activeCuts.has(c.id));
       const activeManualList = manualCuts.filter((c) => activeManualCuts.has(c.id));
-      const allCuts = [
-        ...activeCutsList.map((c) => {
-          const eff = getEffectiveFill(c.id, c);
-          const existingFills = eff.isExisting ? getInsertedFillsForCut(c) : [];
-          // Only include fill if it's an existing pre-generated fill
-          const s3Key = eff.isExisting ? (existingFills[0]?.s3Key ?? undefined) : undefined;
-          return { start: c.start, end: c.end, type: c.type, fill_duration: s3Key ? eff.duration : 0, model: eff.model, existing_fill_s3_key: s3Key };
-        }),
-        ...activeManualList.map((c) => {
-          const eff = getEffectiveFill(c.id, c);
-          const existingFills = eff.isExisting ? getInsertedFillsForCut(c) : [];
-          const s3Key = eff.isExisting ? (existingFills[0]?.s3Key ?? undefined) : undefined;
-          return { start: c.start, end: c.end, type: 'manual', fill_duration: s3Key ? eff.duration : 0, model: eff.model, existing_fill_s3_key: s3Key };
-        }),
-      ].sort((a, b) => a.start - b.start);
 
-      // Build gaps array for the project-edl edge function (assembly only)
-      const gaps = allCuts.map((c) => ({
-        pre_cut_timestamp: c.start,
-        post_cut_timestamp: c.end,
-        fill_duration: c.fill_duration,
-        model: c.model,
-        type: c.type,
-        existing_fill_s3_key: c.existing_fill_s3_key,
-      }));
+      const buildGap = (c: { id: string; start: number; end: number; type?: string }, type: string) => {
+        const inserted = getInsertedFillsForCut(c);
+        const s3Keys = inserted.filter(f => f.s3Key).map(f => f.s3Key!);
+        const totalDuration = inserted.reduce((sum, f) => sum + (f.duration ?? 0), 0);
+        const eff = getEffectiveFill(c.id, c);
+        return {
+          pre_cut_timestamp: c.start,
+          post_cut_timestamp: c.end,
+          fill_duration: s3Keys.length > 0 ? totalDuration : 0,
+          model: eff.model,
+          type,
+          existing_fill_s3_keys: s3Keys.length > 0 ? s3Keys : undefined,
+        };
+      };
+
+      const gaps = [
+        ...activeCutsList.map((c) => buildGap(c, c.type)),
+        ...activeManualList.map((c) => buildGap(c, 'manual')),
+      ].sort((a, b) => a.pre_cut_timestamp - b.pre_cut_timestamp);
 
       const { data: edlData, error: edlError } = await supabase.functions.invoke('project-edl', {
         body: { project_id: project.id, gaps },
