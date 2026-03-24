@@ -42,8 +42,8 @@ function parseArgs(raw: string[]): Record<string, string | boolean> {
   const result: Record<string, string | boolean> = {};
   for (let i = 0; i < raw.length; i++) {
     const arg = raw[i];
-    if (arg === "--no-frames") {
-      result["no-frames"] = true;
+    if (arg === "--no-frames" || arg === "--dry-run") {
+      result[arg.slice(2)] = true;
     } else if (arg.startsWith("--") && i + 1 < raw.length && !raw[i + 1].startsWith("--")) {
       result[arg.slice(2)] = raw[++i];
     } else if (arg === "--help" || arg === "-h") {
@@ -371,8 +371,7 @@ while (Date.now() - startTime < maxWaitMs) {
 
   // Still processing
   const metadata = pollResult.metadata;
-  process.stdout?.write?.(`\r  ${elapsed}s elapsed...`) ??
-    Deno.stdout.writeSync(new TextEncoder().encode(`\r  ${elapsed}s elapsed...`));
+  Deno.stdout.writeSync(new TextEncoder().encode(`\r  ${elapsed}s elapsed...`));
 }
 
 console.error(`\nERROR: Timed out after ${maxWaitMs / 1000}s`);

@@ -53,12 +53,25 @@ console.log("--- Existing frames in S3 ---");
 const prefix = `frames/${projectId}/`;
 
 try {
-  const listResult = await s3.send(new ListObjectsV2Command({
-    Bucket: bucket,
-    Prefix: prefix,
-  }));
+  // deno-lint-ignore no-explicit-any
+  const allObjects: any[] = [];
+  let continuationToken: string | undefined = undefined;
 
-  const objects = listResult.Contents ?? [];
+  do {
+    const listResult = await s3.send(new ListObjectsV2Command({
+      Bucket: bucket,
+      Prefix: prefix,
+      ContinuationToken: continuationToken,
+    }));
+
+    if (listResult.Contents && listResult.Contents.length > 0) {
+      allObjects.push(...listResult.Contents);
+    }
+
+    continuationToken = listResult.IsTruncated ? listResult.NextContinuationToken : undefined;
+  } while (continuationToken);
+
+  const objects = allObjects;
   if (objects.length === 0) {
     console.log("  NO FRAMES FOUND in S3 for this project.");
     console.log(`  Expected at: s3://${bucket}/${prefix}frame_*.png`);

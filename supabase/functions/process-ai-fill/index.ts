@@ -1,4 +1,5 @@
 import { S3Client, CopyObjectCommand, PutObjectCommand, GetObjectCommand, HeadObjectCommand } from "npm:@aws-sdk/client-s3";
+import { encodeBase64 } from "https://deno.land/std@0.224.0/encoding/base64.ts";
 import { handleCors } from "../_shared/cors.ts";
 import {
   getAuthenticatedUser,
@@ -451,12 +452,7 @@ async function loadFrameBase64(projectId: string, timestamp: number): Promise<st
       return null;
     }
     console.log(`Loaded frame from S3: ${s3Key} (${bytes.length} bytes)`);
-    // Convert to base64
-    let binary = "";
-    for (let i = 0; i < bytes.length; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
+    return encodeBase64(bytes);
   } catch (err) {
     const errMsg = (err as Error).message ?? String(err);
     console.error(`Failed to load frame from S3: ${s3Key} — ${errMsg}`);
