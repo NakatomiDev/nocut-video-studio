@@ -1,5 +1,6 @@
 // @refresh reset
 import { useEffect, useState } from 'react';
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useEditorStore } from '@/stores/editorStore';
