@@ -2,6 +2,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEditorStore, AI_FILL_MODELS, MODEL_CREDITS_PER_SEC, DEFAULT_AI_FILL_MODEL, getAvailableModels, getModelDurations, getFillsForCut, type AiFill, type AiFillModel } from '@/stores/editorStore';
+import { FILL_PROMPT_PRESETS, DEFAULT_FILL_PROMPT_ID, MAX_CUSTOM_PROMPT_LENGTH, resolvePrompt } from '@/constants/fillPrompts';
+import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -136,6 +138,8 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     setFillDuration,
     fillModels,
     setFillModel,
+    fillPrompts,
+    setFillPrompt,
     creditEstimate,
     creditBalance,
     setCreditBalance,
@@ -260,12 +264,12 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
         ...activeCutsList.map((c) => {
           const eff = getEffectiveFill(c.id, c);
           const existingFills = eff.isExisting ? getInsertedFillsForCut(c) : [];
-          return { start: c.start, end: c.end, type: c.type, fill_duration: eff.duration, model: eff.model, isExisting: eff.isExisting, existing_fill_s3_key: existingFills[0]?.s3Key ?? undefined };
+          return { start: c.start, end: c.end, type: c.type, fill_duration: eff.duration, model: eff.model, isExisting: eff.isExisting, existing_fill_s3_key: existingFills[0]?.s3Key ?? undefined, prompt: resolvePrompt(fillPrompts.get(c.id)) };
         }),
         ...activeManualList.map((c) => {
           const eff = getEffectiveFill(c.id, c);
           const existingFills = eff.isExisting ? getInsertedFillsForCut(c) : [];
-          return { start: c.start, end: c.end, type: 'manual', fill_duration: eff.duration, model: eff.model, isExisting: eff.isExisting, existing_fill_s3_key: existingFills[0]?.s3Key ?? undefined };
+          return { start: c.start, end: c.end, type: 'manual', fill_duration: eff.duration, model: eff.model, isExisting: eff.isExisting, existing_fill_s3_key: existingFills[0]?.s3Key ?? undefined, prompt: resolvePrompt(fillPrompts.get(c.id)) };
         }),
       ].sort((a, b) => a.start - b.start);
 
@@ -279,6 +283,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
         model: c.model,
         type: c.type,
         existing_fill_s3_key: c.existing_fill_s3_key,
+        ...(c.prompt ? { prompt: c.prompt } : {}),
       }));
 
       // Call project-edl: handles credit deduction, edit_decisions, and job_queue server-side
@@ -316,7 +321,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     } finally {
       setExporting(false);
     }
-  }, [project, cuts, activeCuts, manualCuts, activeManualCuts, fillDurations, fillModels, creditEstimate, getEffectiveFill]);
+  }, [project, cuts, activeCuts, manualCuts, activeManualCuts, fillDurations, fillModels, fillPrompts, creditEstimate, getEffectiveFill]);
 
   const renderFillSelector = (cutId: string) => {
     const currentFill = fillDurations.get(cutId) || 0;
@@ -331,6 +336,11 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     const selectedExistingFills = cutObj ? getInsertedFillsForCut(cutObj) : [];
     const selectedExistingFill = selectedExistingFills[0] ?? null;
     const selectedExistingIdentity = selectedExistingFill ? formatFillIdentity(selectedExistingFill) : null;
+
+    const rawPrompt = fillPrompts.get(cutId) ?? DEFAULT_FILL_PROMPT_ID;
+    const isCustomPrompt = rawPrompt.startsWith("custom:");
+    const currentPromptId = isCustomPrompt ? "custom" : rawPrompt;
+    const customPromptText = isCustomPrompt ? rawPrompt.slice(7) : "";
 
     return (
       <div className="flex flex-col gap-1.5 pl-3 pr-1 mt-1 overflow-hidden">
@@ -425,6 +435,50 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
             <span className="text-[9px] text-muted-foreground shrink-0">Silent</span>
           )}
         </div>
+        {/* Prompt selector */}
+        {currentFill > 0 && (
+          <div className="flex flex-col gap-1 pl-4 min-w-0">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-[10px] text-muted-foreground shrink-0">Prompt:</span>
+              <Select
+                value={currentPromptId}
+                onValueChange={(val) => {
+                  if (val === "custom") {
+                    setFillPrompt(cutId, `custom:${customPromptText}`);
+                  } else {
+                    setFillPrompt(cutId, val);
+                  }
+                }}
+              >
+                <SelectTrigger
+                  className="h-6 min-w-0 flex-1 text-[10px] px-2 truncate"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FILL_PROMPT_PRESETS.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
+                  ))}
+                  <SelectItem value="custom">Custom...</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {currentPromptId === "custom" && (
+              <div className="flex flex-col gap-0.5">
+                <Textarea
+                  className="min-h-[40px] h-10 text-[10px] px-2 py-1 resize-none"
+                  placeholder="Describe the transition style..."
+                  maxLength={MAX_CUSTOM_PROMPT_LENGTH}
+                  value={customPromptText}
+                  onChange={(e) => setFillPrompt(cutId, `custom:${e.target.value}`)}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <span className="text-[9px] text-muted-foreground text-right">{customPromptText.length}/{MAX_CUSTOM_PROMPT_LENGTH}</span>
+              </div>
+            )}
+          </div>
+        )}
         {/* Preview fill button */}
         {currentFill > 0 && (
           <div className="flex items-center gap-1.5 pl-4 flex-wrap">

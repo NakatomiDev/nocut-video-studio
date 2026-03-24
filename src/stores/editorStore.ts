@@ -142,6 +142,8 @@ interface EditorState {
   fillDurations: Map<string, number>;
   /** Maps cutId → selected AI fill model */
   fillModels: Map<string, AiFillModel>;
+  /** Maps cutId → selected prompt (preset ID or "custom:text") */
+  fillPrompts: Map<string, string>;
   /** Maps cutId → ordered list of fill IDs (user-defined sequence) */
   fillOrder: Map<string, string[]>;
   /** Maps fillId → user-defined custom name */
@@ -168,6 +170,7 @@ interface EditorState {
   toggleManualCut: (cutId: string) => void;
   setFillDuration: (cutId: string, seconds: number) => void;
   setFillModel: (cutId: string, model: AiFillModel) => void;
+  setFillPrompt: (cutId: string, prompt: string) => void;
   setPlayhead: (time: number) => void;
   play: () => void;
   pause: () => void;
@@ -209,6 +212,7 @@ interface PersistedEditorState {
   insertedFills: string[];
   fillDurations: [string, number][];
   fillModels: [string, string][];
+  fillPrompts: [string, string][];
   fillOrder: [string, string[]][];
   fillNames: [string, string][];
   showFills: boolean;
@@ -224,6 +228,7 @@ function saveEditorState(state: EditorState) {
       insertedFills: Array.from(state.insertedFills),
       fillDurations: Array.from(state.fillDurations.entries()),
       fillModels: Array.from(state.fillModels.entries()),
+      fillPrompts: Array.from(state.fillPrompts.entries()),
       fillOrder: Array.from(state.fillOrder.entries()),
       fillNames: Array.from(state.fillNames.entries()),
       showFills: state.showFills,
@@ -300,6 +305,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedFill: null,
   fillDurations: new Map<string, number>(),
   fillModels: new Map<string, AiFillModel>(),
+  fillPrompts: new Map<string, string>(),
   fillOrder: new Map<string, string[]>(),
   fillNames: new Map<string, string>(),
   playheadPosition: 0,
@@ -365,6 +371,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const fillModels = saved
       ? new Map(saved.fillModels.filter(([id]) => cuts.some((c) => c.id === id) || manualCuts.some((c) => c.id === id))) as Map<string, AiFillModel>
       : new Map<string, AiFillModel>();
+    const fillPrompts = saved?.fillPrompts
+      ? new Map(saved.fillPrompts.filter(([id]) => cuts.some((c) => c.id === id) || manualCuts.some((c) => c.id === id)))
+      : new Map<string, string>();
     const insertedFills = saved ? new Set(saved.insertedFills) : new Set<string>();
     const fillOrder = saved?.fillOrder
       ? new Map(saved.fillOrder)
@@ -382,6 +391,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       activeManualCuts,
       fillDurations,
       fillModels,
+      fillPrompts,
       fillOrder,
       fillNames,
       insertedFills,
@@ -395,10 +405,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const next = new Set(state.activeCuts);
       const nextFills = new Map(state.fillDurations);
       const nextModels = new Map(state.fillModels);
+      const nextPrompts = new Map(state.fillPrompts);
       if (next.has(cutId)) {
         next.delete(cutId);
         nextFills.delete(cutId);
         nextModels.delete(cutId);
+        nextPrompts.delete(cutId);
       } else {
         next.add(cutId);
       }
@@ -406,6 +418,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         activeCuts: next,
         fillDurations: nextFills,
         fillModels: nextModels,
+        fillPrompts: nextPrompts,
         creditEstimate: calcCredits(nextFills, nextModels),
       };
     }),
@@ -438,11 +451,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       nextFills.delete(id);
       const nextModels = new Map(state.fillModels);
       nextModels.delete(id);
+      const nextPrompts = new Map(state.fillPrompts);
+      nextPrompts.delete(id);
       return {
         manualCuts,
         activeManualCuts,
         fillDurations: nextFills,
         fillModels: nextModels,
+        fillPrompts: nextPrompts,
         creditEstimate: calcCredits(nextFills, nextModels),
       };
     });
@@ -455,10 +471,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const next = new Set(state.activeManualCuts);
       const nextFills = new Map(state.fillDurations);
       const nextModels = new Map(state.fillModels);
+      const nextPrompts = new Map(state.fillPrompts);
       if (next.has(cutId)) {
         next.delete(cutId);
         nextFills.delete(cutId);
         nextModels.delete(cutId);
+        nextPrompts.delete(cutId);
       } else {
         next.add(cutId);
       }
@@ -466,6 +484,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         activeManualCuts: next,
         fillDurations: nextFills,
         fillModels: nextModels,
+        fillPrompts: nextPrompts,
         creditEstimate: calcCredits(nextFills, nextModels),
       };
     }),
@@ -490,6 +509,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         fillModels: nextModels,
         creditEstimate: calcCredits(state.fillDurations, nextModels),
       };
+    }),
+  setFillPrompt: (cutId, prompt) =>
+    set((state) => {
+      const next = new Map(state.fillPrompts);
+      if (!prompt) {
+        next.delete(cutId);
+      } else {
+        next.set(cutId, prompt);
+      }
+      return { fillPrompts: next };
     }),
   setPlayhead: (time) => set({ playheadPosition: time }),
   play: () => set({ isPlaying: true }),
@@ -555,6 +584,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedFill: null,
       fillDurations: new Map(),
       fillModels: new Map(),
+      fillPrompts: new Map(),
       fillOrder: new Map(),
       fillNames: new Map(),
       playheadPosition: 0,
@@ -580,6 +610,7 @@ useEditorStore.subscribe((state, prev) => {
     state.insertedFills === prev.insertedFills &&
     state.fillDurations === prev.fillDurations &&
     state.fillModels === prev.fillModels &&
+    state.fillPrompts === prev.fillPrompts &&
     state.fillOrder === prev.fillOrder &&
     state.fillNames === prev.fillNames &&
     state.showFills === prev.showFills
