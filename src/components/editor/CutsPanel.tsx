@@ -1060,7 +1060,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
           disabled={!hasActiveCuts || !!previewGeneratingCutId}
           onClick={() => setShowExportDialog(true)}
         >
-          Export (free)
+          Export
         </Button>
       </div>
 
