@@ -254,13 +254,10 @@ Deno.serve(async (req) => {
         const lastFrameBase64 = await loadFrameBase64(project.id, gap.end);
 
         if (!firstFrameBase64 && !lastFrameBase64) {
-          const msg = `Frame conditioning failed for gap ${gap.gap_index}: neither boundary frame could be loaded from S3. ` +
-            `Expected frames at timestamps ${gap.start} and ${gap.end} for project ${project.id}. ` +
-            `Without frame conditioning, the generated video will not match the source video.`;
-          console.error(msg);
-          await refundOnFailure(serviceClient, creditTransactionId);
-          await failJob(serviceClient, job.id, editDecision.id, msg, isPreview);
-          return errorResponse("frame_conditioning_failed", msg, 502);
+          console.warn(
+            `Frame conditioning unavailable for gap ${gap.gap_index}: neither boundary frame could be loaded. ` +
+            `Proceeding without frame conditioning — generated video may not perfectly match source.`
+          );
         }
         if (!firstFrameBase64) {
           console.warn(`First frame (timestamp ${gap.start}) could not be loaded — only last frame conditioning will be used`);
