@@ -1,7 +1,7 @@
 /**
  * Watermark overlay for free-tier exports.
  *
- * Adds a small "Made with NoCut" text in the bottom-right corner.
+ * Adds a small "NoCut.ai" watermark in the bottom-right corner.
  * Skipped for Pro/Business tier users.
  */
 
