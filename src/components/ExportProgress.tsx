@@ -63,6 +63,9 @@ const stageSteps: { stage: Stage; label: string }[] = [
   { stage: 'complete', label: 'Done' },
 ];
 
+/** How long a job can sit in "queued" before we re-invoke export-video (ms) */
+const STUCK_THRESHOLD_MS = 30_000;
+
 const ExportProgress = ({ projectId, onComplete, onRetry }: ExportProgressProps) => {
   const navigate = useNavigate();
   const [stage, setStage] = useState<Stage>('submitted');
@@ -71,13 +74,15 @@ const ExportProgress = ({ projectId, onComplete, onRetry }: ExportProgressProps)
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const stageRef = useRef<Stage>('submitted');
   const progressRef = useRef(0);
-  const startTimeRef = useRef(Date.now());
+  const jobCreatedAtRef = useRef<number | null>(null);
+  const retryAttemptedRef = useRef(false);
 
-  // Elapsed time ticker
+  // Elapsed time ticker — based on job created_at, not mount time
   useEffect(() => {
     if (stage === 'complete' || stage === 'failed') return;
     const interval = setInterval(() => {
-      setElapsedSeconds(Math.floor((Date.now() - startTimeRef.current) / 1000));
+      const origin = jobCreatedAtRef.current ?? Date.now();
+      setElapsedSeconds(Math.floor((Date.now() - origin) / 1000));
     }, 1000);
     return () => clearInterval(interval);
   }, [stage]);
@@ -102,15 +107,40 @@ const ExportProgress = ({ projectId, onComplete, onRetry }: ExportProgressProps)
     }
   }, []);
 
+  /** Re-invoke export-video for a stuck queued job */
+  const retryStuckJob = useCallback(async (jobId: string) => {
+    if (retryAttemptedRef.current) return;
+    retryAttemptedRef.current = true;
+    console.log('Retrying stuck export job:', jobId);
+    try {
+      await supabase.functions.invoke('export-video', {
+        body: { job_id: jobId },
+      });
+    } catch (err) {
+      console.error('Failed to retry export-video:', err);
+    }
+  }, []);
+
   const applyJobState = useCallback((job: Record<string, unknown>) => {
     if (!job) return;
     const jobType = job.type as string;
     const status = job.status as string;
     const progressPct = (job.progress_percent as number) ?? 0;
 
+    // Capture job created_at for timer
+    if (job.created_at && !jobCreatedAtRef.current) {
+      jobCreatedAtRef.current = new Date(job.created_at as string).getTime();
+    }
+
     if (jobType === 'video.export') {
       if (status === 'queued') {
         advanceStage('queued', 10);
+
+        // Check if job is stuck and needs a retry
+        const createdAt = job.created_at ? new Date(job.created_at as string).getTime() : 0;
+        if (createdAt && Date.now() - createdAt > STUCK_THRESHOLD_MS) {
+          retryStuckJob(job.id as string);
+        }
       } else if (status === 'processing') {
         if (progressPct >= 90) {
           advanceStage('finalizing', 85 + Math.min((progressPct - 90) * 1.5, 14));
@@ -124,15 +154,8 @@ const ExportProgress = ({ projectId, onComplete, onRetry }: ExportProgressProps)
       } else if (status === 'failed') {
         advanceStage('failed', 0, (job.error_message as string) || 'Video export failed');
       }
-    } else if (jobType === 'ai.fill') {
-      // Legacy — shouldn't happen in new flow, but handle gracefully
-      if (status === 'complete') {
-        advanceStage('queued', 10);
-      } else if (status === 'failed') {
-        advanceStage('failed', 0, (job.error_message as string) || 'Processing failed');
-      }
     }
-  }, [advanceStage]);
+  }, [advanceStage, retryStuckJob]);
 
   const applyProjectState = useCallback((proj: Record<string, unknown>) => {
     if (!proj) return;
