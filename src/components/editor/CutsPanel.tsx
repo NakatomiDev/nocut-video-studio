@@ -164,6 +164,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   const [expandedReviewId, setExpandedReviewId] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{ time: number; label: string } | null>(null);
   const [expandedFillsCuts, setExpandedFillsCuts] = useState<Set<string>>(new Set());
+  const [expandedFillConfig, setExpandedFillConfig] = useState<Set<string>>(new Set());
   const [expandedFillDetails, setExpandedFillDetails] = useState<Set<string>>(new Set());
   const [editingFillName, setEditingFillName] = useState<string | null>(null);
   const [inlineFillPreview, setInlineFillPreview] = useState<{ editId: string; fill: AiFill } | null>(null);
@@ -359,7 +360,16 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     return (
       <div className="flex flex-col gap-1.5 pl-3 pr-1 mt-1 overflow-hidden">
         {/* Collapsible fill configuration */}
-        <Collapsible>
+        <Collapsible
+          open={expandedFillConfig.has(cutId)}
+          onOpenChange={(open) => {
+            setExpandedFillConfig((prev) => {
+              const next = new Set(prev);
+              if (open) next.add(cutId); else next.delete(cutId);
+              return next;
+            });
+          }}
+        >
           <CollapsibleTrigger
             className="flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground hover:text-foreground transition-colors w-full group"
             onClick={(e) => e.stopPropagation()}
@@ -368,7 +378,15 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
             <Sparkles className="h-3 w-3 text-primary shrink-0" />
             <span>Fill Configuration</span>
             {generatedFill && (
-              <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[9px] shrink-0 ml-auto">
+              <Badge
+                className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[9px] shrink-0 ml-auto cursor-pointer hover:bg-emerald-500/30"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Expand both fill config and AI fills list
+                  setExpandedFillConfig((prev) => new Set(prev).add(cutId));
+                  setExpandedFillsCuts((prev) => new Set(prev).add(cutId));
+                }}
+              >
                 ✓ Generated
               </Badge>
             )}
