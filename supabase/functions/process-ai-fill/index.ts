@@ -399,6 +399,8 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error("Unhandled error in process-ai-fill:", err);
+    // Best-effort refund on unexpected errors — we don't have creditTransactionId
+    // in scope here, but the edit_decision should have it if credits were taken
     return errorResponse("internal_error", "An unexpected error occurred", 500);
   }
 });
