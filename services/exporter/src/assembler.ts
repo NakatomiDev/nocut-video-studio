@@ -60,6 +60,8 @@ export async function extractSegments(
         "-movflags", "+faststart",
         "-y", segPath,
       ], { timeout: 15 * 60 * 1000 });
+
+      segmentPaths.push(segPath);
     } else if (entry.type === "fill") {
       const fillKey = entry.s3_key;
       if (!fillKey) {
@@ -87,9 +89,11 @@ export async function extractSegments(
         "-movflags", "+faststart",
         "-y", segPath,
       ], { timeout: 5 * 60 * 1000 });
-    }
 
-    segmentPaths.push(segPath);
+      segmentPaths.push(segPath);
+    } else {
+      log("warn", `Unknown EDL entry type: ${entry.type}, skipping segment ${i}`);
+    }
   }
 
   return segmentPaths;
