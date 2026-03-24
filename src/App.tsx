@@ -68,6 +68,7 @@ const App = () => (
               <Route path="/project/:projectId/export/:exportId" element={<ProtectedRoute><ExportComplete /></ProtectedRoute>} />
               <Route path="/editor/:projectId" element={<ProtectedRoute><ProjectEditor /></ProtectedRoute>} />
               <Route path="/commercial-disclosure" element={<CommercialDisclosure />} />
+              <Route path="/test-transition" element={<ProtectedRoute><TestTransition /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
