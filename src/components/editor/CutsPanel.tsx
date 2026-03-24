@@ -1452,6 +1452,43 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Generate fill confirmation dialog */}
+      <Dialog open={!!generateConfirm} onOpenChange={(open) => !open && setGenerateConfirm(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+              <Sparkles className="h-6 w-6 text-primary" />
+            </div>
+            <DialogTitle className="text-center">Generate AI Fill?</DialogTitle>
+            <DialogDescription className="text-center">
+              This will cost{' '}
+              <span className="font-semibold text-foreground">
+                {generateConfirm?.cost ?? 0} credit{(generateConfirm?.cost ?? 0) !== 1 ? 's' : ''}
+              </span>
+              .<br />
+              Your balance:{' '}
+              <span className="font-semibold text-foreground">{creditBalance.total}</span> credits.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2 sm:justify-center">
+            <Button variant="outline" onClick={() => setGenerateConfirm(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (generateConfirm) {
+                  generatePreview(generateConfirm.cutId);
+                  setGenerateConfirm(null);
+                }
+              }}
+            >
+              <Sparkles className="h-4 w-4 mr-1.5" />
+              Generate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
