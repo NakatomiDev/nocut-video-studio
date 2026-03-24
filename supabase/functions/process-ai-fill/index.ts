@@ -502,16 +502,14 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
 
   if (request.firstFrameBase64) {
     instance.image = {
-      bytesBase64Encoded: request.firstFrameBase64,
-      mimeType: "image/png",
+      inlineData: { mimeType: "image/png", data: request.firstFrameBase64 },
     };
     console.log("Using first frame conditioning for fill generation");
   }
 
   if (request.lastFrameBase64) {
     instance.lastFrame = {
-      bytesBase64Encoded: request.lastFrameBase64,
-      mimeType: "image/png",
+      inlineData: { mimeType: "image/png", data: request.lastFrameBase64 },
     };
     console.log("Using last frame conditioning for fill generation");
   }
