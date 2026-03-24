@@ -20,6 +20,7 @@ const ProjectEditor = lazy(() => import("@/pages/ProjectEditor"));
 const ExportComplete = lazy(() => import("@/pages/ExportComplete"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const CommercialDisclosure = lazy(() => import("@/pages/CommercialDisclosure"));
+const TestTransition = lazy(() => import("@/pages/TestTransition"));
 
 const queryClient = new QueryClient();
 
