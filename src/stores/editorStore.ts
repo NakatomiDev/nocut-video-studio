@@ -525,6 +525,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       next.set(cutId, orderedFillIds);
       return { fillOrder: next };
     }),
+  setFillName: (fillId, name) =>
+    set((state) => {
+      const next = new Map(state.fillNames);
+      if (name.trim()) {
+        next.set(fillId, name.trim());
+      } else {
+        next.delete(fillId);
+      }
+      return { fillNames: next };
+    }),
   startPreviewGeneration: (cutId, jobId) =>
     set({ previewGeneratingCutId: cutId, previewJobId: jobId }),
   clearPreviewGeneration: () =>
