@@ -398,9 +398,14 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                 className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[9px] shrink-0 ml-auto cursor-pointer hover:bg-emerald-500/30"
                 onClick={(e) => {
                   e.stopPropagation();
-                  // Expand both fill config and AI fills list
-                  setExpandedFillConfig((prev) => new Set(prev).add(cutId));
-                  setExpandedFillsCuts((prev) => new Set(prev).add(cutId));
+                  const isOpen = expandedFillConfig.has(cutId) && expandedFillsCuts.has(cutId);
+                  if (isOpen) {
+                    setExpandedFillConfig((prev) => { const next = new Set(prev); next.delete(cutId); return next; });
+                    setExpandedFillsCuts((prev) => { const next = new Set(prev); next.delete(cutId); return next; });
+                  } else {
+                    setExpandedFillConfig((prev) => new Set(prev).add(cutId));
+                    setExpandedFillsCuts((prev) => new Set(prev).add(cutId));
+                  }
                 }}
               >
                 ✓ Generated
