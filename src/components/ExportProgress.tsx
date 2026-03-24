@@ -45,7 +45,7 @@ const stageConfig: Record<Stage, { label: string; sub: string; icon: React.React
   },
   complete: {
     label: 'Export complete!',
-    sub: 'Your video is ready to download',
+    sub: 'Your video is ready — redirecting to export page...',
     icon: <CheckCircle2 className="h-10 w-10 text-green-500" />,
   },
   failed: {
@@ -63,8 +63,8 @@ const stageSteps: { stage: Stage; label: string }[] = [
   { stage: 'complete', label: 'Done' },
 ];
 
-/** How long a job can sit in "queued" before we re-invoke export-video (ms) */
 const STUCK_THRESHOLD_MS = 30_000;
+const MIN_STAGE_DISPLAY_MS = 2000;
 
 const ExportProgress = ({ projectId, onComplete, onRetry }: ExportProgressProps) => {
   const navigate = useNavigate();
@@ -72,10 +72,15 @@ const ExportProgress = ({ projectId, onComplete, onRetry }: ExportProgressProps)
   const [progress, setProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [countdown, setCountdown] = useState<number | null>(null);
+
   const stageRef = useRef<Stage>('submitted');
   const progressRef = useRef(0);
   const jobCreatedAtRef = useRef<number | null>(null);
   const retryAttemptedRef = useRef(false);
+  const stageEnteredAtRef = useRef<number>(Date.now());
+  const pendingAdvanceRef = useRef<{ stage: Stage; progress: number; error?: string } | null>(null);
+  const completeExportIdRef = useRef<string | null>(null);
 
   // Elapsed time ticker — based on job created_at, not mount time
   useEffect(() => {
@@ -93,6 +98,7 @@ const ExportProgress = ({ projectId, onComplete, onRetry }: ExportProgressProps)
     return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
   };
 
+  // Core stage advancement (no gating)
   const advanceStage = useCallback((newStage: Stage, newProgress: number, error?: string) => {
     const current = stageRef.current;
     if (STAGE_ORDER[newStage] >= STAGE_ORDER[current] || newStage === 'failed') {
@@ -107,7 +113,27 @@ const ExportProgress = ({ projectId, onComplete, onRetry }: ExportProgressProps)
     }
   }, []);
 
-  /** Re-invoke export-video for a stuck queued job */
+  // Gated advancement — ensures minimum 2s display per stage
+  const gatedAdvanceStage = useCallback((newStage: Stage, newProgress: number, error?: string) => {
+    const elapsed = Date.now() - stageEnteredAtRef.current;
+
+    if (elapsed < MIN_STAGE_DISPLAY_MS && STAGE_ORDER[newStage] > STAGE_ORDER[stageRef.current]) {
+      pendingAdvanceRef.current = { stage: newStage, progress: newProgress, error };
+      setTimeout(() => {
+        const pending = pendingAdvanceRef.current;
+        if (pending) {
+          pendingAdvanceRef.current = null;
+          stageEnteredAtRef.current = Date.now();
+          advanceStage(pending.stage, pending.progress, pending.error);
+        }
+      }, MIN_STAGE_DISPLAY_MS - elapsed);
+    } else {
+      stageEnteredAtRef.current = Date.now();
+      advanceStage(newStage, newProgress, error);
+    }
+  }, [advanceStage]);
+
+  // Re-invoke export-video for a stuck queued job
   const retryStuckJob = useCallback(async (jobId: string) => {
     if (retryAttemptedRef.current) return;
     retryAttemptedRef.current = true;
@@ -127,42 +153,39 @@ const ExportProgress = ({ projectId, onComplete, onRetry }: ExportProgressProps)
     const status = job.status as string;
     const progressPct = (job.progress_percent as number) ?? 0;
 
-    // Capture job created_at for timer
     if (job.created_at && !jobCreatedAtRef.current) {
       jobCreatedAtRef.current = new Date(job.created_at as string).getTime();
     }
 
     if (jobType === 'video.export') {
       if (status === 'queued') {
-        advanceStage('queued', 10);
-
-        // Check if job is stuck and needs a retry
+        gatedAdvanceStage('queued', 10);
         const createdAt = job.created_at ? new Date(job.created_at as string).getTime() : 0;
         if (createdAt && Date.now() - createdAt > STUCK_THRESHOLD_MS) {
           retryStuckJob(job.id as string);
         }
       } else if (status === 'processing') {
         if (progressPct >= 90) {
-          advanceStage('finalizing', 85 + Math.min((progressPct - 90) * 1.5, 14));
+          gatedAdvanceStage('finalizing', 85 + Math.min((progressPct - 90) * 1.5, 14));
         } else if (progressPct > 0) {
-          advanceStage('assembling', 15 + Math.min(progressPct * 0.75, 70));
+          gatedAdvanceStage('assembling', 15 + Math.min(progressPct * 0.75, 70));
         } else {
-          advanceStage('assembling', 15);
+          gatedAdvanceStage('assembling', 15);
         }
       } else if (status === 'complete') {
-        advanceStage('complete', 100);
+        gatedAdvanceStage('complete', 100);
       } else if (status === 'failed') {
-        advanceStage('failed', 0, (job.error_message as string) || 'Video export failed');
+        gatedAdvanceStage('failed', 0, (job.error_message as string) || 'Video export failed');
       }
     }
-  }, [advanceStage, retryStuckJob]);
+  }, [gatedAdvanceStage, retryStuckJob]);
 
   const applyProjectState = useCallback((proj: Record<string, unknown>) => {
     if (!proj) return;
     const status = proj.status as string;
 
     if (status === 'complete') {
-      advanceStage('complete', 100);
+      gatedAdvanceStage('complete', 100);
       supabase
         .from('exports')
         .select('id')
@@ -171,18 +194,20 @@ const ExportProgress = ({ projectId, onComplete, onRetry }: ExportProgressProps)
         .limit(1)
         .single()
         .then(({ data }) => {
-          if (data) onComplete(data.id);
+          if (data) {
+            completeExportIdRef.current = data.id;
+          }
         });
     } else if (status === 'ready') {
-      advanceStage('queued', 10);
+      gatedAdvanceStage('queued', 10);
     } else if (status === 'failed') {
-      advanceStage('failed', 0, (proj.error_message as string) || 'Processing failed');
+      gatedAdvanceStage('failed', 0, (proj.error_message as string) || 'Processing failed');
     } else if (status === 'exporting') {
-      advanceStage('queued', 10);
+      gatedAdvanceStage('queued', 10);
     } else if (status === 'generating') {
-      advanceStage('assembling', 15);
+      gatedAdvanceStage('assembling', 15);
     }
-  }, [advanceStage, projectId, onComplete]);
+  }, [gatedAdvanceStage, projectId]);
 
   const fetchCurrentState = useCallback(async () => {
     const { data: jobs } = await supabase
@@ -193,8 +218,7 @@ const ExportProgress = ({ projectId, onComplete, onRetry }: ExportProgressProps)
       .limit(2);
 
     if (jobs && jobs.length > 0) {
-      const latestJob = jobs[0];
-      applyJobState(latestJob as Record<string, unknown>);
+      applyJobState(jobs[0] as Record<string, unknown>);
     }
 
     const { data: proj } = await supabase
@@ -208,15 +232,34 @@ const ExportProgress = ({ projectId, onComplete, onRetry }: ExportProgressProps)
     }
   }, [projectId, applyJobState, applyProjectState]);
 
-  // Animate initial "submitted" → "queued" transition
+  // Animate initial "submitted" stage
   useEffect(() => {
     const timer = setTimeout(() => {
       if (stageRef.current === 'submitted') {
-        advanceStage('submitted', 5);
+        gatedAdvanceStage('submitted', 5);
       }
     }, 800);
     return () => clearTimeout(timer);
-  }, [advanceStage]);
+  }, [gatedAdvanceStage]);
+
+  // Auto-redirect countdown on complete
+  useEffect(() => {
+    if (stage !== 'complete') return;
+    setCountdown(5);
+    const interval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(interval);
+          if (completeExportIdRef.current) {
+            onComplete(completeExportIdRef.current);
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [stage, onComplete]);
 
   // Realtime subscriptions + initial fetch
   useEffect(() => {
@@ -281,6 +324,45 @@ const ExportProgress = ({ projectId, onComplete, onRetry }: ExportProgressProps)
         )}
       </div>
 
+      {/* Complete stage: show notification + countdown */}
+      {stage === 'complete' && (
+        <div className="w-full max-w-md space-y-4">
+          <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-4 text-center space-y-2">
+            <p className="text-sm font-medium text-foreground">
+              🎉 Your video is ready to view!
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {countdown !== null && countdown > 0
+                ? `Redirecting in ${countdown}s...`
+                : 'Redirecting now...'}
+            </p>
+          </div>
+          <div className="flex justify-center gap-3">
+            <Button
+              onClick={() => {
+                if (completeExportIdRef.current) onComplete(completeExportIdRef.current);
+              }}
+            >
+              View Export Now
+            </Button>
+            <Button variant="ghost" onClick={() => navigate('/dashboard')}>
+              <ArrowLeft className="mr-2 h-4 w-4" /> Dashboard
+            </Button>
+          </div>
+
+          {/* Show completed step indicators */}
+          <div className="flex items-center justify-between mt-2">
+            {stageSteps.map((step) => (
+              <div key={step.stage} className="flex flex-col items-center gap-1 flex-1">
+                <div className="h-2 w-2 rounded-full bg-primary scale-100" />
+                <span className="text-[9px] text-foreground font-medium">{step.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* In-progress stages */}
       {stage !== 'failed' && stage !== 'complete' && (
         <div className="w-full max-w-md space-y-3">
           <Progress value={progress} className="h-2" />
@@ -289,12 +371,10 @@ const ExportProgress = ({ projectId, onComplete, onRetry }: ExportProgressProps)
             <span>{formatElapsed(elapsedSeconds)} elapsed</span>
           </div>
 
-          {/* Step indicators */}
           <div className="flex items-center justify-between mt-4">
             {stageSteps.map((step, i) => {
-              const stepIdx = i;
-              const isActive = stepIdx === currentStageIdx;
-              const isDone = stepIdx < currentStageIdx;
+              const isActive = i === currentStageIdx;
+              const isDone = i < currentStageIdx;
               return (
                 <div key={step.stage} className="flex flex-col items-center gap-1 flex-1">
                   <div
@@ -320,16 +400,19 @@ const ExportProgress = ({ projectId, onComplete, onRetry }: ExportProgressProps)
         </div>
       )}
 
-      <div className="flex gap-3 mt-2">
-        <Button variant="ghost" onClick={() => navigate('/dashboard')}>
-          <ArrowLeft className="mr-2 h-4 w-4" /> Dashboard
-        </Button>
-        {stage === 'failed' && (
-          <Button onClick={onRetry}>
-            <RefreshCw className="mr-2 h-4 w-4" /> Try Again
+      {/* Failed + in-progress bottom buttons */}
+      {stage !== 'complete' && (
+        <div className="flex gap-3 mt-2">
+          <Button variant="ghost" onClick={() => navigate('/dashboard')}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> Dashboard
           </Button>
-        )}
-      </div>
+          {stage === 'failed' && (
+            <Button onClick={onRetry}>
+              <RefreshCw className="mr-2 h-4 w-4" /> Try Again
+            </Button>
+          )}
+        </div>
+      )}
 
       {stage !== 'failed' && stage !== 'complete' && (
         <p className="text-xs text-muted-foreground mt-4">
