@@ -7,7 +7,6 @@ import {
 import { successResponse, errorResponse } from "../_shared/response.ts";
 import {
   MAX_FILL_DURATION,
-  TOPUP_PRODUCTS,
   MODEL_CREDITS_PER_SEC,
   DEFAULT_AI_FILL_MODEL,
   type AiFillModel,
@@ -91,11 +90,7 @@ Deno.serve(async (req) => {
     const tier = (userData.tier ?? "free") as Tier;
     const maxFill = MAX_FILL_DURATION[tier] ?? 1;
 
-    // 3. Determine fill durations: use explicit values if provided, else heuristic
-    const hasExplicitDurations = gaps.some((g) => typeof g.fill_duration === "number");
-
-    // 4. Validate and build EDL entries with credits
-    let totalCredits = 0;
+    // 3. Build EDL entries — export is assembly-only, no credit charges
     let totalFillSeconds = 0;
     const edlJson: Array<{
       start: number;
@@ -111,13 +106,16 @@ Deno.serve(async (req) => {
       const gap = gaps[i];
       const gapDuration = Math.abs(gap.post_cut_timestamp - gap.pre_cut_timestamp);
 
-      // Resolve fill duration: explicit (clamped to tier max) or heuristic
-      let fillDuration: number;
-      if (hasExplicitDurations && typeof gap.fill_duration === "number") {
+      // Resolve fill duration
+      let fillDuration = 0;
+      if (typeof gap.fill_duration === "number") {
         fillDuration = Math.min(Math.max(0, gap.fill_duration), maxFill);
-      } else {
-        fillDuration = Math.min(Math.ceil(Math.min(gapDuration * 0.5, 3.0)), maxFill);
-        if (fillDuration <= 0 && gapDuration > 0) fillDuration = 1;
+      }
+
+      // Only include fill if there's an existing fill to reuse
+      if (fillDuration > 0 && !gap.existing_fill_s3_key) {
+        // No pre-generated fill — treat as cut-only
+        fillDuration = 0;
       }
 
       if (fillDuration > maxFill) {
@@ -128,17 +126,11 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Resolve per-gap model or use the request-level default
+      // Resolve per-gap model
       const gapModel: AiFillModel = (gap.model && gap.model in MODEL_CREDITS_PER_SEC)
         ? gap.model as AiFillModel
         : model;
 
-      // If reusing an existing fill, no credits needed for this gap
-      const isReuse = !!gap.existing_fill_s3_key;
-      const creditsPerSec = MODEL_CREDITS_PER_SEC[gapModel] ?? 1;
-      const gapCredits = isReuse ? 0 : fillDuration * creditsPerSec;
-
-      totalCredits += gapCredits;
       totalFillSeconds += fillDuration;
 
       const entry: typeof edlJson[number] = {
@@ -148,7 +140,7 @@ Deno.serve(async (req) => {
         fill_duration: fillDuration,
         model: gapModel,
       };
-      if (isReuse) {
+      if (gap.existing_fill_s3_key) {
         entry.existing_fill_s3_key = gap.existing_fill_s3_key;
       }
       if (gap.prompt) {
@@ -157,56 +149,18 @@ Deno.serve(async (req) => {
       edlJson.push(entry);
     }
 
-    const credits_per_sec = MODEL_CREDITS_PER_SEC[model] ?? 1;
-
-    // 5. Deduct credits atomically via Postgres function
-    let creditTransactionId: string | null = null;
-    let creditsRemaining = 0;
-
-    if (totalCredits > 0) {
-      const { data: creditResult, error: creditError } = await serviceClient
-        .rpc("deduct_credits", {
-          p_user_id: user.id,
-          p_required_credits: totalCredits,
-          p_project_id: project_id,
-          p_reason: "ai_fill",
-        });
-
-      if (creditError) {
-        console.error("Credit deduction RPC error:", creditError);
-        return errorResponse("internal_error", "Credit deduction failed", 500);
-      }
-
-      const result = creditResult?.[0] ?? creditResult;
-      if (!result?.out_success) {
-        return errorResponse("payment_required", result?.out_message ?? "Insufficient credits", 402, {
-          credits_required: totalCredits,
-          credits_available: result?.out_credits_remaining ?? 0,
-          topup_options: Object.entries(TOPUP_PRODUCTS).map(([id, p]) => ({
-            product_id: id,
-            credits: p.credits,
-            price: `$${(p.price_cents / 100).toFixed(2)}`,
-            name: p.name,
-          })),
-        });
-      }
-
-      creditTransactionId = result.out_transaction_id;
-      creditsRemaining = result.out_credits_remaining;
-    }
-
-    // 7. Create edit_decisions row
+    // 4. Create edit_decisions row — no credits charged (export is free)
     const { data: editDecision, error: edError } = await serviceClient
       .from("edit_decisions")
       .insert({
         project_id,
         edl_json: edlJson,
         total_fill_seconds: totalFillSeconds,
-        credits_charged: totalCredits,
+        credits_charged: 0,
         model,
-        credits_per_sec,
+        credits_per_sec: 0,
         status: "pending",
-        credit_transaction_id: creditTransactionId,
+        credit_transaction_id: null,
       })
       .select("id")
       .single();
@@ -216,7 +170,7 @@ Deno.serve(async (req) => {
       return errorResponse("internal_error", "Failed to create edit decision", 500);
     }
 
-    // 8. Create job_queue row
+    // 5. Create job_queue row — assembly job, not AI generation
     const priority = tier === "business" ? 1 : tier === "pro" ? 5 : 10;
 
     const { data: jobRow, error: jobError } = await serviceClient
@@ -224,7 +178,7 @@ Deno.serve(async (req) => {
       .insert({
         project_id,
         user_id: user.id,
-        type: "ai.fill",
+        type: "video.export",
         payload: {
           edit_decision_id: editDecision.id,
           output_format: output_format ?? "mp4",
@@ -244,23 +198,17 @@ Deno.serve(async (req) => {
       return errorResponse("internal_error", "Failed to queue processing job", 500);
     }
 
-    // 9. Update project status
+    // 6. Update project status to exporting (assembly only)
     await serviceClient
       .from("projects")
-      .update({ status: "generating" })
+      .update({ status: "exporting" })
       .eq("id", project_id);
-
-    // Estimate processing time: ~30s per second of fill (rough heuristic)
-    const estimatedProcessingSeconds = totalFillSeconds * 30;
 
     return successResponse({
       edit_decision_id: editDecision.id,
       job_id: jobRow.id,
       model,
-      credits_per_sec,
-      credits_charged: totalCredits,
-      credits_remaining: creditsRemaining,
-      estimated_processing_seconds: estimatedProcessingSeconds,
+      credits_charged: 0,
       edl: edlJson,
     });
   } catch (err) {
