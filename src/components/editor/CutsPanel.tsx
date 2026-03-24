@@ -613,9 +613,9 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
           </button>
         </div>
 
-        {/* Wrapped fill thumbnails grid for 3+ fills */}
-        {useGridLayout && orderedFills.length > 0 && (
-          <div className="flex flex-wrap gap-1 pl-1">
+        {/* Fill thumbnails — always wrapping grid */}
+        {orderedFills.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 pl-1">
             {orderedFills.map((fill, i) => (
               <button
                 key={fill.id}
@@ -626,9 +626,11 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                 }}
               >
                 <FillThumbnailInline fill={fill} isInserted={true} />
-                <span className="absolute -top-1 -left-1 bg-primary text-primary-foreground text-[7px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center">
-                  {i + 1}
-                </span>
+                {orderedFills.length > 1 && (
+                  <span className="absolute -top-1 -left-1 bg-primary text-primary-foreground text-[7px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center">
+                    {i + 1}
+                  </span>
+                )}
               </button>
             ))}
           </div>
