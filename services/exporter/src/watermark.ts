@@ -20,12 +20,26 @@ function log(level: string, msg: string, extra: Record<string, unknown> = {}): v
  * @param inputPath - Path to the input video.
  * @param outputPath - Path to write the watermarked video.
  */
-export async function applyWatermark(inputPath: string, outputPath: string): Promise<void> {
-  log("info", "Applying watermark");
+/**
+ * Apply a watermark overlay to the video.
+ *
+ * @param inputPath - Path to the input video.
+ * @param outputPath - Path to write the watermarked video.
+ * @param watermarkPath - Path to the watermark PNG image. Defaults to bundled asset.
+ */
+export async function applyWatermark(
+  inputPath: string,
+  outputPath: string,
+  watermarkPath = "/app/assets/watermark.png",
+): Promise<void> {
+  log("info", "Applying watermark", { watermarkPath });
 
+  // Scale watermark to 80px height, preserve aspect ratio, place bottom-right with padding
   await execFileAsync("ffmpeg", [
     "-i", inputPath,
-    "-vf", "drawtext=text='Made with NoCut':fontsize=24:fontcolor=white@0.5:x=w-tw-20:y=h-th-20",
+    "-i", watermarkPath,
+    "-filter_complex",
+    "[1:v]scale=-1:80,format=rgba,colorchannelmixer=aa=0.4[wm];[0:v][wm]overlay=W-w-20:H-h-20",
     "-c:v", "libx264", "-preset", "fast", "-crf", "18",
     "-c:a", "copy",
     "-movflags", "+faststart",
