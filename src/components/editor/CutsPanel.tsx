@@ -1424,7 +1424,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">AI fills included</span>
-              <span className="font-semibold">{cutsWithFills}</span>
+              <span className="font-semibold">{totalInsertedFills}</span>
             </div>
           </div>
           <DialogFooter className="shrink-0 border-t border-border px-6 py-3">
