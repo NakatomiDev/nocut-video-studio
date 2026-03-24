@@ -528,14 +528,30 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     );
   };
 
+  const [dragState, setDragState] = useState<{ cutId: string; dragIdx: number; overIdx: number } | null>(null);
+
   const renderFillsList = (cutId: string) => {
     const allCutsArr = [...cuts, ...manualCuts.map((c) => ({ ...c, type: 'manual' }))];
     const cutObj = allCutsArr.find((c) => c.id === cutId);
     if (!cutObj) return null;
-    const fills = [...getFillsForCut(cutObj, aiFills)].sort(
-      (a, b) => Number(insertedFills.has(b.id)) - Number(insertedFills.has(a.id)),
-    );
-    if (fills.length === 0) return null;
+    const rawFills = getFillsForCut(cutObj, aiFills);
+    if (rawFills.length === 0) return null;
+
+    // Apply user-defined order if available, otherwise default sort
+    const order = fillOrder.get(cutId);
+    let fills: AiFill[];
+    if (order && order.length > 0) {
+      const byId = new Map(rawFills.map((f) => [f.id, f]));
+      const ordered = order.map((id) => byId.get(id)).filter(Boolean) as AiFill[];
+      // Append any new fills not yet in the order
+      const orderedSet = new Set(order);
+      const extra = rawFills.filter((f) => !orderedSet.has(f.id));
+      fills = [...ordered, ...extra];
+    } else {
+      fills = [...rawFills].sort(
+        (a, b) => Number(insertedFills.has(b.id)) - Number(insertedFills.has(a.id)),
+      );
+    }
 
     const isOpen = expandedFillsCuts.has(cutId);
     const toggleOpen = () => {
@@ -546,6 +562,28 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
         return next;
       });
     };
+
+    const handleDragStart = (idx: number) => {
+      setDragState({ cutId, dragIdx: idx, overIdx: idx });
+    };
+    const handleDragOver = (e: React.DragEvent, idx: number) => {
+      e.preventDefault();
+      if (dragState && dragState.cutId === cutId) {
+        setDragState({ ...dragState, overIdx: idx });
+      }
+    };
+    const handleDrop = (idx: number) => {
+      if (!dragState || dragState.cutId !== cutId) return;
+      const { dragIdx } = dragState;
+      if (dragIdx !== idx) {
+        const reordered = [...fills.map((f) => f.id)];
+        const [moved] = reordered.splice(dragIdx, 1);
+        reordered.splice(idx, 0, moved);
+        setFillOrder(cutId, reordered);
+      }
+      setDragState(null);
+    };
+    const handleDragEnd = () => setDragState(null);
 
     return (
       <Collapsible open={isOpen} onOpenChange={toggleOpen}>
@@ -563,14 +601,25 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
               const isInserted = insertedFills.has(fill.id);
               const hasVideo = !!fill.s3Key;
               const identity = formatFillIdentity(fill);
+              const isDragOver = dragState?.cutId === cutId && dragState.overIdx === idx && dragState.dragIdx !== idx;
               return (
                 <div
                   key={fill.id}
-                  className={`flex items-start gap-1.5 rounded px-2 py-1.5 text-[10px] transition-colors ${
+                  draggable
+                  onDragStart={() => handleDragStart(idx)}
+                  onDragOver={(e) => handleDragOver(e, idx)}
+                  onDrop={() => handleDrop(idx)}
+                  onDragEnd={handleDragEnd}
+                  className={`flex items-start gap-1 rounded px-1.5 py-1.5 text-[10px] transition-colors cursor-grab active:cursor-grabbing ${
                     isInserted ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-secondary/50'
-                  }`}
+                  } ${isDragOver ? 'ring-2 ring-primary/50' : ''}`}
                   onClick={(e) => e.stopPropagation()}
                 >
+                  {/* Drag handle + sequence number */}
+                  <div className="flex flex-col items-center gap-0.5 shrink-0 self-center select-none">
+                    <GripVertical className="h-3.5 w-3.5 text-muted-foreground/50" />
+                    <span className="text-[8px] font-mono text-muted-foreground/70">{idx + 1}</span>
+                  </div>
                   {/* First-frame thumbnail */}
                   {hasVideo && (
                     <FillThumbnailInline fill={fill} isInserted={isInserted} />
