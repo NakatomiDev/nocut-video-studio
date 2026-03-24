@@ -177,7 +177,7 @@ interface EditorState {
   setRazorStart: (time: number | null) => void;
   setAiFills: (fills: AiFill[]) => void;
   toggleShowFills: () => void;
-  selectFill: (fill: AiFill | null) => void;
+  selectFill: (fill: AiFill | AiFill[] | null) => void;
   insertFill: (fillId: string) => void;
   removeFill: (fillId: string) => void;
   setFillVideoUrl: (fillId: string, url: string) => void;
