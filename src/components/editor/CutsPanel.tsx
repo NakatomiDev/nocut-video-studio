@@ -563,9 +563,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                       onClick={(e) => {
                         e.stopPropagation();
                         const cost = currentFill * creditsPerSec;
-                        if (window.confirm(`Generate a new AI fill?\n\nThis will cost ${cost} credit${cost > 1 ? 's' : ''}.\nYour balance: ${creditBalance.total} credits.`)) {
-                          generatePreview(cutId);
-                        }
+                        setGenerateConfirm({ cutId, cost });
                       }}
                     >
                       <Sparkles className="h-3 w-3 mr-1" /> Generate New Fill ({currentFill * creditsPerSec} cr)
