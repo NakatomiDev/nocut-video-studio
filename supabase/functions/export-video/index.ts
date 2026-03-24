@@ -298,8 +298,8 @@ function buildMediaConvertInputs(
       });
     }
 
-    // AI fill for this gap (if one was generated)
-    const fillS3Key = aiFillsByGapIndex.get(cut.originalIndex);
+    // AI fill for this gap: prefer existing_fill_s3_key from EDL, fallback to ai_fills table
+    const fillS3Key = cut.existing_fill_s3_key || aiFillsByGapIndex.get(cut.originalIndex);
     if (cut.fill_duration > 0 && fillS3Key) {
       inputs.push({
         FileInput: `s3://${bucket}/${fillS3Key}`,
