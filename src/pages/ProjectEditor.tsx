@@ -48,6 +48,14 @@ const ProjectEditor = () => {
     return payload.data?.url || payload.data?.data?.url || null;
   };
 
+  // Sync useCreditsBalance into the editor store so CutsPanel/usePreviewFill see it
+  const { setCreditBalance } = useEditorStore.getState();
+  useEffect(() => {
+    if (balance) {
+      setCreditBalance({ total: balance.total, monthly: balance.monthly, topup: balance.topup });
+    }
+  }, [balance, setCreditBalance]);
+
   useEffect(() => {
     return () => reset();
   }, [reset]);
