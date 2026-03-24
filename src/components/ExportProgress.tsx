@@ -134,7 +134,7 @@ const ExportProgress = ({ projectId, onComplete, onRetry }: ExportProgressProps)
 
     if (jobType === 'video.export') {
       if (status === 'queued') {
-        advanceStage('queued', 10);
+        gatedAdvanceStage('queued', 10);
 
         // Check if job is stuck and needs a retry
         const createdAt = job.created_at ? new Date(job.created_at as string).getTime() : 0;
@@ -143,19 +143,19 @@ const ExportProgress = ({ projectId, onComplete, onRetry }: ExportProgressProps)
         }
       } else if (status === 'processing') {
         if (progressPct >= 90) {
-          advanceStage('finalizing', 85 + Math.min((progressPct - 90) * 1.5, 14));
+          gatedAdvanceStage('finalizing', 85 + Math.min((progressPct - 90) * 1.5, 14));
         } else if (progressPct > 0) {
-          advanceStage('assembling', 15 + Math.min(progressPct * 0.75, 70));
+          gatedAdvanceStage('assembling', 15 + Math.min(progressPct * 0.75, 70));
         } else {
-          advanceStage('assembling', 15);
+          gatedAdvanceStage('assembling', 15);
         }
       } else if (status === 'complete') {
-        advanceStage('complete', 100);
+        gatedAdvanceStage('complete', 100);
       } else if (status === 'failed') {
-        advanceStage('failed', 0, (job.error_message as string) || 'Video export failed');
+        gatedAdvanceStage('failed', 0, (job.error_message as string) || 'Video export failed');
       }
     }
-  }, [advanceStage, retryStuckJob]);
+  }, [gatedAdvanceStage, retryStuckJob]);
 
   const applyProjectState = useCallback((proj: Record<string, unknown>) => {
     if (!proj) return;
