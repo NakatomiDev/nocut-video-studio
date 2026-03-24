@@ -634,18 +634,24 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
     prompt: promptText,
   };
 
+  // Gemini API (generativelanguage.googleapis.com) requires inlineData format.
+  // Vertex AI (aiplatform.googleapis.com) uses bytesBase64Encoded — do NOT mix them.
   if (request.firstFrameBase64) {
     instance.image = {
-      mimeType: "image/png",
-      bytesBase64Encoded: request.firstFrameBase64,
+      inlineData: {
+        mimeType: "image/png",
+        data: request.firstFrameBase64,
+      },
     };
     console.log("Using first frame conditioning for fill generation");
   }
 
   if (request.lastFrameBase64) {
     instance.lastFrame = {
-      mimeType: "image/png",
-      bytesBase64Encoded: request.lastFrameBase64,
+      inlineData: {
+        mimeType: "image/png",
+        data: request.lastFrameBase64,
+      },
     };
     console.log("Using last frame conditioning for fill generation");
   }
