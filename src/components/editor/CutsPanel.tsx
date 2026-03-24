@@ -1171,12 +1171,12 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                                 : edit.modelLabel}
                             </span>
                           </span>
-                          {edit.existingFill ? (
+                          {edit.existingFill && (
                             <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-[10px] text-emerald-400">
                               <CheckCircle2 className="mr-1 h-2.5 w-2.5" />
                               Generated
                             </Badge>
-                          )
+                          )}
                           {edit.existingFillIdentity && (
                             <span className="basis-full text-[10px] text-foreground/90 md:pl-5">
                               AI fill selected for this cut
