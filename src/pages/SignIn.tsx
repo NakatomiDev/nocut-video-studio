@@ -126,8 +126,8 @@ const SignIn = () => {
             </div>
           </div>
 
-          <Button variant="outline" className="w-full" onClick={handleGoogleSignIn}>
-            Continue with Google
+          <Button variant="outline" className="w-full" disabled>
+            Continue with Google — Coming soon
           </Button>
 
           <p className="text-center text-sm text-muted-foreground">
