@@ -510,6 +510,8 @@ export type Database = {
           email: string
           id: string
           revenuecat_id: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
           supabase_uid: string
           tier: string
           updated_at: string | null
@@ -519,6 +521,8 @@ export type Database = {
           email: string
           id: string
           revenuecat_id?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           supabase_uid: string
           tier?: string
           updated_at?: string | null
@@ -528,6 +532,8 @@ export type Database = {
           email?: string
           id?: string
           revenuecat_id?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           supabase_uid?: string
           tier?: string
           updated_at?: string | null
