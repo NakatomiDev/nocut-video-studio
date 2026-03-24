@@ -52,6 +52,70 @@ const typeBadgeClass: Record<string, string> = {
   retake: 'bg-red-500/20 text-red-400 border-red-500/30',
 };
 
+/** Inline fill thumbnail: shows a frozen first frame of the AI fill video */
+const FillThumbnailInline = ({ fill, isInserted }: { fill: AiFill; isInserted: boolean }) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [url, setUrl] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if (!fill.s3Key) return;
+    let cancelled = false;
+    supabase.functions.invoke('get-signed-url', { body: { s3_key: fill.s3Key } })
+      .then(({ data }) => {
+        if (!cancelled) {
+          const signedUrl = data?.data?.url ?? data?.url;
+          if (signedUrl) setUrl(signedUrl);
+        }
+      });
+    return () => { cancelled = true; };
+  }, [fill.s3Key]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !url) return;
+    let cancelled = false;
+    const onLoaded = () => {
+      if (cancelled) return;
+      video.currentTime = 0.1;
+    };
+    const onSeeked = () => {
+      if (cancelled) return;
+      video.pause();
+      setReady(true);
+    };
+    video.addEventListener('loadedmetadata', onLoaded);
+    video.addEventListener('seeked', onSeeked);
+    video.src = url;
+    video.load();
+    return () => {
+      cancelled = true;
+      video.removeEventListener('loadedmetadata', onLoaded);
+      video.removeEventListener('seeked', onSeeked);
+    };
+  }, [url]);
+
+  return (
+    <div className="flex flex-col items-center gap-0.5 shrink-0">
+      <div className={`relative h-10 w-[72px] rounded border overflow-hidden bg-muted/40 ${isInserted ? 'border-primary/50 ring-1 ring-primary/30' : 'border-border'}`}>
+        <video
+          ref={videoRef}
+          className={`h-full w-full object-contain transition-opacity duration-200 ${ready ? 'opacity-100' : 'opacity-0'}`}
+          muted
+          playsInline
+          preload="metadata"
+        />
+        {!ready && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Sparkles className="h-3 w-3 text-primary animate-pulse" />
+          </div>
+        )}
+      </div>
+      <span className="text-[9px] text-primary font-mono">AI Fill</span>
+    </div>
+  );
+};
+
 interface CutsPanelProps {
   thumbnailSpriteUrl?: string | null;
   videoUrl?: string | null;
@@ -403,45 +467,64 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     setLightbox({ time, label });
   };
 
-  const renderPreview = (start: number, end: number) => (
-    <div className="flex items-center gap-2 pl-2 pr-1 overflow-hidden">
-      <button
-        className="flex flex-col items-center gap-0.5 shrink-0 min-w-0 cursor-zoom-in hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background"
-        onClick={(e) => handleFrameClick(start, `Start frame · ${formatTimestamp(start)}`, e)}
-      >
-        {videoUrl ? (
-          <ExactVideoFrame
-            videoUrl={videoUrl}
-            time={start}
-            label={`Start frame ${formatTimestamp(start)}`}
-            className="h-10 w-[72px]"
-            cachedFrame={getFrame(start)}
-          />
-        ) : thumbnailSpriteUrl ? (
-          <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={start} duration={duration} width={72} height={40} />
-        ) : null}
-        <span className="text-[9px] text-muted-foreground font-mono">Start</span>
-      </button>
-      <div className="flex-1 border-t border-dashed border-muted-foreground/30 min-w-1" />
-      <button
-        className="flex flex-col items-center gap-0.5 shrink-0 min-w-0 cursor-zoom-in hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background"
-        onClick={(e) => handleFrameClick(end, `End frame · ${formatTimestamp(end)}`, e)}
-      >
-        {videoUrl ? (
-          <ExactVideoFrame
-            videoUrl={videoUrl}
-            time={end}
-            label={`End frame ${formatTimestamp(end)}`}
-            className="h-10 w-[72px]"
-            cachedFrame={getFrame(end)}
-          />
-        ) : thumbnailSpriteUrl ? (
-          <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={end} duration={duration} width={72} height={40} />
-        ) : null}
-        <span className="text-[9px] text-muted-foreground font-mono">End</span>
-      </button>
-    </div>
-  );
+  const renderPreview = (start: number, end: number, cutId?: string) => {
+    // Find selected/inserted fill for this cut
+    const allCutsArr = [...cuts, ...manualCuts.map((c) => ({ ...c, type: 'manual' }))];
+    const cutObj = cutId ? allCutsArr.find((c) => c.id === cutId) : null;
+    const insertedFill = cutObj ? getInsertedFillForCut(cutObj) : null;
+    const previewFill = cutObj ? getPreviewFillForCut(cutObj) : null;
+    const activeFill = insertedFill ?? previewFill;
+
+    return (
+      <div className="flex items-center gap-1 pl-2 pr-1 overflow-hidden">
+        <button
+          className="flex flex-col items-center gap-0.5 shrink-0 min-w-0 cursor-zoom-in hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background"
+          onClick={(e) => handleFrameClick(start, `Start frame · ${formatTimestamp(start)}`, e)}
+        >
+          {videoUrl ? (
+            <ExactVideoFrame
+              videoUrl={videoUrl}
+              time={start}
+              label={`Start frame ${formatTimestamp(start)}`}
+              className="h-10 w-[72px]"
+              cachedFrame={getFrame(start)}
+            />
+          ) : thumbnailSpriteUrl ? (
+            <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={start} duration={duration} width={72} height={40} />
+          ) : null}
+          <span className="text-[9px] text-muted-foreground font-mono">Start</span>
+        </button>
+
+        {activeFill && activeFill.s3Key ? (
+          <>
+            <div className="border-t border-dashed border-muted-foreground/30 w-2 shrink-0" />
+            <FillThumbnailInline fill={activeFill} isInserted={insertedFill?.id === activeFill.id} />
+            <div className="border-t border-dashed border-muted-foreground/30 w-2 shrink-0" />
+          </>
+        ) : (
+          <div className="flex-1 border-t border-dashed border-muted-foreground/30 min-w-1" />
+        )}
+
+        <button
+          className="flex flex-col items-center gap-0.5 shrink-0 min-w-0 cursor-zoom-in hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background"
+          onClick={(e) => handleFrameClick(end, `End frame · ${formatTimestamp(end)}`, e)}
+        >
+          {videoUrl ? (
+            <ExactVideoFrame
+              videoUrl={videoUrl}
+              time={end}
+              label={`End frame ${formatTimestamp(end)}`}
+              className="h-10 w-[72px]"
+              cachedFrame={getFrame(end)}
+            />
+          ) : thumbnailSpriteUrl ? (
+            <CutThumbnail spriteUrl={thumbnailSpriteUrl} time={end} duration={duration} width={72} height={40} />
+          ) : null}
+          <span className="text-[9px] text-muted-foreground font-mono">End</span>
+        </button>
+      </div>
+    );
+  };
 
   const renderFillsList = (cutId: string) => {
     const allCutsArr = [...cuts, ...manualCuts.map((c) => ({ ...c, type: 'manual' }))];
@@ -587,7 +670,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
               </div>
               {activeCuts.has(cut.id) && (
                 <>
-                  {thumbnailSpriteUrl && renderPreview(cut.start, cut.end)}
+                  {thumbnailSpriteUrl && renderPreview(cut.start, cut.end, cut.id)}
                   {renderFillSelector(cut.id)}
                   {renderFillsList(cut.id)}
                 </>
@@ -641,7 +724,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
               </div>
               {activeManualCuts.has(cut.id) && (
                 <>
-                  {(thumbnailSpriteUrl || videoUrl) && renderPreview(cut.start, cut.end)}
+                  {(thumbnailSpriteUrl || videoUrl) && renderPreview(cut.start, cut.end, cut.id)}
                   {renderFillSelector(cut.id)}
                   {renderFillsList(cut.id)}
                 </>
