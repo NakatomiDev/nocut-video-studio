@@ -253,8 +253,6 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   const { getFrame } = useFrameCache(videoUrl ?? null, allCutTimestamps, priorityCutTimestamps);
 
   const hasActiveCuts = activeCuts.size > 0 || activeManualCuts.size > 0;
-  const insufficientCredits = creditEstimate > creditBalance.total;
-  const creditsAfterExport = creditBalance.total - creditEstimate;
   const cutsWithFills = fillDurations.size;
 
   const getInsertedFillsForCut = useCallback((cutObj: { end: number }) => {
@@ -1048,31 +1046,21 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground">Active cuts</span>
           <span className="text-sm font-semibold text-foreground">
-            {activeCuts.size + activeManualCuts.size} (free)
+            {activeCuts.size + activeManualCuts.size}
           </span>
         </div>
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground">AI fills</span>
           <span className="text-sm font-semibold text-foreground">
-            {cutsWithFills > 0 ? `${creditEstimate} credit${creditEstimate !== 1 ? 's' : ''}` : 'None'}
+            {cutsWithFills > 0 ? `${cutsWithFills} selected` : 'None'}
           </span>
         </div>
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">Your balance</span>
-          <span className="text-sm font-semibold text-foreground">{creditBalance.total} credits</span>
-        </div>
-        {insufficientCredits && (
-          <div className="flex items-center gap-1.5 text-destructive">
-            <AlertTriangle className="h-3.5 w-3.5" />
-            <span className="text-xs font-medium">Insufficient credits for AI fills</span>
-          </div>
-        )}
         <Button
           className="w-full"
-          disabled={!hasActiveCuts || insufficientCredits || !!previewGeneratingCutId}
+          disabled={!hasActiveCuts || !!previewGeneratingCutId}
           onClick={() => setShowExportDialog(true)}
         >
-          {creditEstimate > 0 ? `Export (${creditEstimate} credits)` : 'Export (free)'}
+          Export (free)
         </Button>
       </div>
 
@@ -1081,9 +1069,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
           <DialogHeader className="shrink-0 border-b border-border px-6 py-4">
             <DialogTitle>Review Edits</DialogTitle>
             <DialogDescription>
-              {creditEstimate > 0
-                ? `${creditEstimate} credit${creditEstimate !== 1 ? 's' : ''} for AI fills · Click any edit to preview`
-                : 'All cuts are free — click any edit to preview'}
+              Review your cuts and AI fills before exporting · Export is free
             </DialogDescription>
           </DialogHeader>
 
@@ -1185,14 +1171,10 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                                 : edit.modelLabel}
                             </span>
                           </span>
-                          {edit.existingFill ? (
+                          {edit.existingFill && (
                             <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-[10px] text-emerald-400">
                               <CheckCircle2 className="mr-1 h-2.5 w-2.5" />
                               Generated
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-[10px] text-amber-400">
-                              Pending
                             </Badge>
                           )}
                           {edit.existingFillIdentity && (
@@ -1229,8 +1211,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
 
                             <div className="flex flex-col items-center justify-center gap-1 lg:min-w-[96px]">
                               <div className="hidden h-px w-8 bg-muted-foreground/30 lg:block" />
-                              {(edit.fill > 0 || edit.existingFill) && (
-                                edit.existingFill ? (
+                              {edit.existingFill && (
                                   <button
                                     className="group/fill flex w-full max-w-[320px] flex-col items-center gap-1 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 transition-colors hover:bg-primary/10 lg:w-auto lg:max-w-none"
                                     onClick={(e) => {
@@ -1271,17 +1252,6 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                                       {inlineFillPreview?.editId === edit.id ? 'Click to close' : 'Click to preview'}
                                     </span>
                                   </button>
-                                ) : (
-                                  <div className="flex w-full max-w-[320px] flex-col items-center gap-0.5 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 lg:w-auto lg:max-w-none">
-                                    <div className="flex h-14 w-full items-center justify-center rounded border border-dashed border-muted-foreground/30 bg-muted/60 lg:h-12 lg:w-20">
-                                      <Sparkles className="h-4 w-4 text-amber-400/60" />
-                                    </div>
-                                    <span className="text-[9px] font-semibold text-amber-400">
-                                      {edit.fill}s AI Fill
-                                    </span>
-                                    <span className="text-[8px] text-muted-foreground">Pending</span>
-                                  </div>
-                                )
                               )}
                               <div className="hidden h-px w-8 bg-muted-foreground/30 lg:block" />
                             </div>
@@ -1377,21 +1347,17 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
 
           <div className="shrink-0 space-y-2 border-t border-border px-6 py-3 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Cuts (removal)</span>
-              <span className="font-semibold">{activeCuts.size + activeManualCuts.size} — Free</span>
+              <span className="text-muted-foreground">Cuts</span>
+              <span className="font-semibold">{activeCuts.size + activeManualCuts.size}</span>
             </div>
-            {creditEstimate > 0 && (
-              <>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">AI fill transitions</span>
-                  <span className="font-semibold">{creditEstimate} credits</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Balance after export</span>
-                  <span className="font-semibold">{creditsAfterExport}</span>
-                </div>
-              </>
-            )}
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">AI fills included</span>
+              <span className="font-semibold">{cutsWithFills}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Cost</span>
+              <span className="font-semibold text-emerald-400">Free</span>
+            </div>
           </div>
           <DialogFooter className="shrink-0 border-t border-border px-6 py-3">
             <Button variant="ghost" onClick={() => setShowExportDialog(false)}>Cancel</Button>
