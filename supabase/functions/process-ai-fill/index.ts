@@ -1,4 +1,5 @@
 import { S3Client, CopyObjectCommand, PutObjectCommand, GetObjectCommand, HeadObjectCommand } from "npm:@aws-sdk/client-s3";
+import { encodeBase64 } from "https://deno.land/std@0.224.0/encoding/base64.ts";
 import { handleCors } from "../_shared/cors.ts";
 import {
   getAuthenticatedUser,
@@ -252,6 +253,22 @@ Deno.serve(async (req) => {
         const firstFrameBase64 = await loadFrameBase64(project.id, gap.start);
         const lastFrameBase64 = await loadFrameBase64(project.id, gap.end);
 
+        if (!firstFrameBase64 && !lastFrameBase64) {
+          const msg = `Frame conditioning failed for gap ${gap.gap_index}: neither boundary frame could be loaded from S3. ` +
+            `Expected frames at timestamps ${gap.start} and ${gap.end} for project ${project.id}. ` +
+            `Without frame conditioning, the generated video will not match the source video.`;
+          console.error(msg);
+          await refundOnFailure(serviceClient, creditTransactionId);
+          await failJob(serviceClient, job.id, editDecision.id, msg, isPreview);
+          return errorResponse("frame_conditioning_failed", msg, 502);
+        }
+        if (!firstFrameBase64) {
+          console.warn(`First frame (timestamp ${gap.start}) could not be loaded — only last frame conditioning will be used`);
+        }
+        if (!lastFrameBase64) {
+          console.warn(`Last frame (timestamp ${gap.end}) could not be loaded — only first frame conditioning will be used`);
+        }
+
         let fillResult: FillResponse;
         try {
           fillResult = await generateAiFill({
@@ -424,17 +441,21 @@ async function loadFrameBase64(projectId: string, timestamp: number): Promise<st
       Key: s3Key,
     }));
 
-    if (!response.Body) return null;
+    if (!response.Body) {
+      console.warn(`Frame S3 object has no body: ${s3Key}`);
+      return null;
+    }
 
     const bytes = new Uint8Array(await response.Body.transformToByteArray());
-    // Convert to base64
-    let binary = "";
-    for (let i = 0; i < bytes.length; i++) {
-      binary += String.fromCharCode(bytes[i]);
+    if (bytes.length === 0) {
+      console.warn(`Frame S3 object is empty (0 bytes): ${s3Key}`);
+      return null;
     }
-    return btoa(binary);
-  } catch {
-    // Frame not available — will generate without conditioning
+    console.log(`Loaded frame from S3: ${s3Key} (${bytes.length} bytes)`);
+    return encodeBase64(bytes);
+  } catch (err) {
+    const errMsg = (err as Error).message ?? String(err);
+    console.error(`Failed to load frame from S3: ${s3Key} — ${errMsg}`);
     return null;
   }
 }
@@ -450,10 +471,16 @@ async function ensureFramesExtracted(
   videoS3Key: string | null,
   timestamps: number[],
 ): Promise<void> {
-  if (!videoS3Key) return;
+  if (!videoS3Key) {
+    console.error("ensureFramesExtracted: no videoS3Key — cannot extract boundary frames");
+    return;
+  }
 
   const bucket = Deno.env.get("AWS_S3_BUCKET");
-  if (!bucket) return;
+  if (!bucket) {
+    console.error("ensureFramesExtracted: AWS_S3_BUCKET not set — cannot extract or check frames");
+    return;
+  }
 
   // Deduplicate timestamps based on the 3-decimal precision used in frame filenames
   const seenRounded = new Set<string>();
@@ -603,20 +630,32 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
     prompt: promptText,
   };
 
+  // Gemini API (generativelanguage.googleapis.com) requires inlineData format.
+  // Vertex AI (aiplatform.googleapis.com) uses bytesBase64Encoded — do NOT mix them.
   if (request.firstFrameBase64) {
     instance.image = {
-      mimeType: "image/png",
-      bytesBase64Encoded: request.firstFrameBase64,
+      inlineData: {
+        mimeType: "image/png",
+        data: request.firstFrameBase64,
+      },
     };
     console.log("Using first frame conditioning for fill generation");
   }
 
   if (request.lastFrameBase64) {
     instance.lastFrame = {
-      mimeType: "image/png",
-      bytesBase64Encoded: request.lastFrameBase64,
+      inlineData: {
+        mimeType: "image/png",
+        data: request.lastFrameBase64,
+      },
     };
     console.log("Using last frame conditioning for fill generation");
+  }
+
+  if (!request.firstFrameBase64 && !request.lastFrameBase64) {
+    console.error("WARNING: No frame conditioning provided — Veo will generate from text prompt only. Output will NOT match source video.");
+  } else {
+    console.log(`Frame conditioning: first=${!!request.firstFrameBase64}, last=${!!request.lastFrameBase64}`);
   }
 
   const parameters: Record<string, unknown> = {
