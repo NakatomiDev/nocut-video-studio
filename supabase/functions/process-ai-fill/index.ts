@@ -1,4 +1,4 @@
-import { S3Client, CopyObjectCommand, PutObjectCommand, GetObjectCommand } from "npm:@aws-sdk/client-s3";
+import { S3Client, CopyObjectCommand, PutObjectCommand, GetObjectCommand, HeadObjectCommand } from "npm:@aws-sdk/client-s3";
 import { handleCors } from "../_shared/cors.ts";
 import {
   getAuthenticatedUser,
@@ -268,9 +268,12 @@ Deno.serve(async (req) => {
         fillQualityScore = 0.9;
       } else {
         // Generate new AI fill
-        // Try to load boundary frames from S3 (extracted by transcoder service)
-        const firstFrameBase64 = await loadFrameBase64(project.id, gap.end);
-        const lastFrameBase64 = await loadFrameBase64(project.id, gap.end + gap.fill_duration);
+        // Ensure boundary frames are extracted before loading them
+        await ensureFramesExtracted(serviceClient, project.id, user.id, sourceVideoKey, [gap.start, gap.end]);
+
+        // Load boundary frames from S3: gap.start = last frame before cut, gap.end = first frame after cut
+        const firstFrameBase64 = await loadFrameBase64(project.id, gap.start);
+        const lastFrameBase64 = await loadFrameBase64(project.id, gap.end);
 
         let fillResult: FillResponse;
         try {
@@ -448,6 +451,85 @@ async function loadFrameBase64(projectId: string, timestamp: number): Promise<st
     // Frame not available — will generate without conditioning
     return null;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Ensure boundary frames are extracted before AI fill generation
+// ---------------------------------------------------------------------------
+
+async function ensureFramesExtracted(
+  serviceClient: ReturnType<typeof createServiceClient>,
+  projectId: string,
+  userId: string,
+  videoS3Key: string | null,
+  timestamps: number[],
+): Promise<void> {
+  if (!videoS3Key) return;
+
+  const bucket = Deno.env.get("AWS_S3_BUCKET");
+  if (!bucket) return;
+
+  // Check which frames are missing from S3
+  const missing: number[] = [];
+  for (const ts of timestamps) {
+    const frameName = `frame_${ts.toFixed(3).replace(".", "_")}.png`;
+    const s3Key = `frames/${projectId}/${frameName}`;
+    try {
+      await getS3Client().send(new HeadObjectCommand({ Bucket: bucket, Key: s3Key }));
+    } catch {
+      missing.push(ts);
+    }
+  }
+
+  if (missing.length === 0) {
+    console.log("All boundary frames already exist in S3");
+    return;
+  }
+
+  console.log(`Extracting ${missing.length} missing boundary frame(s) at timestamps: ${missing.join(", ")}`);
+
+  // Enqueue frame extraction job for the transcoder service
+  const { data: job, error } = await serviceClient
+    .from("job_queue")
+    .insert({
+      project_id: projectId,
+      user_id: userId,
+      type: "video.extract_frames",
+      payload: { video_s3_key: videoS3Key, timestamps: missing },
+      status: "queued",
+      priority: 1,
+      attempts: 0,
+      max_attempts: 3,
+    })
+    .select("id")
+    .single();
+
+  if (error || !job) {
+    console.error("Failed to enqueue frame extraction:", error?.message);
+    return; // proceed without frames rather than failing the whole fill
+  }
+
+  // Poll for completion (max 60s)
+  const deadline = Date.now() + 60_000;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 2000));
+    const { data } = await serviceClient
+      .from("job_queue")
+      .select("status")
+      .eq("id", job.id)
+      .single();
+
+    if (data?.status === "complete") {
+      console.log("Boundary frame extraction complete");
+      return;
+    }
+    if (data?.status === "failed") {
+      console.warn("Frame extraction job failed, proceeding without frame conditioning");
+      return;
+    }
+  }
+
+  console.warn("Frame extraction timed out after 60s, proceeding without frame conditioning");
 }
 
 // ---------------------------------------------------------------------------
