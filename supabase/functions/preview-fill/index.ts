@@ -158,6 +158,8 @@ Deno.serve(async (req) => {
 
     if (edError || !editDecision) {
       console.error("Failed to create edit_decision:", edError);
+      // Refund the credits we just deducted since we can't proceed
+      await refundCredits(serviceClient, creditTransactionId);
       return errorResponse("internal_error", "Failed to create edit decision", 500);
     }
 
@@ -182,6 +184,8 @@ Deno.serve(async (req) => {
 
     if (jobError || !jobRow) {
       console.error("Failed to create job:", jobError);
+      // Refund credits since we can't queue the job
+      await refundCredits(serviceClient, creditTransactionId);
       return errorResponse("internal_error", "Failed to queue preview job", 500);
     }
 
@@ -196,3 +200,24 @@ Deno.serve(async (req) => {
     return errorResponse("internal_error", "An unexpected error occurred", 500);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Helper: refund credits on failure
+// ---------------------------------------------------------------------------
+async function refundCredits(
+  serviceClient: ReturnType<typeof createServiceClient>,
+  transactionId: string,
+) {
+  try {
+    const { data, error } = await serviceClient
+      .rpc("refund_credits", { p_transaction_id: transactionId });
+    if (error) {
+      console.error("Credit refund RPC error:", error);
+    } else {
+      const r = data?.[0] ?? data;
+      console.log(`Refunded ${r?.out_credits_refunded ?? 0} credits (txn: ${transactionId})`);
+    }
+  } catch (refundErr) {
+    console.error("Credit refund failed:", refundErr);
+  }
+}

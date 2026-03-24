@@ -71,7 +71,8 @@ const ProjectCard = ({ id, title, status, date, thumbnailUrl }: ProjectCardProps
 
   const handleDelete = async () => {
     setSaving(true);
-    await supabase.from("projects").delete().eq("id", id);
+    // Soft-delete: set deleted_at instead of actually deleting (preserves audit trail)
+    await supabase.from("projects").update({ deleted_at: new Date().toISOString() }).eq("id", id);
     setSaving(false);
     setDeleteOpen(false);
   };
