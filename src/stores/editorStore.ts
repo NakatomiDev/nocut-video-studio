@@ -191,10 +191,28 @@ interface EditorState {
   reset: () => void;
 }
 
-/** Credits = sum of (fill duration × model credits/sec) for each cut */
-const calcCredits = (fillDurations: Map<string, number>, fillModels: Map<string, AiFillModel>) => {
+/** Credits = sum of (fill duration × model credits/sec) for each cut, skipping cuts with existing inserted fills */
+const calcCredits = (
+  fillDurations: Map<string, number>,
+  fillModels: Map<string, AiFillModel>,
+  cuts?: Cut[],
+  manualCuts?: ManualCut[],
+  aiFills?: AiFill[],
+  insertedFills?: Set<string>,
+) => {
   let total = 0;
   fillDurations.forEach((sec, cutId) => {
+    // If this cut already has an inserted (previously generated) fill, it's free to reuse
+    if (cuts && aiFills && insertedFills && insertedFills.size > 0) {
+      const allCuts = [...cuts, ...(manualCuts ?? [])];
+      const cutObj = allCuts.find((c) => c.id === cutId);
+      if (cutObj) {
+        const matchingFills = getFillsForCut(cutObj, aiFills);
+        if (matchingFills.some((f) => insertedFills.has(f.id))) {
+          return; // skip — reusing existing fill, no new credits needed
+        }
+      }
+    }
     const model = fillModels.get(cutId) ?? DEFAULT_AI_FILL_MODEL;
     total += sec * MODEL_CREDITS_PER_SEC[model];
   });
