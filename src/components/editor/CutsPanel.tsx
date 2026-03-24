@@ -184,6 +184,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   const [expandedFillDetails, setExpandedFillDetails] = useState<Set<string>>(new Set());
   const [editingFillName, setEditingFillName] = useState<string | null>(null);
   const [inlineFillPreview, setInlineFillPreview] = useState<{ editId: string; fills: AiFill[]; currentIndex: number } | null>(null);
+  const [generateConfirm, setGenerateConfirm] = useState<{ cutId: string; cost: number } | null>(null);
   const [inlineFillVideoUrl, setInlineFillVideoUrl] = useState<string | null>(null);
   const [inlineFillLoading, setInlineFillLoading] = useState(false);
   const inlineFillVideoRef = useRef<HTMLVideoElement>(null);
