@@ -57,6 +57,13 @@ Deno.serve(async (req: Request) => {
       if (!proj) {
         return errorResponse("unauthorized", "Unauthorized", 403);
       }
+    } else if (s3_key.startsWith("exports/")) {
+      // Verify user owns the project referenced in the path: exports/{user_id}/{project_id}/...
+      const parts = s3_key.split("/");
+      const pathUserId = parts[1];
+      if (pathUserId !== user.id) {
+        return errorResponse("unauthorized", "Unauthorized", 403);
+      }
     } else {
       return errorResponse("unauthorized", "Unauthorized", 403);
     }
