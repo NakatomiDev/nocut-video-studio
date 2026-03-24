@@ -160,6 +160,8 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   const [expandedReviewId, setExpandedReviewId] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{ time: number; label: string } | null>(null);
   const [expandedFillsCuts, setExpandedFillsCuts] = useState<Set<string>>(new Set());
+  const [expandedFillDetails, setExpandedFillDetails] = useState<Set<string>>(new Set());
+  const [editingFillName, setEditingFillName] = useState<string | null>(null);
   const [inlineFillPreview, setInlineFillPreview] = useState<{ editId: string; fill: AiFill } | null>(null);
   const [inlineFillVideoUrl, setInlineFillVideoUrl] = useState<string | null>(null);
   const [inlineFillLoading, setInlineFillLoading] = useState(false);
