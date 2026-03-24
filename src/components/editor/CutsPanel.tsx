@@ -328,7 +328,8 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     const allCutsArr = [...cuts, ...manualCuts.map((c) => ({ ...c, type: 'manual' }))];
     const cutObj = allCutsArr.find((c) => c.id === cutId);
     const generatedFill = cutObj ? getPreviewFillForCut(cutObj) : null;
-    const selectedExistingFill = cutObj ? getInsertedFillForCut(cutObj) : null;
+    const selectedExistingFills = cutObj ? getInsertedFillsForCut(cutObj) : [];
+    const selectedExistingFill = selectedExistingFills[0] ?? null;
     const selectedExistingIdentity = selectedExistingFill ? formatFillIdentity(selectedExistingFill) : null;
 
     return (
