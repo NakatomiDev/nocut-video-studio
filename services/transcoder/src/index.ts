@@ -54,8 +54,16 @@ async function main(): Promise<void> {
         project_id: job.data.projectId,
         timestamps: job.data.timestamps,
       });
-      const results = await extractFrames(job.data);
-      return results;
+      try {
+        const results = await extractFrames(job.data);
+        await completeJob(job.data.jobId);
+        return results;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        log("error", "Frame extraction failed", { job_id: job.data.jobId, error: message });
+        await failJob(job.data.jobId, message);
+        throw err;
+      }
     },
     {
       connection,
