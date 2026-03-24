@@ -517,8 +517,9 @@ async function processExport(
 
   const projectId = job.project_id;
   const userId = job.user_id;
-  const payload = job.payload as { edit_decision_id: string };
+  const payload = job.payload as { edit_decision_id: string; crossfade_duration?: number };
   const editDecisionId = payload.edit_decision_id;
+  const crossfadeDuration = payload.crossfade_duration ?? 0;
 
   try {
     // 2. Fetch metadata

@@ -144,6 +144,10 @@ interface EditorState {
   fillModels: Map<string, AiFillModel>;
   /** Maps cutId → selected prompt (preset ID or "custom:text") */
   fillPrompts: Map<string, string>;
+  /** Maps cutId → selected audio prompt (preset ID or "custom:text") */
+  audioPrompts: Map<string, string>;
+  /** Cross-fade duration in seconds (0 = disabled) */
+  crossfadeDuration: number;
   /** Maps cutId → ordered list of fill IDs (user-defined sequence) */
   fillOrder: Map<string, string[]>;
   /** Maps fillId → user-defined custom name */
@@ -171,6 +175,8 @@ interface EditorState {
   setFillDuration: (cutId: string, seconds: number) => void;
   setFillModel: (cutId: string, model: AiFillModel) => void;
   setFillPrompt: (cutId: string, prompt: string) => void;
+  setAudioPrompt: (cutId: string, prompt: string) => void;
+  setCrossfadeDuration: (seconds: number) => void;
   setPlayhead: (time: number) => void;
   play: () => void;
   pause: () => void;
@@ -231,6 +237,8 @@ interface PersistedEditorState {
   fillDurations: [string, number][];
   fillModels: [string, string][];
   fillPrompts: [string, string][];
+  audioPrompts?: [string, string][];
+  crossfadeDuration?: number;
   fillOrder: [string, string[]][];
   fillNames: [string, string][];
   showFills: boolean;
@@ -247,6 +255,8 @@ function saveEditorState(state: EditorState) {
       fillDurations: Array.from(state.fillDurations.entries()),
       fillModels: Array.from(state.fillModels.entries()),
       fillPrompts: Array.from(state.fillPrompts.entries()),
+      audioPrompts: Array.from(state.audioPrompts.entries()),
+      crossfadeDuration: state.crossfadeDuration,
       fillOrder: Array.from(state.fillOrder.entries()),
       fillNames: Array.from(state.fillNames.entries()),
       showFills: state.showFills,
@@ -324,6 +334,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   fillDurations: new Map<string, number>(),
   fillModels: new Map<string, AiFillModel>(),
   fillPrompts: new Map<string, string>(),
+  audioPrompts: new Map<string, string>(),
+  crossfadeDuration: 0,
   fillOrder: new Map<string, string[]>(),
   fillNames: new Map<string, string>(),
   playheadPosition: 0,
@@ -392,6 +404,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const fillPrompts = saved?.fillPrompts
       ? new Map(saved.fillPrompts.filter(([id]) => cuts.some((c) => c.id === id) || manualCuts.some((c) => c.id === id)))
       : new Map<string, string>();
+    const audioPrompts = saved?.audioPrompts
+      ? new Map(saved.audioPrompts.filter(([id]) => cuts.some((c) => c.id === id) || manualCuts.some((c) => c.id === id)))
+      : new Map<string, string>();
+    const crossfadeDuration = saved?.crossfadeDuration ?? 0;
     const insertedFills = saved ? new Set(saved.insertedFills) : new Set<string>();
     const fillOrder = saved?.fillOrder
       ? new Map(saved.fillOrder)
@@ -410,6 +426,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       fillDurations,
       fillModels,
       fillPrompts,
+      audioPrompts,
+      crossfadeDuration,
       fillOrder,
       fillNames,
       insertedFills,
@@ -424,11 +442,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const nextFills = new Map(state.fillDurations);
       const nextModels = new Map(state.fillModels);
       const nextPrompts = new Map(state.fillPrompts);
+      const nextAudioPrompts = new Map(state.audioPrompts);
       if (next.has(cutId)) {
         next.delete(cutId);
         nextFills.delete(cutId);
         nextModels.delete(cutId);
         nextPrompts.delete(cutId);
+        nextAudioPrompts.delete(cutId);
       } else {
         next.add(cutId);
       }
@@ -437,6 +457,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         fillDurations: nextFills,
         fillModels: nextModels,
         fillPrompts: nextPrompts,
+        audioPrompts: nextAudioPrompts,
         creditEstimate: calcCredits(nextFills, nextModels, state.cuts, state.manualCuts, state.aiFills, state.insertedFills),
       };
     }),
@@ -471,12 +492,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       nextModels.delete(id);
       const nextPrompts = new Map(state.fillPrompts);
       nextPrompts.delete(id);
+      const nextAudioPrompts = new Map(state.audioPrompts);
+      nextAudioPrompts.delete(id);
       return {
         manualCuts,
         activeManualCuts,
         fillDurations: nextFills,
         fillModels: nextModels,
         fillPrompts: nextPrompts,
+        audioPrompts: nextAudioPrompts,
         creditEstimate: calcCredits(nextFills, nextModels, state.cuts, manualCuts, state.aiFills, state.insertedFills),
       };
     });
@@ -490,11 +514,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const nextFills = new Map(state.fillDurations);
       const nextModels = new Map(state.fillModels);
       const nextPrompts = new Map(state.fillPrompts);
+      const nextAudioPrompts = new Map(state.audioPrompts);
       if (next.has(cutId)) {
         next.delete(cutId);
         nextFills.delete(cutId);
         nextModels.delete(cutId);
         nextPrompts.delete(cutId);
+        nextAudioPrompts.delete(cutId);
       } else {
         next.add(cutId);
       }
@@ -503,6 +529,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         fillDurations: nextFills,
         fillModels: nextModels,
         fillPrompts: nextPrompts,
+        audioPrompts: nextAudioPrompts,
         creditEstimate: calcCredits(nextFills, nextModels, state.cuts, state.manualCuts, state.aiFills, state.insertedFills),
       };
     }),
@@ -538,6 +565,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
       return { fillPrompts: next };
     }),
+  setAudioPrompt: (cutId, prompt) =>
+    set((state) => {
+      const next = new Map(state.audioPrompts);
+      if (!prompt) {
+        next.delete(cutId);
+      } else {
+        next.set(cutId, prompt);
+      }
+      return { audioPrompts: next };
+    }),
+  setCrossfadeDuration: (seconds) => set({ crossfadeDuration: Math.max(0, Math.min(0.5, seconds)) }),
   setPlayhead: (time) => set({ playheadPosition: time }),
   play: () => set({ isPlaying: true }),
   pause: () => set({ isPlaying: false }),
@@ -609,6 +647,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       fillDurations: new Map(),
       fillModels: new Map(),
       fillPrompts: new Map(),
+      audioPrompts: new Map(),
+      crossfadeDuration: 0,
       fillOrder: new Map(),
       fillNames: new Map(),
       playheadPosition: 0,
@@ -635,6 +675,8 @@ useEditorStore.subscribe((state, prev) => {
     state.fillDurations === prev.fillDurations &&
     state.fillModels === prev.fillModels &&
     state.fillPrompts === prev.fillPrompts &&
+    state.audioPrompts === prev.audioPrompts &&
+    state.crossfadeDuration === prev.crossfadeDuration &&
     state.fillOrder === prev.fillOrder &&
     state.fillNames === prev.fillNames &&
     state.showFills === prev.showFills

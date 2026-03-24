@@ -128,6 +128,89 @@ export async function concatenateSegments(
 }
 
 /**
+ * Concatenate segments with cross-fade transitions using FFmpeg xfade filter.
+ * Requires re-encoding but produces smoother transitions between segments.
+ */
+export async function concatenateWithCrossfade(
+  segmentPaths: string[],
+  outputPath: string,
+  tmpDir: string,
+  crossfadeDuration: number,
+): Promise<void> {
+  if (segmentPaths.length === 0) {
+    throw new Error("No segments to concatenate");
+  }
+
+  if (segmentPaths.length === 1) {
+    // Single segment — just copy it
+    await execFileAsync("ffmpeg", [
+      "-i", segmentPaths[0],
+      "-c", "copy",
+      "-movflags", "+faststart",
+      "-y", outputPath,
+    ], { timeout: 30 * 60 * 1000 });
+    return;
+  }
+
+  // Probe each segment for its duration
+  const durations: number[] = [];
+  for (const segPath of segmentPaths) {
+    const probe = await probeVideo(segPath);
+    durations.push(probe.duration);
+  }
+
+  log("info", `Cross-fading ${segmentPaths.length} segments (fade: ${crossfadeDuration}s)`);
+
+  // Build FFmpeg xfade filter chain:
+  // For N segments, we need N-1 xfade filters chained together.
+  // [0][1]xfade=transition=fade:duration=D:offset=O1[v01];
+  // [v01][2]xfade=transition=fade:duration=D:offset=O2[v012]; ...
+  // Similarly for audio: acrossfade
+  const inputs: string[] = [];
+  for (const p of segmentPaths) {
+    inputs.push("-i", p);
+  }
+
+  const filterParts: string[] = [];
+  const audioFilterParts: string[] = [];
+  let prevVideoLabel = "[0:v]";
+  let prevAudioLabel = "[0:a]";
+  let cumulativeOffset = durations[0];
+
+  for (let i = 1; i < segmentPaths.length; i++) {
+    const offset = Math.max(0, cumulativeOffset - crossfadeDuration);
+    const outVideoLabel = i === segmentPaths.length - 1 ? "[vout]" : `[v${i}]`;
+    const outAudioLabel = i === segmentPaths.length - 1 ? "[aout]" : `[a${i}]`;
+
+    filterParts.push(
+      `${prevVideoLabel}[${i}:v]xfade=transition=fade:duration=${crossfadeDuration}:offset=${offset.toFixed(3)}${outVideoLabel}`
+    );
+    audioFilterParts.push(
+      `${prevAudioLabel}[${i}:a]acrossfade=d=${crossfadeDuration}:c1=tri:c2=tri${outAudioLabel}`
+    );
+
+    prevVideoLabel = outVideoLabel;
+    prevAudioLabel = outAudioLabel;
+    // Each xfade shortens the output by crossfadeDuration
+    cumulativeOffset = offset + durations[i];
+  }
+
+  const filterComplex = [...filterParts, ...audioFilterParts].join(";");
+
+  await execFileAsync("ffmpeg", [
+    ...inputs,
+    "-filter_complex", filterComplex,
+    "-map", "[vout]",
+    "-map", "[aout]",
+    "-c:v", "libx264", "-preset", "fast", "-crf", "18",
+    "-c:a", "aac", "-b:a", "128k",
+    "-pix_fmt", "yuv420p",
+    "-movflags", "+faststart",
+    "-y", outputPath,
+  ], { timeout: 60 * 60 * 1000 });
+}
+
+/**
  * Probe video for duration and resolution.
  */
 export async function probeVideo(filePath: string): Promise<{

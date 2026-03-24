@@ -29,7 +29,7 @@ import {
   type FillSummary,
 } from "./supabase.js";
 import { downloadFile, uploadFile, generateSignedDownloadUrl } from "./s3.js";
-import { extractSegments, concatenateSegments, probeVideo, parseResolution } from "./assembler.js";
+import { extractSegments, concatenateSegments, concatenateWithCrossfade, probeVideo, parseResolution } from "./assembler.js";
 import { normalizeAudio } from "./audio.js";
 import { applyWatermark } from "./watermark.js";
 import { isCutBasedEdl, convertCutBasedEdl } from "./edl-converter.js";
@@ -77,6 +77,7 @@ async function processJob(job: ExportJobRow): Promise<void> {
   const projectId = job.project_id;
   const userId = job.user_id;
   const editDecisionId = job.payload.edit_decision_id;
+  const crossfadeDuration = job.payload.crossfade_duration ?? 0;
 
   const ctx = { job_id: jobId, project_id: projectId, edit_decision_id: editDecisionId };
   log("info", "Processing export job", ctx);
@@ -162,7 +163,12 @@ async function processJob(job: ExportJobRow): Promise<void> {
 
     // Step 4: Concatenate segments (60%)
     const rawOutputPath = join(tmpDir, "output_raw.mp4");
-    await concatenateSegments(segmentPaths, rawOutputPath, tmpDir);
+    if (crossfadeDuration > 0) {
+      log("info", `Concatenating with ${crossfadeDuration}s cross-fade`, ctx);
+      await concatenateWithCrossfade(segmentPaths, rawOutputPath, tmpDir, crossfadeDuration);
+    } else {
+      await concatenateSegments(segmentPaths, rawOutputPath, tmpDir);
+    }
     await updateJobProgress(jobId, 60);
 
     // Step 5: Audio normalization (70%)
