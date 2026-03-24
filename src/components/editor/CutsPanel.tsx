@@ -1065,39 +1065,43 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                 const activeManualList = manualCuts.filter((c) => activeManualCuts.has(c.id));
                 const allEdits = [
                   ...activeCutsList.map((c) => {
-                    const eff = getEffectiveFill(c.id, c);
-                    const modelConfig = AI_FILL_MODELS.find((m) => m.id === eff.model);
-                    const existingFill = eff.isExisting ? (getInsertedFillsForCut(c)[0] ?? null) : null;
+                    const insertedList = getInsertedFillsForCut(c);
+                    const order = fillOrder.get(c.id);
+                    let orderedFills = insertedList.filter((f) => f.s3Key);
+                    if (order && order.length > 0) {
+                      const byId = new Map(orderedFills.map((f) => [f.id, f]));
+                      const sorted = order.map((id) => byId.get(id)).filter(Boolean) as typeof orderedFills;
+                      const extra = orderedFills.filter((f) => !order.includes(f.id));
+                      orderedFills = [...sorted, ...extra];
+                    }
                     return {
                       id: c.id,
                       start: c.start,
                       end: c.end,
                       duration: c.duration,
                       type: c.type,
-                      fill: eff.duration,
-                      model: eff.model,
-                      modelLabel: modelConfig?.label ?? eff.model,
-                      existingFill,
-                      existingFillIdentity: existingFill ? formatFillIdentity(existingFill) : null,
-                      isExisting: eff.isExisting,
+                      fills: orderedFills,
+                      totalFillDuration: orderedFills.reduce((s, f) => s + (f.duration || 0), 0),
                     };
                   }),
                   ...activeManualList.map((c) => {
-                    const eff = getEffectiveFill(c.id, c);
-                    const modelConfig = AI_FILL_MODELS.find((m) => m.id === eff.model);
-                    const existingFill = eff.isExisting ? (getInsertedFillsForCut(c)[0] ?? null) : null;
+                    const insertedList = getInsertedFillsForCut(c);
+                    const order = fillOrder.get(c.id);
+                    let orderedFills = insertedList.filter((f) => f.s3Key);
+                    if (order && order.length > 0) {
+                      const byId = new Map(orderedFills.map((f) => [f.id, f]));
+                      const sorted = order.map((id) => byId.get(id)).filter(Boolean) as typeof orderedFills;
+                      const extra = orderedFills.filter((f) => !order.includes(f.id));
+                      orderedFills = [...sorted, ...extra];
+                    }
                     return {
                       id: c.id,
                       start: c.start,
                       end: c.end,
                       duration: c.duration,
                       type: 'manual' as string,
-                      fill: eff.duration,
-                      model: eff.model,
-                      modelLabel: modelConfig?.label ?? eff.model,
-                      existingFill,
-                      existingFillIdentity: existingFill ? formatFillIdentity(existingFill) : null,
-                      isExisting: eff.isExisting,
+                      fills: orderedFills,
+                      totalFillDuration: orderedFills.reduce((s, f) => s + (f.duration || 0), 0),
                     };
                   }),
                 ].sort((a, b) => a.start - b.start);
