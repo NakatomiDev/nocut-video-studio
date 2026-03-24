@@ -459,12 +459,14 @@ async function loadFrameBase64(projectId: string, timestamp: number): Promise<st
 
 // ---------------------------------------------------------------------------
 // Ensure boundary frames are extracted before AI fill generation
+// Uses Gemini's video understanding to capture frames at specific timestamps,
+// removing the dependency on the external transcoder Docker service.
 // ---------------------------------------------------------------------------
 
 async function ensureFramesExtracted(
-  serviceClient: ReturnType<typeof createServiceClient>,
+  _serviceClient: ReturnType<typeof createServiceClient>,
   projectId: string,
-  userId: string,
+  _userId: string,
   videoS3Key: string | null,
   timestamps: number[],
 ): Promise<void> {
@@ -475,11 +477,11 @@ async function ensureFramesExtracted(
 
   const bucket = Deno.env.get("AWS_S3_BUCKET");
   if (!bucket) {
-    console.error("ensureFramesExtracted: AWS_S3_BUCKET not set — cannot extract or check frames");
+    console.error("ensureFramesExtracted: AWS_S3_BUCKET not set");
     return;
   }
 
-  // Deduplicate timestamps based on the 3-decimal precision used in frame filenames
+  // Deduplicate timestamps based on 3-decimal precision
   const seenRounded = new Set<string>();
   const uniqueTimestamps: number[] = [];
   for (const ts of timestamps) {
@@ -500,12 +502,11 @@ async function ensureFramesExtracted(
     } catch (err) {
       const httpStatus = (err as any)?.$metadata?.httpStatusCode;
       const errorName = (err as any)?.name;
-      // Only treat 404/NotFound as "missing frame"
       if (httpStatus === 404 || errorName === "NotFound") {
         missing.push(ts);
       } else {
         console.error("S3 HeadObject probe failed unexpectedly", { s3Key, errorName, httpStatus });
-        return; // Bail to avoid masking config/permission issues
+        return;
       }
     }
   }
@@ -517,53 +518,120 @@ async function ensureFramesExtracted(
 
   console.log(`Extracting ${missing.length} missing boundary frame(s) at timestamps: ${missing.join(", ")}`);
 
-  // Enqueue frame extraction job for the transcoder service
-  const { data: job, error } = await serviceClient
-    .from("job_queue")
-    .insert({
-      project_id: projectId,
-      user_id: userId,
-      type: "video.extract_frames",
-      payload: { video_s3_key: videoS3Key, timestamps: missing },
-      status: "queued",
-      priority: 1,
-      attempts: 0,
-      max_attempts: 3,
-    })
-    .select("id")
-    .single();
-
-  if (error || !job) {
-    console.error("Failed to enqueue frame extraction:", error?.message);
-    return; // proceed without frames rather than failing the whole fill
+  // Download the proxy video from S3 to extract frames via Gemini
+  const apiKey = Deno.env.get("GOOGLE_AI_API_KEY");
+  if (!apiKey) {
+    console.error("ensureFramesExtracted: GOOGLE_AI_API_KEY not set — cannot extract frames via Gemini");
+    return;
   }
 
-  // Poll for completion (max 60s)
-  const deadline = Date.now() + 60_000;
-  while (Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, 2000));
-    const { data, error: jobStatusError } = await serviceClient
-      .from("job_queue")
-      .select("status")
-      .eq("id", job.id)
-      .single();
-
-    if (jobStatusError) {
-      console.warn("Error polling frame extraction job status, proceeding without conditioning:", jobStatusError.message);
+  let videoBase64: string;
+  try {
+    const videoResponse = await getS3Client().send(new GetObjectCommand({
+      Bucket: bucket,
+      Key: videoS3Key,
+    }));
+    if (!videoResponse.Body) {
+      console.error("ensureFramesExtracted: video S3 object has no body");
       return;
     }
-
-    if (data?.status === "complete") {
-      console.log("Boundary frame extraction complete");
+    const videoBytes = new Uint8Array(await videoResponse.Body.transformToByteArray());
+    console.log(`Downloaded proxy video: ${videoS3Key} (${videoBytes.length} bytes)`);
+    
+    // If video is too large (>20MB), skip — Gemini inline limit
+    if (videoBytes.length > 20 * 1024 * 1024) {
+      console.warn(`Proxy video too large for inline Gemini extraction (${videoBytes.length} bytes). Skipping frame extraction.`);
       return;
     }
-    if (data?.status === "failed") {
-      console.warn("Frame extraction job failed, proceeding without frame conditioning");
-      return;
-    }
+    
+    videoBase64 = encodeBase64(videoBytes);
+  } catch (err) {
+    console.error(`Failed to download video for frame extraction: ${(err as Error).message}`);
+    return;
   }
 
-  console.warn("Frame extraction timed out after 60s, proceeding without frame conditioning");
+  // Use Gemini to extract each missing frame
+  for (const ts of missing) {
+    try {
+      const minutes = Math.floor(ts / 60);
+      const seconds = Math.floor(ts % 60);
+      const tsFormatted = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+      
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`;
+      
+      const geminiResponse = await fetch(geminiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              {
+                inlineData: {
+                  mimeType: "video/mp4",
+                  data: videoBase64,
+                },
+              },
+              {
+                text: `Extract exactly the video frame at timestamp ${tsFormatted} (${ts.toFixed(3)} seconds). Return ONLY the frame as an image, no text.`,
+              },
+            ],
+          }],
+          generationConfig: {
+            responseModalities: ["IMAGE", "TEXT"],
+            temperature: 0,
+          },
+        }),
+      });
+
+      if (!geminiResponse.ok) {
+        const body = await geminiResponse.text();
+        console.error(`Gemini frame extraction failed for ts=${ts}: ${geminiResponse.status} — ${body}`);
+        continue;
+      }
+
+      const geminiResult = await geminiResponse.json();
+      
+      // Look for image part in the response
+      let imageData: string | null = null;
+      let imageMimeType = "image/png";
+      const candidates = geminiResult.candidates ?? [];
+      for (const candidate of candidates) {
+        for (const part of candidate.content?.parts ?? []) {
+          if (part.inlineData?.data) {
+            imageData = part.inlineData.data;
+            imageMimeType = part.inlineData.mimeType || "image/png";
+            break;
+          }
+        }
+        if (imageData) break;
+      }
+
+      if (!imageData) {
+        console.warn(`Gemini did not return an image for timestamp ${ts}. Response: ${JSON.stringify(geminiResult).slice(0, 500)}`);
+        continue;
+      }
+
+      // Decode and upload to S3
+      const frameBytes = Uint8Array.from(atob(imageData), (c) => c.charCodeAt(0));
+      const frameName = `frame_${ts.toFixed(3).replace(".", "_")}.png`;
+      const s3Key = `frames/${projectId}/${frameName}`;
+
+      await getS3Client().send(new PutObjectCommand({
+        Bucket: bucket,
+        Key: s3Key,
+        Body: frameBytes,
+        ContentType: imageMimeType,
+      }));
+
+      console.log(`Extracted and uploaded frame: ${s3Key} (${frameBytes.length} bytes) via Gemini`);
+    } catch (err) {
+      console.error(`Frame extraction via Gemini failed for ts=${ts}: ${(err as Error).message}`);
+      // Continue to next timestamp — partial conditioning is better than none
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
