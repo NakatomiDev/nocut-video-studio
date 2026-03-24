@@ -44,6 +44,7 @@ Deno.serve(async (req) => {
         fill_duration?: number;
         model?: string;
         type?: string;
+        existing_fill_s3_key?: string;
       }>;
       output_format?: string;
       output_resolution?: string;
@@ -101,6 +102,7 @@ Deno.serve(async (req) => {
       type: string;
       fill_duration: number;
       model: string;
+      existing_fill_s3_key?: string;
     }> = [];
 
     for (let i = 0; i < gaps.length; i++) {
@@ -128,19 +130,26 @@ Deno.serve(async (req) => {
       const gapModel: AiFillModel = (gap.model && gap.model in MODEL_CREDITS_PER_SEC)
         ? gap.model as AiFillModel
         : model;
+
+      // If reusing an existing fill, no credits needed for this gap
+      const isReuse = !!gap.existing_fill_s3_key;
       const creditsPerSec = MODEL_CREDITS_PER_SEC[gapModel] ?? 1;
-      const gapCredits = fillDuration * creditsPerSec;
+      const gapCredits = isReuse ? 0 : fillDuration * creditsPerSec;
 
       totalCredits += gapCredits;
       totalFillSeconds += fillDuration;
 
-      edlJson.push({
+      const entry: typeof edlJson[number] = {
         start: gap.pre_cut_timestamp,
         end: gap.post_cut_timestamp,
         type: gap.type ?? "gap",
         fill_duration: fillDuration,
         model: gapModel,
-      });
+      };
+      if (isReuse) {
+        entry.existing_fill_s3_key = gap.existing_fill_s3_key;
+      }
+      edlJson.push(entry);
     }
 
     const credits_per_sec = MODEL_CREDITS_PER_SEC[model] ?? 1;

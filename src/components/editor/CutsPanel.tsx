@@ -188,11 +188,13 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
       const allCuts = [
         ...activeCutsList.map((c) => {
           const eff = getEffectiveFill(c.id, c);
-          return { start: c.start, end: c.end, type: c.type, fill_duration: eff.duration, model: eff.model, isExisting: eff.isExisting };
+          const existingFill = eff.isExisting ? getInsertedFillForCut(c) : null;
+          return { start: c.start, end: c.end, type: c.type, fill_duration: eff.duration, model: eff.model, isExisting: eff.isExisting, existing_fill_s3_key: existingFill?.s3Key ?? undefined };
         }),
         ...activeManualList.map((c) => {
           const eff = getEffectiveFill(c.id, c);
-          return { start: c.start, end: c.end, type: 'manual', fill_duration: eff.duration, model: eff.model, isExisting: eff.isExisting };
+          const existingFill = eff.isExisting ? getInsertedFillForCut(c) : null;
+          return { start: c.start, end: c.end, type: 'manual', fill_duration: eff.duration, model: eff.model, isExisting: eff.isExisting, existing_fill_s3_key: existingFill?.s3Key ?? undefined };
         }),
       ].sort((a, b) => a.start - b.start);
 
@@ -205,6 +207,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
         fill_duration: c.fill_duration,
         model: c.model,
         type: c.type,
+        existing_fill_s3_key: c.existing_fill_s3_key,
       }));
 
       // Call project-edl: handles credit deduction, edit_decisions, and job_queue server-side
