@@ -606,68 +606,167 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
               const hasVideo = !!fill.s3Key;
               const identity = formatFillIdentity(fill);
               const isDragOver = dragState?.cutId === cutId && dragState.overIdx === idx && dragState.dragIdx !== idx;
+              const customName = fillNames.get(fill.id);
+              const displayName = customName || `AI Fill ${idx + 1}`;
+              const isEditingName = editingFillName === fill.id;
+              const isDetailsOpen = expandedFillDetails.has(fill.id);
+              const toggleDetails = (e: React.MouseEvent) => {
+                e.stopPropagation();
+                setExpandedFillDetails((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(fill.id)) next.delete(fill.id);
+                  else next.add(fill.id);
+                  return next;
+                });
+              };
+
               return (
                 <div
                   key={fill.id}
-                  draggable
+                  draggable={!isEditingName}
                   onDragStart={() => handleDragStart(idx)}
                   onDragOver={(e) => handleDragOver(e, idx)}
                   onDrop={() => handleDrop(idx)}
                   onDragEnd={handleDragEnd}
-                  className={`flex items-start gap-1 rounded px-1.5 py-1.5 text-[10px] transition-colors cursor-grab active:cursor-grabbing ${
+                  className={`flex flex-col rounded text-[10px] transition-colors ${
                     isInserted ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-secondary/50'
                   } ${isDragOver ? 'ring-2 ring-primary/50' : ''}`}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {/* Drag handle + sequence number */}
-                  <div className="flex flex-col items-center gap-0.5 shrink-0 self-center select-none">
-                    <GripVertical className="h-3.5 w-3.5 text-muted-foreground/50" />
-                    <span className="text-[8px] font-mono text-muted-foreground/70">{idx + 1}</span>
-                  </div>
-                  {/* First-frame thumbnail */}
-                  {hasVideo && (
-                    <FillThumbnailInline fill={fill} isInserted={isInserted} />
-                  )}
-                  {/* Info column */}
-                  <div className="flex flex-col gap-0.5 flex-1 min-w-0 justify-center">
-                    <div className="flex items-center gap-1 flex-wrap">
-                      <span className="font-mono text-[9px] text-muted-foreground shrink-0">#{identity.shortId}</span>
-                      <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[9px] shrink-0">
-                        {fill.duration}s
-                      </Badge>
-                      {isInserted && (
-                        <Badge className="bg-primary/15 text-primary border-primary/30 text-[9px] shrink-0">
-                          Selected
+                  {/* Main row */}
+                  <div className="flex items-center gap-1 px-1.5 py-1.5 cursor-grab active:cursor-grabbing">
+                    {/* Drag handle + sequence */}
+                    <div className="flex flex-col items-center gap-0.5 shrink-0 select-none">
+                      <GripVertical className="h-3.5 w-3.5 text-muted-foreground/50" />
+                      <span className="text-[8px] font-mono text-muted-foreground/70">{idx + 1}</span>
+                    </div>
+                    {/* Thumbnail */}
+                    {hasVideo && (
+                      <FillThumbnailInline fill={fill} isInserted={isInserted} />
+                    )}
+                    {/* Name + meta */}
+                    <div className="flex flex-col gap-0.5 flex-1 min-w-0 justify-center">
+                      <div className="flex items-center gap-1 min-w-0">
+                        {isEditingName ? (
+                          <input
+                            autoFocus
+                            defaultValue={customName || ''}
+                            placeholder={`AI Fill ${idx + 1}`}
+                            className="bg-transparent border-b border-primary text-foreground text-[11px] font-medium outline-none px-0.5 w-full min-w-0"
+                            onBlur={(e) => {
+                              setFillName(fill.id, e.target.value);
+                              setEditingFillName(null);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                setFillName(fill.id, (e.target as HTMLInputElement).value);
+                                setEditingFillName(null);
+                              }
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        ) : (
+                          <button
+                            className="text-[11px] font-medium text-foreground hover:text-primary transition-colors truncate text-left flex items-center gap-1 min-w-0"
+                            onClick={(e) => { e.stopPropagation(); setEditingFillName(fill.id); }}
+                          >
+                            <span className="truncate">{displayName}</span>
+                            <Pencil className="h-2.5 w-2.5 text-muted-foreground/50 shrink-0" />
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[9px] shrink-0">
+                          {fill.duration}s
                         </Badge>
+                        {isInserted && (
+                          <Badge className="bg-primary/15 text-primary border-primary/30 text-[9px] shrink-0">
+                            Selected
+                          </Badge>
+                        )}
+                        <span className="font-mono text-[8px] text-muted-foreground/60 shrink-0">#{identity.shortId}</span>
+                      </div>
+                    </div>
+                    {/* Actions */}
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <Button variant="ghost" size="icon" className="h-5 w-5" onClick={toggleDetails}>
+                        <ChevronDown className={`h-3 w-3 transition-transform ${isDetailsOpen ? 'rotate-180' : ''}`} />
+                      </Button>
+                      {hasVideo ? (
+                        <>
+                          <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => selectFill(fill)}>
+                            <Eye className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={`h-5 w-5 ${isInserted ? 'text-emerald-400' : 'text-muted-foreground'}`}
+                            onClick={() => isInserted ? removeFill(fill.id) : insertFill(fill.id)}
+                          >
+                            {isInserted ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                          </Button>
+                        </>
+                      ) : (
+                        <span className="text-[9px] text-muted-foreground animate-pulse">Generating...</span>
                       )}
                     </div>
-                    <span className="text-muted-foreground truncate text-[9px]">
-                      {identity.modelLabel}
-                      {fill.qualityScore !== null && ` · ${Math.round(fill.qualityScore * 100)}%`}
-                    </span>
                   </div>
-                  {/* Actions */}
-                  {hasVideo ? (
-                    <div className="flex items-center gap-0.5 shrink-0 self-center">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-5 w-5"
-                        onClick={() => selectFill(fill)}
-                      >
-                        <Eye className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className={`h-5 w-5 ${isInserted ? 'text-emerald-400' : 'text-muted-foreground'}`}
-                        onClick={() => isInserted ? removeFill(fill.id) : insertFill(fill.id)}
-                      >
-                        {isInserted ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
-                      </Button>
+
+                  {/* Expandable details */}
+                  {isDetailsOpen && (
+                    <div className="border-t border-border/50 px-2 py-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                      {/* First & last frame of the cut gap */}
+                      {cutObj && videoUrl && (
+                        <div className="space-y-1">
+                          <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wide">Gap Boundary Frames</span>
+                          <div className="flex items-center gap-2">
+                            <div className="flex flex-col items-center gap-0.5">
+                              <ExactVideoFrame
+                                videoUrl={videoUrl}
+                                time={cutObj.start}
+                                label="First frame"
+                                className="h-12 w-[86px]"
+                                cachedFrame={getFrame(cutObj.start)}
+                              />
+                              <span className="text-[8px] text-muted-foreground font-mono">{formatTimestamp(cutObj.start)}</span>
+                            </div>
+                            <div className="border-t border-dashed border-muted-foreground/30 flex-1" />
+                            <div className="flex flex-col items-center gap-0.5">
+                              <ExactVideoFrame
+                                videoUrl={videoUrl}
+                                time={cutObj.end}
+                                label="Last frame"
+                                className="h-12 w-[86px]"
+                                cachedFrame={getFrame(cutObj.end)}
+                              />
+                              <span className="text-[8px] text-muted-foreground font-mono">{formatTimestamp(cutObj.end)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {/* Generation details */}
+                      <div className="space-y-1">
+                        <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wide">Generation Details</span>
+                        <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-[9px]">
+                          <span className="text-muted-foreground">Model</span>
+                          <span className="text-foreground">{identity.modelLabel}</span>
+                          <span className="text-muted-foreground">Method</span>
+                          <span className="text-foreground">{fill.method || '—'}</span>
+                          <span className="text-muted-foreground">Duration</span>
+                          <span className="text-foreground">{fill.duration}s</span>
+                          <span className="text-muted-foreground">Provider</span>
+                          <span className="text-foreground">{fill.provider || '—'}</span>
+                          {fill.qualityScore !== null && (
+                            <>
+                              <span className="text-muted-foreground">Quality</span>
+                              <span className="text-foreground">{Math.round(fill.qualityScore * 100)}%</span>
+                            </>
+                          )}
+                          <span className="text-muted-foreground">Fill ID</span>
+                          <span className="text-foreground font-mono">{fill.id.slice(0, 12)}…</span>
+                        </div>
+                      </div>
                     </div>
-                  ) : (
-                    <span className="text-[9px] text-muted-foreground animate-pulse self-center">Generating...</span>
                   )}
                 </div>
               );
