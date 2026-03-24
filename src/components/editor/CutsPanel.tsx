@@ -989,7 +989,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                   ...activeManualList.map((c) => {
                     const eff = getEffectiveFill(c.id, c);
                     const modelConfig = AI_FILL_MODELS.find((m) => m.id === eff.model);
-                    const existingFill = eff.isExisting ? getInsertedFillForCut(c) : null;
+                    const existingFill = eff.isExisting ? (getInsertedFillsForCut(c)[0] ?? null) : null;
                     return {
                       id: c.id,
                       start: c.start,
