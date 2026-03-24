@@ -123,10 +123,25 @@ export function usePreviewFill() {
       // 4. Invoke process-ai-fill to start generation (fire-and-forget)
       supabase.functions.invoke('process-ai-fill', {
         body: { job_id },
-      }).then(({ error: invokeError }) => {
+      }).then(async ({ data, error: invokeError }) => {
         if (invokeError) {
+          // Try to extract user-friendly message from the response
+          let msg = 'Preview generation failed';
+          try {
+            const context = invokeError?.context;
+            if (context && typeof context === 'object' && 'json' in context) {
+              const body = await (context as Response).json();
+              msg = body?.error?.message || msg;
+            }
+          } catch { /* ignore parse errors */ }
+
+          // Check if it was a safety filter issue
+          if (msg.includes('returned no video URI') || msg.includes('safety filter')) {
+            msg = 'AI generation was blocked by safety filters. Your credits have been refunded. Please try a different prompt or clip.';
+          }
+
           console.error('Failed to invoke process-ai-fill for preview:', invokeError);
-          toast.error('Preview generation failed to start');
+          toast.error(msg);
           useEditorStore.getState().clearPreviewGeneration();
           cleanup();
         }

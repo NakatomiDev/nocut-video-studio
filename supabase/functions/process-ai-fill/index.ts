@@ -292,6 +292,23 @@ Deno.serve(async (req) => {
         } catch (fillErr) {
           const msg = `AI fill generation failed for gap ${gap.gap_index}: ${(fillErr as Error).message}`;
           console.error(msg);
+
+          // Refund credits since generation failed
+          if (creditTransactionId) {
+            try {
+              const { data: refundResult, error: refundError } = await serviceClient
+                .rpc("refund_credits", { p_transaction_id: creditTransactionId });
+              if (refundError) {
+                console.error("Credit refund RPC error:", refundError);
+              } else {
+                const r = refundResult?.[0] ?? refundResult;
+                console.log(`Refunded ${r?.out_credits_refunded ?? 0} credits for failed generation`);
+              }
+            } catch (refundErr) {
+              console.error("Credit refund failed:", refundErr);
+            }
+          }
+
           await failJob(serviceClient, job.id, editDecision.id, msg, isPreview);
           return errorResponse("ai_generation_failed", msg, 502);
         }
