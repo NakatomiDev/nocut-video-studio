@@ -174,39 +174,15 @@ Deno.serve(async (req) => {
       return errorResponse("invalid_request", "Credit validation failed", 400);
     }
 
-    // Use server-calculated credits for deduction
-    const creditsToDeduct = serverCalculatedCredits;
+    // Credits were already deducted by preview-fill (or the initiating function).
+    // Do NOT deduct again here — just read the transaction ID from edit_decisions.
+    const creditTransactionId: string | null = (editDecision.credit_transaction_id as string) ?? null;
 
-    let creditTransactionId: string | null = null;
-    if (creditsToDeduct > 0) {
-      const { data: creditResult, error: creditError } = await serviceClient
-        .rpc("deduct_credits", {
-          p_user_id: user.id,
-          p_required_credits: creditsToDeduct,
-          p_project_id: project.id,
-          p_reason: "ai_fill",
-        });
-
-      if (creditError) {
-        console.error("Credit deduction RPC error:", creditError);
-        await failJob(serviceClient, job.id, editDecision.id, "Credit deduction failed", isPreview);
-        return errorResponse("internal_error", "Credit deduction failed", 500);
-      }
-
-      const result = creditResult?.[0] ?? creditResult;
-      if (!result?.out_success) {
-        await failJob(serviceClient, job.id, editDecision.id, result?.out_message || "Insufficient credits", isPreview);
-        return errorResponse("payment_required", result?.out_message || "Insufficient credits", 402);
-      }
-
-      creditTransactionId = result.out_transaction_id;
-    }
-
-    if (creditTransactionId) {
-      await serviceClient
-        .from("edit_decisions")
-        .update({ credit_transaction_id: creditTransactionId })
-        .eq("id", editDecision.id);
+    if (!creditTransactionId && serverCalculatedCredits > 0) {
+      // Safety: if somehow no transaction was recorded but credits are required, reject
+      console.error(`No credit_transaction_id on edit_decision ${editDecision.id} but ${serverCalculatedCredits} credits required`);
+      await failJob(serviceClient, job.id, editDecision.id, "Missing credit transaction — cannot proceed", isPreview);
+      return errorResponse("internal_error", "Credit accounting error", 500);
     }
 
     await serviceClient
