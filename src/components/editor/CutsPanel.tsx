@@ -387,7 +387,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
             }}
           >
             <SelectTrigger
-              className="h-6 min-w-0 flex-1 text-[10px] px-2 truncate"
+              className="h-6 w-full text-[10px] px-2 truncate"
               onClick={(e) => e.stopPropagation()}
             >
               <SelectValue />
