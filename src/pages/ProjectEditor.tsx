@@ -337,7 +337,7 @@ const ProjectEditor = () => {
           className="ml-auto flex items-center gap-2 rounded-full border-2 border-primary bg-primary/15 px-4 py-1.5 text-base transition-colors hover:bg-primary/25"
         >
           <Coins className="h-5 w-5 text-primary" />
-          <span className="font-bold tabular-nums text-foreground text-lg">{creditBalance.total || balance?.total ?? '—'}</span>
+          <span className="font-bold tabular-nums text-foreground text-lg">{creditBalance.total > 0 ? creditBalance.total : (balance?.total ?? '—')}</span>
           <span className="font-medium text-muted-foreground">credits</span>
         </button>
       </div>
