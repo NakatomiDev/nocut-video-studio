@@ -299,7 +299,7 @@ Deno.serve(async (req) => {
 
     await serviceClient
       .from("edit_decisions")
-      .update({ status: "fills_complete" })
+      .update({ status: "exporting" })
       .eq("id", editDecision.id);
 
     if (!isPreview) {
@@ -330,22 +330,31 @@ Deno.serve(async (req) => {
         .update({ status: "exporting" })
         .eq("id", project.id);
 
-      // Fire-and-forget: invoke export-video edge function to process the job
-      // immediately, instead of relying on a separate polling service
+      // Invoke export-video edge function. We must await the fetch so the
+      // request is actually sent before this function returns — otherwise the
+      // Deno runtime kills the in-flight request on function termination.
+      // We only await the HTTP response (not the full export), because
+      // export-video streams its work independently once it receives the job.
       const exportJobId = exportJobData?.id;
       if (!exportJobError && exportJobId) {
         const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
         const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-        fetch(`${supabaseUrl}/functions/v1/export-video`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${serviceRoleKey}`,
-          },
-          body: JSON.stringify({ job_id: exportJobId }),
-        }).catch((err) => {
+        try {
+          const exportRes = await fetch(`${supabaseUrl}/functions/v1/export-video`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${serviceRoleKey}`,
+            },
+            body: JSON.stringify({ job_id: exportJobId }),
+          });
+          if (!exportRes.ok) {
+            const body = await exportRes.text();
+            console.error(`export-video returned ${exportRes.status}: ${body}`);
+          }
+        } catch (err) {
           console.error("Failed to invoke export-video:", err);
-        });
+        }
       }
     } else {
       // Preview mode — no export needed, just mark ready
