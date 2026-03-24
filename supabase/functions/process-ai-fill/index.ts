@@ -20,7 +20,8 @@ import {
 function recalculateCreditsFromEdl(edlJson: EdlEntry[], defaultModel: string): number {
   let total = 0;
   for (const entry of edlJson) {
-    if (entry.fill_duration > 0) {
+    // Skip existing fills — they don't cost credits
+    if (entry.fill_duration > 0 && !entry.existing_fill_s3_key) {
       const model = (entry.model ?? defaultModel) as AiFillModel;
       const creditsPerSec = MODEL_CREDITS_PER_SEC[model] ?? 1;
       total += entry.fill_duration * creditsPerSec;
