@@ -360,6 +360,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       ? new Map(saved.fillModels.filter(([id]) => cuts.some((c) => c.id === id) || manualCuts.some((c) => c.id === id))) as Map<string, AiFillModel>
       : new Map<string, AiFillModel>();
     const insertedFills = saved ? new Set(saved.insertedFills) : new Set<string>();
+    const fillOrder = saved?.fillOrder
+      ? new Map(saved.fillOrder)
+      : new Map<string, string[]>();
     const showFills = saved?.showFills ?? false;
 
     set({
@@ -370,6 +373,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       activeManualCuts,
       fillDurations,
       fillModels,
+      fillOrder,
       insertedFills,
       showFills,
       creditEstimate: calcCredits(fillDurations, fillModels),
