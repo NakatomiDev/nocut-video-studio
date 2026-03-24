@@ -469,15 +469,34 @@ async function ensureFramesExtracted(
   const bucket = Deno.env.get("AWS_S3_BUCKET");
   if (!bucket) return;
 
+  // Deduplicate timestamps based on the 3-decimal precision used in frame filenames
+  const seenRounded = new Set<string>();
+  const uniqueTimestamps: number[] = [];
+  for (const ts of timestamps) {
+    const rounded = ts.toFixed(3);
+    if (!seenRounded.has(rounded)) {
+      seenRounded.add(rounded);
+      uniqueTimestamps.push(ts);
+    }
+  }
+
   // Check which frames are missing from S3
   const missing: number[] = [];
-  for (const ts of timestamps) {
+  for (const ts of uniqueTimestamps) {
     const frameName = `frame_${ts.toFixed(3).replace(".", "_")}.png`;
     const s3Key = `frames/${projectId}/${frameName}`;
     try {
       await getS3Client().send(new HeadObjectCommand({ Bucket: bucket, Key: s3Key }));
-    } catch {
-      missing.push(ts);
+    } catch (err) {
+      const httpStatus = (err as any)?.$metadata?.httpStatusCode;
+      const errorName = (err as any)?.name;
+      // Only treat 404/NotFound as "missing frame"
+      if (httpStatus === 404 || errorName === "NotFound") {
+        missing.push(ts);
+      } else {
+        console.error("S3 HeadObject probe failed unexpectedly", { s3Key, errorName, httpStatus });
+        return; // Bail to avoid masking config/permission issues
+      }
     }
   }
 
@@ -513,11 +532,16 @@ async function ensureFramesExtracted(
   const deadline = Date.now() + 60_000;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 2000));
-    const { data } = await serviceClient
+    const { data, error: jobStatusError } = await serviceClient
       .from("job_queue")
       .select("status")
       .eq("id", job.id)
       .single();
+
+    if (jobStatusError) {
+      console.warn("Error polling frame extraction job status, proceeding without conditioning:", jobStatusError.message);
+      return;
+    }
 
     if (data?.status === "complete") {
       console.log("Boundary frame extraction complete");
