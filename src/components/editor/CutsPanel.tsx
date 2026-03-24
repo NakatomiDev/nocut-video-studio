@@ -358,27 +358,6 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
 
     return (
       <div className="flex flex-col gap-1.5 pl-3 pr-1 mt-1 overflow-hidden">
-        {selectedExistingFill && (
-          <div className="flex items-center gap-1.5 pl-4 flex-wrap rounded-md border border-primary/20 bg-primary/5 px-2 py-1">
-            <Badge className="bg-primary/15 text-primary border-primary/30 text-[9px]">
-              Selected for export
-            </Badge>
-            <span className="text-[10px] text-foreground font-medium">
-              {selectedExistingFill.duration}s AI Fill
-            </span>
-            <span className="text-[10px] text-muted-foreground truncate">
-              {selectedExistingIdentity?.summary}
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 text-[10px] px-2"
-              onClick={(e) => { e.stopPropagation(); selectFill(selectedExistingFill); }}
-            >
-              <Eye className="h-3 w-3 mr-1" /> Preview selected
-            </Button>
-          </div>
-        )}
         {/* Collapsible fill configuration */}
         <Collapsible>
           <CollapsibleTrigger
