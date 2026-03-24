@@ -13,6 +13,8 @@ import {
   useRevenueCatCustomer,
   PRODUCTS,
 } from "@/hooks/useRevenueCat";
+import { useStripeSubscription } from "@/hooks/useStripeSubscription";
+import { isRevenueCatAvailable } from "@/lib/revenuecat";
 import { toast } from "@/hooks/use-toast";
 
 interface UpgradePaywallProps {
@@ -21,7 +23,7 @@ interface UpgradePaywallProps {
   currentTier?: string;
 }
 
-// Static plan metadata (features, display info) — prices come from RevenueCat
+// Static plan metadata (features, display info) — prices come from RevenueCat or fallback
 const PLAN_META: Record<
   string,
   { name: string; features: string[]; highlight?: boolean }
@@ -64,6 +66,12 @@ const PRODUCT_TO_TIER: Record<string, string> = {
   [PRODUCTS.BUSINESS_ANNUAL]: "business",
 };
 
+// Fallback static prices when RevenueCat is unavailable (must match Stripe prices)
+const FALLBACK_PRICES: Record<string, { monthly: string; annual: string }> = {
+  pro: { monthly: "$14.99", annual: "$9.99" },
+  business: { monthly: "$39.99", annual: "$29.99" },
+};
+
 function formatPrice(pkg: Package | undefined): string {
   if (!pkg) return "—";
   const product = pkg.webBillingProduct as any;
@@ -71,7 +79,7 @@ function formatPrice(pkg: Package | undefined): string {
 
   // RevenueCat JS SDK: currentPrice has { amountMicros, currencyCode, formattedPrice }
   const price = product.currentPrice ?? product.defaultPrice ?? product.normalPurchasePrice ?? product.defaultPurchasePrice;
-  
+
   // If the SDK provides a pre-formatted string, use it
   if (price?.formattedPrice) return price.formattedPrice;
   if (product.priceString) return product.priceString;
@@ -94,24 +102,32 @@ export const UpgradePaywall = ({
   currentTier = "free",
 }: UpgradePaywallProps) => {
   const [annual, setAnnual] = useState(true);
+
+  // RevenueCat hooks (only used when RC is available)
   const { offerings, loading: offeringsLoading, error: offeringsError } = useRevenueCatOfferings();
   const { purchase, purchasing } = useRevenueCatPurchase();
   const { refetch: refetchCustomer } = useRevenueCatCustomer();
 
-  // Resolve packages from the current offering
+  // Stripe fallback hook
+  const { subscribe, loading: stripeLoading } = useStripeSubscription();
+
+  const useRC = isRevenueCatAvailable;
+  const isProcessing = useRC ? purchasing : stripeLoading;
+
+  // Resolve packages from the current offering (RC only)
   const currentOffering = offerings?.current;
   const allPackages = currentOffering?.availablePackages ?? [];
 
   // Debug: log available packages to help diagnose matching issues
   useEffect(() => {
-    if (allPackages.length > 0) {
+    if (useRC && allPackages.length > 0) {
       console.log("RevenueCat packages:", allPackages.map(p => ({
         id: p.identifier,
         productId: p.webBillingProduct?.identifier,
         product: p.webBillingProduct,
       })));
     }
-  }, [allPackages]);
+  }, [allPackages, useRC]);
 
   // Build a lookup: productId → Package (try both product identifier and package identifier)
   const packagesByProduct = new Map<string, Package>();
@@ -128,25 +144,60 @@ export const UpgradePaywall = ({
     const suffix = isAnnual ? "_annual" : "_monthly";
     const productId = `nocut_${tier}${suffix}`;
     // Try exact match first, then common RC package identifiers
-    return packagesByProduct.get(productId) 
+    return packagesByProduct.get(productId)
       ?? packagesByProduct.get(`$rc_${isAnnual ? "annual" : "monthly"}`)
       ?? undefined;
   };
 
   const handleUpgrade = async (tier: string) => {
-    const pkg = getPackage(tier, annual);
-    if (!pkg) return;
+    if (useRC) {
+      // RevenueCat path
+      const pkg = getPackage(tier, annual);
+      if (!pkg) return;
 
-    const result = await purchase(pkg);
-    if (result) {
-      toast({
-        title: "Subscription activated!",
-        description: `You're now on the ${PLAN_META[tier]?.name ?? tier} plan.`,
-      });
-      await refetchCustomer();
-      onClose();
+      const result = await purchase(pkg);
+      if (result) {
+        toast({
+          title: "Subscription activated!",
+          description: `You're now on the ${PLAN_META[tier]?.name ?? tier} plan.`,
+        });
+        await refetchCustomer();
+        onClose();
+      }
+    } else {
+      // Stripe fallback path
+      const suffix = annual ? "_annual" : "_monthly";
+      const productId = `nocut_${tier}${suffix}`;
+      try {
+        await subscribe(productId);
+        toast({
+          title: "Redirecting to checkout…",
+          description: "Complete your subscription in the new tab.",
+        });
+      } catch {
+        toast({
+          title: "Checkout failed",
+          description: "Please try again.",
+          variant: "destructive",
+        });
+      }
     }
   };
+
+  // Price display
+  const getPrice = (tier: string): string => {
+    if (tier === "free") return "Free";
+    if (useRC) {
+      return formatPrice(getPackage(tier, annual));
+    }
+    const fallback = FALLBACK_PRICES[tier];
+    if (!fallback) return "—";
+    return annual ? fallback.annual : fallback.monthly;
+  };
+
+  // Loading / error states
+  const isLoading = useRC ? offeringsLoading : false;
+  const loadError = useRC ? offeringsError : null;
 
   const tiers = ["free", "pro", "business"] as const;
 
@@ -186,11 +237,11 @@ export const UpgradePaywall = ({
           )}
         </div>
 
-        {offeringsLoading ? (
+        {isLoading ? (
           <div className="flex justify-center py-12">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
-        ) : offeringsError ? (
+        ) : loadError ? (
           <div className="flex items-center justify-center gap-2 py-12 text-sm text-destructive">
             <AlertCircle className="h-4 w-4" />
             Failed to load plans. Please try again.
@@ -200,8 +251,7 @@ export const UpgradePaywall = ({
             {tiers.map((tier) => {
               const meta = PLAN_META[tier];
               const isCurrent = tier === currentTier;
-              const pkg = getPackage(tier, annual);
-              const price = tier === "free" ? "Free" : formatPrice(pkg);
+              const price = getPrice(tier);
 
               return (
                 <Card
@@ -251,10 +301,10 @@ export const UpgradePaywall = ({
                       size="sm"
                       className="w-full"
                       variant={meta.highlight ? "default" : "outline"}
-                      disabled={isCurrent || tier === "free" || purchasing}
+                      disabled={isCurrent || tier === "free" || isProcessing}
                       onClick={() => handleUpgrade(tier)}
                     >
-                      {purchasing ? (
+                      {isProcessing ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : isCurrent ? (
                         "Current Plan"

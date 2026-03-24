@@ -2,6 +2,9 @@ import { Purchases } from "@revenuecat/purchases-js";
 
 const RC_API_KEY = import.meta.env.VITE_REVENUECAT_BILLING_KEY ?? "";
 
+/** True when a RevenueCat billing key is configured; false → use Stripe fallback. */
+export const isRevenueCatAvailable = RC_API_KEY.length > 0;
+
 let configured = false;
 
 /**

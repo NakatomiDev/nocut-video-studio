@@ -2,6 +2,21 @@ import { createServiceClient } from "../_shared/auth.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import Stripe from "stripe";
 
+// Monthly credit allocation per tier (must match webhooks-revenuecat)
+const TIER_CREDITS: Record<string, number> = {
+  pro: 40,
+  business: 120,
+  free: 5,
+};
+
+// Product ID → tier mapping (for subscription metadata)
+const PRODUCT_TIER_MAP: Record<string, "pro" | "business"> = {
+  nocut_pro_monthly: "pro",
+  nocut_pro_annual: "pro",
+  nocut_business_monthly: "business",
+  nocut_business_annual: "business",
+};
+
 Deno.serve(async (req) => {
   // CORS preflight
   if (req.method === "OPTIONS") {
@@ -53,6 +68,14 @@ Deno.serve(async (req) => {
         await handleCheckoutComplete(serviceClient, event);
         break;
 
+      case "invoice.paid":
+        await handleInvoicePaid(serviceClient, stripe, event);
+        break;
+
+      case "customer.subscription.deleted":
+        await handleSubscriptionDeleted(serviceClient, event);
+        break;
+
       case "charge.refunded":
         await handleChargeRefunded(serviceClient, stripe, event);
         break;
@@ -78,6 +101,14 @@ async function handleCheckoutComplete(
   event: Stripe.Event,
 ): Promise<void> {
   const session = event.data.object as Stripe.Checkout.Session;
+
+  // Route subscription checkouts to dedicated handler
+  if (session.mode === "subscription") {
+    await handleSubscriptionCheckout(serviceClient, session);
+    return;
+  }
+
+  // --- Original top-up checkout logic ---
   const metadata = session.metadata ?? {};
 
   const userId = metadata.user_id;
@@ -146,6 +177,143 @@ async function handleCheckoutComplete(
     `Credited ${creditAmount} top-up credits to user ${userId} ` +
     `(payment_intent: ${paymentIntentId}, session: ${session.id})`,
   );
+}
+
+// ---------------------------------------------------------------------------
+// Subscription checkout (mode === "subscription")
+// ---------------------------------------------------------------------------
+async function handleSubscriptionCheckout(
+  serviceClient: ReturnType<typeof createServiceClient>,
+  session: Stripe.Checkout.Session,
+): Promise<void> {
+  const metadata = session.metadata ?? {};
+  const userId = metadata.user_id;
+  const tier = metadata.tier as "pro" | "business" | undefined;
+  const productId = metadata.product_id;
+
+  if (!userId || !tier) {
+    console.error("Subscription checkout missing user_id or tier in metadata", metadata);
+    return;
+  }
+
+  // Verify user exists
+  const { data: user, error: userError } = await serviceClient
+    .from("users")
+    .select("id")
+    .eq("id", userId)
+    .single();
+
+  if (userError || !user) {
+    console.error(`User not found for subscription checkout: ${userId}`);
+    return;
+  }
+
+  // Extract Stripe IDs
+  const stripeCustomerId = typeof session.customer === "string"
+    ? session.customer
+    : (session.customer as any)?.id ?? null;
+  const stripeSubscriptionId = typeof session.subscription === "string"
+    ? session.subscription
+    : (session.subscription as any)?.id ?? null;
+
+  // Update user tier and store Stripe IDs
+  const userUpdate: Record<string, unknown> = {
+    tier,
+    updated_at: new Date().toISOString(),
+  };
+  if (stripeCustomerId) userUpdate.stripe_customer_id = stripeCustomerId;
+  if (stripeSubscriptionId) userUpdate.stripe_subscription_id = stripeSubscriptionId;
+
+  await serviceClient
+    .from("users")
+    .update(userUpdate)
+    .eq("id", userId);
+
+  // Allocate monthly credits
+  await allocateMonthlyCredits(serviceClient, userId, tier, `stripe_subscription_${session.id}`);
+
+  console.log(
+    `Subscription activated: user ${userId} → ${tier} ` +
+    `(customer: ${stripeCustomerId}, subscription: ${stripeSubscriptionId})`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// invoice.paid (subscription renewals)
+// ---------------------------------------------------------------------------
+async function handleInvoicePaid(
+  serviceClient: ReturnType<typeof createServiceClient>,
+  stripe: Stripe,
+  event: Stripe.Event,
+): Promise<void> {
+  const invoice = event.data.object as Stripe.Invoice;
+
+  // Only process subscription renewals, not the initial purchase
+  if (invoice.billing_reason !== "subscription_cycle") {
+    console.log(`Skipping invoice.paid with billing_reason: ${invoice.billing_reason}`);
+    return;
+  }
+
+  // Get subscription metadata (user_id + tier)
+  const subscriptionId = typeof invoice.subscription === "string"
+    ? invoice.subscription
+    : (invoice.subscription as any)?.id ?? null;
+
+  if (!subscriptionId) {
+    console.error("invoice.paid missing subscription ID");
+    return;
+  }
+
+  // Fetch subscription to get metadata
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  const userId = subscription.metadata?.user_id;
+  const tier = subscription.metadata?.tier as "pro" | "business" | undefined;
+
+  if (!userId || !tier) {
+    console.error("Subscription missing user_id or tier in metadata", subscription.metadata);
+    return;
+  }
+
+  // Update tier (in case it drifted) and allocate monthly credits
+  await serviceClient
+    .from("users")
+    .update({ tier, updated_at: new Date().toISOString() })
+    .eq("id", userId);
+
+  await allocateMonthlyCredits(serviceClient, userId, tier, `stripe_renewal_${invoice.id}`);
+
+  console.log(`Renewal credited: user ${userId} → ${tier} (invoice: ${invoice.id})`);
+}
+
+// ---------------------------------------------------------------------------
+// customer.subscription.deleted (cancellation / expiration)
+// ---------------------------------------------------------------------------
+async function handleSubscriptionDeleted(
+  serviceClient: ReturnType<typeof createServiceClient>,
+  event: Stripe.Event,
+): Promise<void> {
+  const subscription = event.data.object as Stripe.Subscription;
+  const userId = subscription.metadata?.user_id;
+
+  if (!userId) {
+    console.error("Subscription deleted event missing user_id in metadata", subscription.metadata);
+    return;
+  }
+
+  // Downgrade to free tier
+  await serviceClient
+    .from("users")
+    .update({
+      tier: "free",
+      stripe_subscription_id: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", userId);
+
+  // Allocate free-tier credits
+  await allocateMonthlyCredits(serviceClient, userId, "free", `stripe_expiration_${subscription.id}`);
+
+  console.log(`Subscription ended: user ${userId} downgraded to free (subscription: ${subscription.id})`);
 }
 
 // ---------------------------------------------------------------------------
@@ -232,6 +400,49 @@ async function handleChargeRefunded(
     `(refund on payment_intent ${paymentIntentId}, ` +
     `${ledgerEntry.credits_granted - creditsToRevoke} credits were already consumed)`,
   );
+}
+
+// ---------------------------------------------------------------------------
+// Shared: allocate monthly credits
+// ---------------------------------------------------------------------------
+async function allocateMonthlyCredits(
+  serviceClient: ReturnType<typeof createServiceClient>,
+  userId: string,
+  tier: string,
+  sourceEventId: string,
+): Promise<void> {
+  const credits = TIER_CREDITS[tier] ?? TIER_CREDITS["free"];
+  const expiresAt = new Date(Date.now() + 2 * 30 * 24 * 60 * 60 * 1000).toISOString(); // ~2 months
+
+  const { data: ledger, error: ledgerError } = await serviceClient
+    .from("credit_ledger")
+    .insert({
+      user_id: userId,
+      type: "monthly_allowance",
+      credits_granted: credits,
+      credits_remaining: credits,
+      expires_at: expiresAt,
+      stripe_payment_id: sourceEventId,
+    })
+    .select("id")
+    .single();
+
+  if (ledgerError) {
+    console.error("Failed to insert credit_ledger for subscription:", ledgerError);
+    return;
+  }
+
+  await serviceClient
+    .from("credit_transactions")
+    .insert({
+      user_id: userId,
+      type: "allocation",
+      credits,
+      ledger_entries: [{ ledger_id: ledger.id, credits_allocated: credits }],
+      reason: `monthly_allowance_${tier}`,
+    });
+
+  console.log(`Allocated ${credits} ${tier} credits for user ${userId}`);
 }
 
 // ---------------------------------------------------------------------------
