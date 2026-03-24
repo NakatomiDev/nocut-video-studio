@@ -316,6 +316,8 @@ Deno.serve(async (req) => {
       if (fillInsertError) {
         const msg = `Failed to persist ai_fill for gap ${gap.gap_index}: ${fillInsertError.message}`;
         console.error(msg);
+        // Refund credits since fill couldn't be persisted
+        await refundOnFailure(serviceClient, creditTransactionId);
         await failJob(serviceClient, job.id, editDecision.id, msg, isPreview);
         return errorResponse("internal_error", msg, 500);
       }
