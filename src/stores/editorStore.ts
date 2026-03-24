@@ -453,7 +453,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         manualCuts,
         activeManualCuts,
-        creditEstimate: calcCredits(state.fillDurations, state.fillModels),
+        creditEstimate: calcCredits(state.fillDurations, state.fillModels, state.cuts, manualCuts, state.aiFills, state.insertedFills),
       };
     });
     // Persist to DB after state update
