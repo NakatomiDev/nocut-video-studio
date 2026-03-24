@@ -558,7 +558,7 @@ async function requestTranscoderFrameExtraction(
         video_s3_key: videoS3Key,
         timestamps,
       },
-      priority: 20, // Higher priority so frames are extracted before lower-priority work
+      priority: 5, // Higher priority (smaller number; 1 is highest) so frames are extracted before lower-priority work
     })
     .select("id")
     .single();
