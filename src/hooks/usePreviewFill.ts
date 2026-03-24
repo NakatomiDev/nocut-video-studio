@@ -199,12 +199,9 @@ async function handlePreviewComplete(
       };
 
       const store = useEditorStore.getState();
-      // Append to aiFills (replace any existing fill at same startTime)
-      const existing = store.aiFills.filter(
-        (existing) => Math.abs(existing.startTime - cutEndTime) >= 0.5,
-      );
+      // Append new fill alongside existing fills (never remove old ones)
       useEditorStore.setState({
-        aiFills: [...existing, fill],
+        aiFills: [...store.aiFills, fill],
         selectedFill: fill,
       });
 
