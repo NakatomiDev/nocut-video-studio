@@ -414,7 +414,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       fillNames,
       insertedFills,
       showFills,
-      creditEstimate: calcCredits(fillDurations, fillModels),
+      creditEstimate: calcCredits(fillDurations, fillModels, cuts, manualCuts, get().aiFills, insertedFills),
     });
   },
   setCuts: (cuts) => set({ cuts }),
