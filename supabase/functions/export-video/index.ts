@@ -13,7 +13,9 @@ import {
 import { getSignedUrl } from "npm:@aws-sdk/cloudfront-signer";
 import { handleCors } from "../_shared/cors.ts";
 import {
+  getAuthenticatedUser,
   createServiceClient,
+  AuthError,
 } from "../_shared/auth.ts";
 import { successResponse, errorResponse } from "../_shared/response.ts";
 
@@ -774,6 +776,18 @@ Deno.serve(async (req) => {
   const bucket = Deno.env.get("AWS_S3_BUCKET")!;
   const roleArn = Deno.env.get("AWS_MEDIACONVERT_ROLE_ARN")!;
 
+  // Authenticate the caller
+  let user;
+  try {
+    const auth = await getAuthenticatedUser(req);
+    user = auth.user;
+  } catch (err) {
+    if (err instanceof AuthError) {
+      return errorResponse("unauthorized", err.message, 401);
+    }
+    throw err;
+  }
+
   try {
     const body = await req.json();
     const { job_id } = body;
@@ -793,6 +807,10 @@ Deno.serve(async (req) => {
 
     if (jobError || !job) {
       return errorResponse("not_found", "Job not found", 404);
+    }
+
+    if (job.user_id !== user.id) {
+      return errorResponse("forbidden", "You do not own this job", 403);
     }
 
     if (job.type !== "video.export") {
