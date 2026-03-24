@@ -171,6 +171,20 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   const [inlineFillLoading, setInlineFillLoading] = useState(false);
   const inlineFillVideoRef = useRef<HTMLVideoElement>(null);
   const [inlineFillPlaying, setInlineFillPlaying] = useState(false);
+  const previewContainerRef = useRef<HTMLDivElement>(null);
+  const [previewWidth, setPreviewWidth] = useState(0);
+
+  useEffect(() => {
+    const el = previewContainerRef.current;
+    if (!el) return;
+    const obs = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setPreviewWidth(entry.contentRect.width);
+      }
+    });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
 
   useEffect(() => {
     const fetchBalance = async () => {
