@@ -158,6 +158,8 @@ Deno.serve(async (req) => {
 
     if (edError || !editDecision) {
       console.error("Failed to create edit_decision:", edError);
+      // Refund the credits we just deducted since we can't proceed
+      await refundCredits(serviceClient, creditTransactionId);
       return errorResponse("internal_error", "Failed to create edit decision", 500);
     }
 
