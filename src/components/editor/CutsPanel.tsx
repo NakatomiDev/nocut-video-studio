@@ -544,8 +544,6 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
       orderedFills = [...sorted, ...extra];
     }
 
-    // When 3+ fills, switch to a wrapped grid layout
-    const useGridLayout = orderedFills.length >= 3;
 
     return (
       <div className="flex flex-col gap-1 pl-2 pr-1">
@@ -569,30 +567,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
             <span className="text-[9px] text-muted-foreground font-mono">Start</span>
           </button>
 
-          {!useGridLayout && orderedFills.length > 0 ? (
-            <>
-              <div className="border-t border-dashed border-muted-foreground/30 w-2 shrink-0" />
-              {orderedFills.map((fill, i) => (
-                <div key={fill.id} className="flex items-center gap-0 shrink-0">
-                  {i > 0 && <div className="border-t border-dashed border-primary/40 w-1.5 shrink-0" />}
-                  <button
-                    className="cursor-pointer hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      selectFill(orderedFills.length > 1 ? orderedFills : fill);
-                    }}
-                  >
-                    <FillThumbnailInline fill={fill} isInserted={true} />
-                  </button>
-                </div>
-              ))}
-              <div className="border-t border-dashed border-muted-foreground/30 w-2 shrink-0" />
-            </>
-          ) : orderedFills.length === 0 ? (
-            <div className="flex-1 border-t border-dashed border-muted-foreground/30 min-w-1" />
-          ) : (
-            <div className="flex-1 border-t border-dashed border-muted-foreground/30 min-w-1" />
-          )}
+          <div className="flex-1 border-t border-dashed border-muted-foreground/30 min-w-1" />
 
           <button
             className="flex flex-col items-center gap-0.5 shrink-0 min-w-0 cursor-zoom-in hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background"
