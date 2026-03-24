@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Users can insert their own jobs" ON job_queue;
