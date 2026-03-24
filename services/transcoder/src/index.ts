@@ -1,6 +1,6 @@
 import { Worker, Queue, type Job } from "bullmq";
 import { config } from "./config.js";
-import { pollQueuedJobs, claimJob, incrementAttempts, completeJob, failJob, type TranscodeJobRow } from "./supabase.js";
+import { supabase, pollQueuedJobs, claimJob, incrementAttempts, completeJob, failJob, type TranscodeJobRow } from "./supabase.js";
 import { processTranscodeJob, jobRowToData, type TranscodeJobData } from "./transcoder.js";
 import { extractFrames, type FrameExtractionJob } from "./frame-extractor.js";
 
@@ -56,7 +56,18 @@ async function main(): Promise<void> {
       });
       try {
         const results = await extractFrames(job.data);
+        // completeJob logs but does not throw on DB errors. Verify the
+        // status was actually persisted so the process-ai-fill poller
+        // sees "complete" instead of timing out on a stale "processing".
         await completeJob(job.data.jobId);
+        const { data: row } = await supabase
+          .from("job_queue")
+          .select("status")
+          .eq("id", job.data.jobId)
+          .single();
+        if (row?.status !== "complete") {
+          throw new Error(`job_queue status update failed: expected 'complete', got '${row?.status}'`);
+        }
         return results;
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
