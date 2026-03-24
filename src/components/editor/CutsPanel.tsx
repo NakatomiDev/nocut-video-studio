@@ -1069,7 +1069,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
           <DialogHeader className="shrink-0 border-b border-border px-6 py-4">
             <DialogTitle>Review Edits</DialogTitle>
             <DialogDescription>
-              Review your cuts and AI fills before exporting · Export is free
+              Review your cuts and AI fills before exporting
             </DialogDescription>
           </DialogHeader>
 
