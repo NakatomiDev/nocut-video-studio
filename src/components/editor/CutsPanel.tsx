@@ -724,7 +724,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
               </div>
               {activeManualCuts.has(cut.id) && (
                 <>
-                  {(thumbnailSpriteUrl || videoUrl) && renderPreview(cut.start, cut.end)}
+                  {(thumbnailSpriteUrl || videoUrl) && renderPreview(cut.start, cut.end, cut.id)}
                   {renderFillSelector(cut.id)}
                   {renderFillsList(cut.id)}
                 </>
