@@ -237,28 +237,63 @@ Deno.serve(async (req) => {
 
       const generationStart = Date.now();
 
-      // Try to load boundary frames from S3 (extracted by transcoder service)
-      const firstFrameBase64 = await loadFrameBase64(project.id, gap.end);
-      const lastFrameBase64 = await loadFrameBase64(project.id, gap.end + gap.fill_duration);
+      let fillS3Key: string;
+      let fillProvider: string;
+      let fillModel: string;
+      let fillQualityScore: number;
 
-      let fillResult: FillResponse;
-      try {
-        fillResult = await generateAiFill({
-          projectId: project.id,
-          editDecisionId: editDecision.id,
-          gapIndex: gap.gap_index,
-          startTime: gap.end,
-          duration: gap.fill_duration,
-          sourceVideoKey,
-          model: gap.model ?? defaultModel,
-          firstFrameBase64,
-          lastFrameBase64,
-        });
-      } catch (fillErr) {
-        const msg = `AI fill generation failed for gap ${gap.gap_index}: ${(fillErr as Error).message}`;
-        console.error(msg);
-        await failJob(serviceClient, job.id, editDecision.id, msg, isPreview);
-        return errorResponse("ai_generation_failed", msg, 502);
+      if (gap.existing_fill_s3_key) {
+        // Reuse existing AI fill — copy the S3 object to the new edit decision path
+        const bucket = Deno.env.get("AWS_S3_BUCKET")!;
+        const newS3Key = `ai-fills/${project.id}/${editDecision.id}/gap_${gap.gap_index}_${gap.fill_duration}s.mp4`;
+
+        try {
+          await getS3Client().send(new CopyObjectCommand({
+            Bucket: bucket,
+            CopySource: `${bucket}/${gap.existing_fill_s3_key}`,
+            Key: newS3Key,
+          }));
+          console.log(`Copied existing fill ${gap.existing_fill_s3_key} → ${newS3Key}`);
+        } catch (copyErr) {
+          console.error(`Failed to copy existing fill, will regenerate: ${(copyErr as Error).message}`);
+          // Fall through to generation below
+        }
+
+        // Check if copy succeeded by checking if we got here without throwing
+        fillS3Key = newS3Key;
+        fillProvider = "reuse";
+        fillModel = gap.model ?? defaultModel;
+        fillQualityScore = 0.9;
+      } else {
+        // Generate new AI fill
+        // Try to load boundary frames from S3 (extracted by transcoder service)
+        const firstFrameBase64 = await loadFrameBase64(project.id, gap.end);
+        const lastFrameBase64 = await loadFrameBase64(project.id, gap.end + gap.fill_duration);
+
+        let fillResult: FillResponse;
+        try {
+          fillResult = await generateAiFill({
+            projectId: project.id,
+            editDecisionId: editDecision.id,
+            gapIndex: gap.gap_index,
+            startTime: gap.end,
+            duration: gap.fill_duration,
+            sourceVideoKey,
+            model: gap.model ?? defaultModel,
+            firstFrameBase64,
+            lastFrameBase64,
+          });
+        } catch (fillErr) {
+          const msg = `AI fill generation failed for gap ${gap.gap_index}: ${(fillErr as Error).message}`;
+          console.error(msg);
+          await failJob(serviceClient, job.id, editDecision.id, msg, isPreview);
+          return errorResponse("ai_generation_failed", msg, 502);
+        }
+
+        fillS3Key = fillResult.s3_key;
+        fillProvider = fillResult.provider;
+        fillModel = fillResult.model;
+        fillQualityScore = fillResult.quality_score;
       }
 
       const generationTimeMs = Date.now() - generationStart;
@@ -270,11 +305,11 @@ Deno.serve(async (req) => {
           id: aiFillId,
           edit_decision_id: editDecision.id,
           gap_index: gap.gap_index,
-          s3_key: fillResult.s3_key,
+          s3_key: fillS3Key,
           method: "ai_fill",
-          provider: fillResult.provider,
-          model: fillResult.model,
-          quality_score: fillResult.quality_score,
+          provider: fillProvider,
+          model: fillModel,
+          quality_score: fillQualityScore,
           duration: gap.fill_duration,
           generation_time_ms: generationTimeMs,
         });
