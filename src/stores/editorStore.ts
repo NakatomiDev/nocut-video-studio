@@ -144,6 +144,8 @@ interface EditorState {
   fillModels: Map<string, AiFillModel>;
   /** Maps cutId → ordered list of fill IDs (user-defined sequence) */
   fillOrder: Map<string, string[]>;
+  /** Maps fillId → user-defined custom name */
+  fillNames: Map<string, string>;
   playheadPosition: number;
   isPlaying: boolean;
   zoomLevel: number;
