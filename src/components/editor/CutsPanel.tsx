@@ -382,11 +382,10 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
         {/* Collapsible fill configuration */}
         <Collapsible>
           <CollapsibleTrigger
-            className="flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground hover:text-foreground transition-colors w-full"
+            className="flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground hover:text-foreground transition-colors w-full group"
             onClick={(e) => e.stopPropagation()}
           >
-            {({ 'data-state': state } = {}) => null}
-            <ChevronRight className="h-3 w-3 transition-transform [[data-state=open]>&]:rotate-90" />
+            <ChevronRight className="h-3 w-3 transition-transform group-data-[state=open]:rotate-90" />
             <Sparkles className="h-3 w-3 text-primary shrink-0" />
             <span>Fill Configuration</span>
             {generatedFill && (
