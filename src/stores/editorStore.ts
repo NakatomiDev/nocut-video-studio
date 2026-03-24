@@ -293,6 +293,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedFill: null,
   fillDurations: new Map<string, number>(),
   fillModels: new Map<string, AiFillModel>(),
+  fillOrder: new Map<string, string[]>(),
   playheadPosition: 0,
   isPlaying: false,
   zoomLevel: 1,
