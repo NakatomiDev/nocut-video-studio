@@ -21,6 +21,7 @@ const ProjectEditor = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { project, video, setProject, setVideo, setCutMap, setAiFills, reset } = useEditorStore();
+  const { balance } = useCreditsBalance();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [processingStatus, setProcessingStatus] = useState<string | null>(null);
