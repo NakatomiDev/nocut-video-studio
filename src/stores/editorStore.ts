@@ -559,6 +559,7 @@ useEditorStore.subscribe((state, prev) => {
     state.insertedFills === prev.insertedFills &&
     state.fillDurations === prev.fillDurations &&
     state.fillModels === prev.fillModels &&
+    state.fillOrder === prev.fillOrder &&
     state.showFills === prev.showFills
   ) return;
   // Debounce to avoid excessive writes
