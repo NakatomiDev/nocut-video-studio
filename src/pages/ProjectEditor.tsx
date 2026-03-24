@@ -12,7 +12,8 @@ import FillPreviewPanel from '@/components/editor/FillPreviewPanel';
 import ExportProgress from '@/components/ExportProgress';
 import EditorSkeleton from '@/components/editor/EditorSkeleton';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Loader2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Loader2, AlertTriangle, Coins } from 'lucide-react';
+import { useCreditsBalance } from '@/hooks/useCredits';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
 const ProjectEditor = () => {
@@ -20,6 +21,7 @@ const ProjectEditor = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { project, video, setProject, setVideo, setCutMap, setAiFills, reset } = useEditorStore();
+  const { balance } = useCreditsBalance();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [processingStatus, setProcessingStatus] = useState<string | null>(null);
@@ -320,6 +322,13 @@ const ProjectEditor = () => {
             {title || 'Untitled Project'}
           </button>
         )}
+
+        {/* Credits indicator */}
+        <div className="ml-auto flex items-center gap-1.5 text-sm text-muted-foreground">
+          <Coins className="h-3.5 w-3.5 text-primary" />
+          <span className="font-medium tabular-nums text-foreground">{balance?.total ?? '—'}</span>
+          <span className="hidden sm:inline">credits</span>
+        </div>
       </div>
 
       {/* Main content */}
