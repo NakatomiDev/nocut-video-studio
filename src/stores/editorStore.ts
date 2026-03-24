@@ -383,6 +383,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       fillDurations,
       fillModels,
       fillOrder,
+      fillNames,
       insertedFills,
       showFills,
       creditEstimate: calcCredits(fillDurations, fillModels),
