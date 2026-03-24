@@ -20,8 +20,8 @@ const ProjectEditor = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { project, video, setProject, setVideo, setCutMap, setAiFills, reset } = useEditorStore();
-  const { balance } = useCreditsBalance();
+  const { project, video, setProject, setVideo, setCutMap, setAiFills, reset, creditBalance } = useEditorStore();
+  const { balance, refetch: refetchBalance } = useCreditsBalance();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [processingStatus, setProcessingStatus] = useState<string | null>(null);
