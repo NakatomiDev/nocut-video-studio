@@ -517,8 +517,18 @@ async function processExport(
 
   const projectId = job.project_id;
   const userId = job.user_id;
-  const payload = job.payload as { edit_decision_id: string };
+  const payload = job.payload as { edit_decision_id: string; crossfade_duration?: number };
   const editDecisionId = payload.edit_decision_id;
+  const crossfadeDuration = payload.crossfade_duration ?? 0;
+
+  if (crossfadeDuration > 0) {
+    console.error(
+      `Export job ${jobId} requires crossfade_duration=${crossfadeDuration}, which is not supported by the MediaConvert exporter.`,
+    );
+    throw new Error(
+      "Crossfade exports must be handled by the FFmpeg exporter service, not the MediaConvert path.",
+    );
+  }
 
   try {
     // 2. Fetch metadata

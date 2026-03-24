@@ -38,6 +38,7 @@ interface EdlEntry {
   model?: string;
   existing_fill_s3_key?: string;
   prompt?: string;
+  audio_prompt?: string;
 }
 
 let _s3Client: S3Client | null = null;
@@ -264,6 +265,7 @@ Deno.serve(async (req) => {
             firstFrameBase64,
             lastFrameBase64,
             prompt: gap.prompt,
+            audioPrompt: gap.audio_prompt,
           });
         } catch (fillErr) {
           const msg = `AI fill generation failed for gap ${gap.gap_index}: ${(fillErr as Error).message}`;
@@ -555,6 +557,7 @@ interface FillRequest {
   firstFrameBase64?: string | null;
   lastFrameBase64?: string | null;
   prompt?: string | null;
+  audioPrompt?: string | null;
 }
 
 interface FillResponse {
@@ -590,10 +593,14 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
 
   // Build the instance with optional first/last frame conditioning
   const defaultPrompt = `Smooth transition video clip, ${request.duration} seconds, seamless continuity, natural head movement`;
+  let promptText = request.prompt
+    ? `${request.prompt}, ${request.duration} seconds`
+    : defaultPrompt;
+  if (includeAudio && request.audioPrompt) {
+    promptText += `. Audio: ${request.audioPrompt}`;
+  }
   const instance: Record<string, unknown> = {
-    prompt: request.prompt
-      ? `${request.prompt}, ${request.duration} seconds`
-      : defaultPrompt,
+    prompt: promptText,
   };
 
   if (request.firstFrameBase64) {

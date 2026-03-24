@@ -30,3 +30,39 @@ export function resolvePrompt(value: string | undefined): string | undefined {
   const preset = FILL_PROMPT_PRESETS.find((p) => p.id === value);
   return preset?.prompt;
 }
+
+// ---------------------------------------------------------------------------
+// Audio prompt presets (used when an audio-enabled model is selected)
+// ---------------------------------------------------------------------------
+
+export interface AudioPromptPreset {
+  id: string;
+  label: string;
+  prompt: string;
+}
+
+export const AUDIO_PROMPT_PRESETS: AudioPromptPreset[] = [
+  { id: "ambient", label: "Ambient Sounds", prompt: "Soft ambient background sounds, natural atmosphere" },
+  { id: "upbeat", label: "Upbeat Music", prompt: "Upbeat energetic background music" },
+  { id: "dramatic", label: "Dramatic Score", prompt: "Dramatic cinematic orchestral score" },
+  { id: "calm", label: "Calm & Relaxing", prompt: "Calm relaxing background music, gentle piano" },
+  { id: "none", label: "No Audio Description", prompt: "" },
+];
+
+export const DEFAULT_AUDIO_PROMPT_ID = "none";
+
+export const MAX_CUSTOM_AUDIO_PROMPT_LENGTH = 200;
+
+/**
+ * Resolve a stored audio prompt value (preset ID or "custom:text") to its actual prompt string.
+ * Returns undefined when no audio prompt should be appended.
+ */
+export function resolveAudioPrompt(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  if (value.startsWith("custom:")) {
+    const text = value.slice(7).trim();
+    return text || undefined;
+  }
+  const preset = AUDIO_PROMPT_PRESETS.find((p) => p.id === value);
+  return preset?.prompt || undefined;
+}

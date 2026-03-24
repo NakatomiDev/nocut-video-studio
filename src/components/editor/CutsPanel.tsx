@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEditorStore, AI_FILL_MODELS, MODEL_CREDITS_PER_SEC, DEFAULT_AI_FILL_MODEL, getAvailableModels, getModelDurations, getFillsForCut, type AiFill, type AiFillModel } from '@/stores/editorStore';
-import { FILL_PROMPT_PRESETS, DEFAULT_FILL_PROMPT_ID, MAX_CUSTOM_PROMPT_LENGTH, resolvePrompt } from '@/constants/fillPrompts';
+import { FILL_PROMPT_PRESETS, DEFAULT_FILL_PROMPT_ID, MAX_CUSTOM_PROMPT_LENGTH, resolvePrompt, AUDIO_PROMPT_PRESETS, DEFAULT_AUDIO_PROMPT_ID, MAX_CUSTOM_AUDIO_PROMPT_LENGTH, resolveAudioPrompt } from '@/constants/fillPrompts';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
@@ -156,6 +156,10 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     setFillModel,
     fillPrompts,
     setFillPrompt,
+    audioPrompts,
+    setAudioPrompt,
+    crossfadeDuration,
+    setCrossfadeDuration,
     creditEstimate,
     creditBalance,
     setCreditBalance,
@@ -346,6 +350,8 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
         const s3Keys = inserted.filter(f => f.s3Key).map(f => f.s3Key!);
         const totalDuration = inserted.reduce((sum, f) => sum + (f.duration ?? 0), 0);
         const eff = getEffectiveFill(c.id, c);
+        const isEffModelAudio = eff.model.endsWith('-audio');
+        const resolvedAudioPrompt = isEffModelAudio ? resolveAudioPrompt(audioPrompts.get(c.id)) : undefined;
         return {
           pre_cut_timestamp: c.start,
           post_cut_timestamp: c.end,
@@ -353,6 +359,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
           model: eff.model,
           type,
           existing_fill_s3_keys: s3Keys.length > 0 ? s3Keys : undefined,
+          ...(resolvedAudioPrompt ? { audio_prompt: resolvedAudioPrompt } : {}),
         };
       };
 
@@ -362,7 +369,11 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
       ].sort((a, b) => a.pre_cut_timestamp - b.pre_cut_timestamp);
 
       const { data: edlData, error: edlError } = await supabase.functions.invoke('project-edl', {
-        body: { project_id: project.id, gaps },
+        body: {
+          project_id: project.id,
+          gaps,
+          ...(crossfadeDuration > 0 ? { crossfade_duration: crossfadeDuration } : {}),
+        },
       });
 
       if (edlError) throw edlError;
@@ -401,6 +412,12 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     const isCustomPrompt = rawPrompt.startsWith("custom:");
     const currentPromptId = isCustomPrompt ? "custom" : rawPrompt;
     const customPromptText = isCustomPrompt ? rawPrompt.slice(7) : "";
+
+    const rawAudioPrompt = audioPrompts.get(cutId) ?? DEFAULT_AUDIO_PROMPT_ID;
+    const isCustomAudioPrompt = rawAudioPrompt.startsWith("custom:");
+    const currentAudioPromptId = isCustomAudioPrompt ? "custom" : rawAudioPrompt;
+    const customAudioPromptText = isCustomAudioPrompt ? rawAudioPrompt.slice(7) : "";
+    const isAudioModel = modelConfig?.audio ?? false;
 
     return (
       <div className="flex flex-col gap-1.5 pl-3 pr-1 mt-1 overflow-hidden">
@@ -543,6 +560,50 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                         onClick={(e) => e.stopPropagation()}
                       />
                       <span className="text-[9px] text-muted-foreground text-right">{customPromptText.length}/{MAX_CUSTOM_PROMPT_LENGTH}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              {/* Audio style selector (only for audio-enabled models) */}
+              {currentFill > 0 && isAudioModel && (
+                <div className="flex flex-col gap-1 min-w-0">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-[10px] text-muted-foreground shrink-0">Audio Style:</span>
+                    <Select
+                      value={currentAudioPromptId}
+                      onValueChange={(val) => {
+                        if (val === "custom") {
+                          setAudioPrompt(cutId, `custom:${customAudioPromptText}`);
+                        } else {
+                          setAudioPrompt(cutId, val);
+                        }
+                      }}
+                    >
+                      <SelectTrigger
+                        className="h-6 min-w-0 flex-1 text-[10px] px-2 truncate"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {AUDIO_PROMPT_PRESETS.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
+                        ))}
+                        <SelectItem value="custom">Custom...</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {currentAudioPromptId === "custom" && (
+                    <div className="flex flex-col gap-0.5">
+                      <Textarea
+                        className="min-h-[40px] h-10 text-[10px] px-2 py-1 resize-none"
+                        placeholder="Describe the audio style (e.g., upbeat music, ambient sounds)..."
+                        maxLength={MAX_CUSTOM_AUDIO_PROMPT_LENGTH}
+                        value={customAudioPromptText}
+                        onChange={(e) => setAudioPrompt(cutId, `custom:${e.target.value}`)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <span className="text-[9px] text-muted-foreground text-right">{customAudioPromptText.length}/{MAX_CUSTOM_AUDIO_PROMPT_LENGTH}</span>
                     </div>
                   )}
                 </div>
@@ -1083,6 +1144,25 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
           <span className="text-sm font-semibold text-foreground">
             {totalInsertedFills > 0 ? `${totalInsertedFills} selected` : 'None'}
           </span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">Blend transitions</span>
+          <div className="flex items-center gap-2">
+            <Select
+              value={String(crossfadeDuration)}
+              onValueChange={(val) => setCrossfadeDuration(Number(val))}
+            >
+              <SelectTrigger className="h-6 w-[80px] text-[10px] px-2">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">Off</SelectItem>
+                <SelectItem value="0.1">0.1s</SelectItem>
+                <SelectItem value="0.2">0.2s</SelectItem>
+                <SelectItem value="0.3">0.3s</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <Button
           className="w-full"

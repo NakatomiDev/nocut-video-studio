@@ -12,8 +12,9 @@ export interface ExportJobRow {
   user_id: string;
   type: string;
   payload: {
-    project_id: string;
+    project_id?: string;
     edit_decision_id: string;
+    crossfade_duration?: number;
   };
   status: string;
   attempts: number;
