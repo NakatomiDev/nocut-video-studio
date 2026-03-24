@@ -191,10 +191,28 @@ interface EditorState {
   reset: () => void;
 }
 
-/** Credits = sum of (fill duration × model credits/sec) for each cut */
-const calcCredits = (fillDurations: Map<string, number>, fillModels: Map<string, AiFillModel>) => {
+/** Credits = sum of (fill duration × model credits/sec) for each cut, skipping cuts with existing inserted fills */
+const calcCredits = (
+  fillDurations: Map<string, number>,
+  fillModels: Map<string, AiFillModel>,
+  cuts?: Cut[],
+  manualCuts?: ManualCut[],
+  aiFills?: AiFill[],
+  insertedFills?: Set<string>,
+) => {
   let total = 0;
   fillDurations.forEach((sec, cutId) => {
+    // If this cut already has an inserted (previously generated) fill, it's free to reuse
+    if (cuts && aiFills && insertedFills && insertedFills.size > 0) {
+      const allCuts = [...cuts, ...(manualCuts ?? [])];
+      const cutObj = allCuts.find((c) => c.id === cutId);
+      if (cutObj) {
+        const matchingFills = getFillsForCut(cutObj, aiFills);
+        if (matchingFills.some((f) => insertedFills.has(f.id))) {
+          return; // skip — reusing existing fill, no new credits needed
+        }
+      }
+    }
     const model = fillModels.get(cutId) ?? DEFAULT_AI_FILL_MODEL;
     total += sec * MODEL_CREDITS_PER_SEC[model];
   });
@@ -396,7 +414,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       fillNames,
       insertedFills,
       showFills,
-      creditEstimate: calcCredits(fillDurations, fillModels),
+      creditEstimate: calcCredits(fillDurations, fillModels, cuts, manualCuts, get().aiFills, insertedFills),
     });
   },
   setCuts: (cuts) => set({ cuts }),
@@ -419,7 +437,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         fillDurations: nextFills,
         fillModels: nextModels,
         fillPrompts: nextPrompts,
-        creditEstimate: calcCredits(nextFills, nextModels),
+        creditEstimate: calcCredits(nextFills, nextModels, state.cuts, state.manualCuts, state.aiFills, state.insertedFills),
       };
     }),
   addManualCut: (start, end) => {
@@ -435,7 +453,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         manualCuts,
         activeManualCuts,
-        creditEstimate: calcCredits(state.fillDurations, state.fillModels),
+        creditEstimate: calcCredits(state.fillDurations, state.fillModels, state.cuts, manualCuts, state.aiFills, state.insertedFills),
       };
     });
     // Persist to DB after state update
@@ -459,7 +477,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         fillDurations: nextFills,
         fillModels: nextModels,
         fillPrompts: nextPrompts,
-        creditEstimate: calcCredits(nextFills, nextModels),
+        creditEstimate: calcCredits(nextFills, nextModels, state.cuts, manualCuts, state.aiFills, state.insertedFills),
       };
     });
     // Persist to DB after state update
@@ -485,7 +503,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         fillDurations: nextFills,
         fillModels: nextModels,
         fillPrompts: nextPrompts,
-        creditEstimate: calcCredits(nextFills, nextModels),
+        creditEstimate: calcCredits(nextFills, nextModels, state.cuts, state.manualCuts, state.aiFills, state.insertedFills),
       };
     }),
   setFillDuration: (cutId, seconds) =>
@@ -498,7 +516,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
       return {
         fillDurations: nextFills,
-        creditEstimate: calcCredits(nextFills, state.fillModels),
+        creditEstimate: calcCredits(nextFills, state.fillModels, state.cuts, state.manualCuts, state.aiFills, state.insertedFills),
       };
     }),
   setFillModel: (cutId, model) =>
@@ -507,7 +525,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       nextModels.set(cutId, model);
       return {
         fillModels: nextModels,
-        creditEstimate: calcCredits(state.fillDurations, nextModels),
+        creditEstimate: calcCredits(state.fillDurations, nextModels, state.cuts, state.manualCuts, state.aiFills, state.insertedFills),
       };
     }),
   setFillPrompt: (cutId, prompt) =>
@@ -534,13 +552,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       const next = new Set(state.insertedFills);
       next.add(fillId);
-      return { insertedFills: next };
+      return {
+        insertedFills: next,
+        creditEstimate: calcCredits(state.fillDurations, state.fillModels, state.cuts, state.manualCuts, state.aiFills, next),
+      };
     }),
   removeFill: (fillId) =>
     set((state) => {
       const next = new Set(state.insertedFills);
       next.delete(fillId);
-      return { insertedFills: next };
+      return {
+        insertedFills: next,
+        creditEstimate: calcCredits(state.fillDurations, state.fillModels, state.cuts, state.manualCuts, state.aiFills, next),
+      };
     }),
   setFillVideoUrl: (fillId, url) =>
     set((state) => {
