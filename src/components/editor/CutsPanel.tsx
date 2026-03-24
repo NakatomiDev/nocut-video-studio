@@ -295,6 +295,19 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
     return fills.filter((fill) => insertedFills.has(fill.id));
   }, [aiFills, insertedFills]);
 
+  // Count actual inserted fills across all active cuts
+  const totalInsertedFills = useMemo(() => {
+    const allCutsArr = [
+      ...cuts.filter(c => activeCuts.has(c.id)),
+      ...manualCuts.filter(c => activeManualCuts.has(c.id)),
+    ];
+    let count = 0;
+    for (const c of allCutsArr) {
+      count += getInsertedFillsForCut(c).length;
+    }
+    return count;
+  }, [cuts, activeCuts, manualCuts, activeManualCuts, getInsertedFillsForCut]);
+
   const getPreviewFillForCut = useCallback((cutObj: { end: number }) => {
     const inserted = getInsertedFillsForCut(cutObj);
     if (inserted.length > 0) return inserted[0];
