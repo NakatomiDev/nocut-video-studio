@@ -208,15 +208,64 @@ const ExportProgress = ({ projectId, onComplete, onRetry }: ExportProgressProps)
     }
   }, [projectId, applyJobState, applyProjectState]);
 
+  // Minimum display time per stage (2s) before allowing advancement
+  const stageEnteredAtRef = useRef<number>(Date.now());
+  const pendingAdvanceRef = useRef<{ stage: Stage; progress: number; error?: string } | null>(null);
+
+  const originalAdvanceStage = advanceStage;
+  const gatedAdvanceStage = useCallback((newStage: Stage, newProgress: number, error?: string) => {
+    const elapsed = Date.now() - stageEnteredAtRef.current;
+    const MIN_STAGE_DISPLAY_MS = 2000;
+
+    if (elapsed < MIN_STAGE_DISPLAY_MS && STAGE_ORDER[newStage] > STAGE_ORDER[stageRef.current]) {
+      // Queue the advancement for after the minimum delay
+      pendingAdvanceRef.current = { stage: newStage, progress: newProgress, error };
+      setTimeout(() => {
+        const pending = pendingAdvanceRef.current;
+        if (pending) {
+          pendingAdvanceRef.current = null;
+          stageEnteredAtRef.current = Date.now();
+          originalAdvanceStage(pending.stage, pending.progress, pending.error);
+        }
+      }, MIN_STAGE_DISPLAY_MS - elapsed);
+    } else {
+      stageEnteredAtRef.current = Date.now();
+      originalAdvanceStage(newStage, newProgress, error);
+    }
+  }, [originalAdvanceStage]);
+
+  // Auto-redirect countdown & notification on complete
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const completeExportIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (stage !== 'complete') return;
+    setCountdown(5);
+    const interval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(interval);
+          // Auto-redirect to export page
+          if (completeExportIdRef.current) {
+            onComplete(completeExportIdRef.current);
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [stage, onComplete]);
+
   // Animate initial "submitted" → "queued" transition
   useEffect(() => {
     const timer = setTimeout(() => {
       if (stageRef.current === 'submitted') {
-        advanceStage('submitted', 5);
+        gatedAdvanceStage('submitted', 5);
       }
     }, 800);
     return () => clearTimeout(timer);
-  }, [advanceStage]);
+  }, [gatedAdvanceStage]);
 
   // Realtime subscriptions + initial fetch
   useEffect(() => {
