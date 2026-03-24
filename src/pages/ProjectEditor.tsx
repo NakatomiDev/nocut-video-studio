@@ -12,7 +12,8 @@ import FillPreviewPanel from '@/components/editor/FillPreviewPanel';
 import ExportProgress from '@/components/ExportProgress';
 import EditorSkeleton from '@/components/editor/EditorSkeleton';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Loader2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Loader2, AlertTriangle, Coins } from 'lucide-react';
+import { useCreditsBalance } from '@/hooks/useCredits';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
 const ProjectEditor = () => {
