@@ -136,8 +136,8 @@ interface EditorState {
   insertedFills: Set<string>;
   /** Signed URLs for fill video clips, keyed by fill ID */
   fillVideoUrls: Map<string, string>;
-  /** Currently selected fill for preview (null = none) */
-  selectedFill: AiFill | null;
+  /** Currently selected fill(s) for preview (null = none, array = chained playback) */
+  selectedFill: AiFill | AiFill[] | null;
   /** Maps cutId → selected AI fill duration in seconds (0 = no fill, just cut) */
   fillDurations: Map<string, number>;
   /** Maps cutId → selected AI fill model */
