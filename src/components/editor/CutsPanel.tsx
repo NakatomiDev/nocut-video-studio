@@ -476,10 +476,19 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
   };
 
   const renderPreview = (start: number, end: number, cutId?: string) => {
-    // Only show fill thumbnails for explicitly inserted fills
+    // Get all explicitly inserted fills for this cut
     const allCutsArr = [...cuts, ...manualCuts.map((c) => ({ ...c, type: 'manual' }))];
     const cutObj = cutId ? allCutsArr.find((c) => c.id === cutId) : null;
-    const insertedFill = cutObj ? getInsertedFillForCut(cutObj) : null;
+    const insertedFillsList = cutObj ? getInsertedFillsForCut(cutObj) : [];
+    // Apply user ordering if available
+    const order = cutId ? fillOrder.get(cutId) : undefined;
+    let orderedFills = insertedFillsList.filter((f) => f.s3Key);
+    if (order && order.length > 0) {
+      const byId = new Map(orderedFills.map((f) => [f.id, f]));
+      const sorted = order.map((id) => byId.get(id)).filter(Boolean) as typeof orderedFills;
+      const extra = orderedFills.filter((f) => !order.includes(f.id));
+      orderedFills = [...sorted, ...extra];
+    }
 
     return (
       <div className="flex items-center gap-1 pl-2 pr-1 overflow-hidden">
@@ -501,15 +510,24 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
           <span className="text-[9px] text-muted-foreground font-mono">Start</span>
         </button>
 
-        {insertedFill && insertedFill.s3Key ? (
+        {orderedFills.length > 0 ? (
           <>
             <div className="border-t border-dashed border-muted-foreground/30 w-2 shrink-0" />
-            <button
-              className="cursor-pointer hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background"
-              onClick={(e) => { e.stopPropagation(); selectFill(insertedFill); }}
-            >
-              <FillThumbnailInline fill={insertedFill} isInserted={true} />
-            </button>
+            {orderedFills.map((fill, i) => (
+              <div key={fill.id} className="flex items-center gap-0">
+                {i > 0 && <div className="border-t border-dashed border-primary/40 w-1.5 shrink-0" />}
+                <button
+                  className="cursor-pointer hover:opacity-80 transition-opacity rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 ring-offset-background"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Open chained preview with all fills
+                    selectFill(orderedFills.length > 1 ? orderedFills : fill);
+                  }}
+                >
+                  <FillThumbnailInline fill={fill} isInserted={true} />
+                </button>
+              </div>
+            ))}
             <div className="border-t border-dashed border-muted-foreground/30 w-2 shrink-0" />
           </>
         ) : (
