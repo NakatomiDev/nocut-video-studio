@@ -271,7 +271,7 @@ const ExportProgress = ({ projectId, onComplete, onRetry }: ExportProgressProps)
             {stageSteps.map((step, i) => {
               const stepIdx = i;
               const isActive = stepIdx === currentStageIdx;
-              const isDone = stepIdx < currentStageIdx || stage === 'complete';
+              const isDone = stepIdx < currentStageIdx;
               return (
                 <div key={step.stage} className="flex flex-col items-center gap-1 flex-1">
                   <div
