@@ -1069,9 +1069,7 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
           <DialogHeader className="shrink-0 border-b border-border px-6 py-4">
             <DialogTitle>Review Edits</DialogTitle>
             <DialogDescription>
-              {creditEstimate > 0
-                ? `${creditEstimate} credit${creditEstimate !== 1 ? 's' : ''} for AI fills · Click any edit to preview`
-                : 'All cuts are free — click any edit to preview'}
+              Review your cuts and AI fills before exporting · Export is free
             </DialogDescription>
           </DialogHeader>
 
