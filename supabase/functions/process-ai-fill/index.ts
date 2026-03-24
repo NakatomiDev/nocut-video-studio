@@ -458,15 +458,15 @@ async function loadFrameBase64(projectId: string, timestamp: number): Promise<st
 }
 
 // ---------------------------------------------------------------------------
-// Ensure boundary frames are extracted before AI fill generation
-// Uses Gemini's video understanding to capture frames at specific timestamps,
-// removing the dependency on the external transcoder Docker service.
+// Ensure boundary frames are extracted before AI fill generation.
+// Primary: enqueue a video.extract_frames job for the transcoder service
+// (FFmpeg-based, precise). Fallback: Gemini video understanding API.
 // ---------------------------------------------------------------------------
 
 async function ensureFramesExtracted(
-  _serviceClient: ReturnType<typeof createServiceClient>,
+  serviceClient: ReturnType<typeof createServiceClient>,
   projectId: string,
-  _userId: string,
+  userId: string,
   videoS3Key: string | null,
   timestamps: number[],
 ): Promise<void> {
@@ -516,12 +516,107 @@ async function ensureFramesExtracted(
     return;
   }
 
-  console.log(`Extracting ${missing.length} missing boundary frame(s) at timestamps: ${missing.join(", ")}`);
+  console.log(`Need to extract ${missing.length} missing boundary frame(s) at timestamps: ${missing.join(", ")}`);
 
-  // Download the proxy video from S3 to extract frames via Gemini
+  // Tier 1: Use the transcoder service (FFmpeg-based, precise frame extraction)
+  const transcoderOk = await requestTranscoderFrameExtraction(
+    serviceClient, projectId, userId, videoS3Key, missing,
+  );
+
+  if (transcoderOk) return;
+
+  // Tier 2: Fall back to Gemini video understanding (approximate but works without transcoder)
+  console.warn("Transcoder frame extraction unavailable or timed out — falling back to Gemini");
+  await extractFramesViaGemini(projectId, videoS3Key, bucket, missing);
+}
+
+// ---------------------------------------------------------------------------
+// Tier 1: Enqueue a video.extract_frames job for the transcoder Docker service
+// and poll for completion. The transcoder uses FFmpeg for precise extraction.
+// ---------------------------------------------------------------------------
+
+async function requestTranscoderFrameExtraction(
+  serviceClient: ReturnType<typeof createServiceClient>,
+  projectId: string,
+  userId: string,
+  videoS3Key: string,
+  timestamps: number[],
+): Promise<boolean> {
+  const POLL_INTERVAL_MS = 3_000;
+  const MAX_WAIT_MS = 60_000;
+
+  // Insert a video.extract_frames job into the Supabase job_queue.
+  // The transcoder service polls this table and processes these jobs via FFmpeg.
+  const { data: frameJob, error: insertError } = await serviceClient
+    .from("job_queue")
+    .insert({
+      project_id: projectId,
+      user_id: userId,
+      type: "video.extract_frames",
+      status: "queued",
+      payload: {
+        video_s3_key: videoS3Key,
+        timestamps,
+      },
+      priority: 20, // Higher priority so frames are extracted before lower-priority work
+    })
+    .select("id")
+    .single();
+
+  if (insertError || !frameJob) {
+    console.error("Failed to enqueue video.extract_frames job:", insertError?.message ?? "no data returned");
+    return false;
+  }
+
+  console.log(`Enqueued video.extract_frames job ${frameJob.id} for ${timestamps.length} frame(s)`);
+
+  // Poll for completion
+  const startTime = Date.now();
+  while (Date.now() - startTime < MAX_WAIT_MS) {
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+
+    const { data: jobStatus } = await serviceClient
+      .from("job_queue")
+      .select("status, error_message")
+      .eq("id", frameJob.id)
+      .single();
+
+    if (jobStatus?.status === "complete") {
+      console.log(`Frame extraction completed via transcoder (job ${frameJob.id})`);
+      return true;
+    }
+
+    if (jobStatus?.status === "failed" || jobStatus?.status === "dead_letter") {
+      console.error(`Transcoder frame extraction job failed: ${jobStatus.error_message}`);
+      return false;
+    }
+  }
+
+  // Timed out — mark the job as failed so the transcoder doesn't process a stale job
+  console.warn(`Transcoder frame extraction timed out after ${MAX_WAIT_MS / 1000}s (job ${frameJob.id})`);
+  await serviceClient
+    .from("job_queue")
+    .update({ status: "failed", error_message: "Timed out waiting for transcoder" })
+    .eq("id", frameJob.id)
+    .in("status", ["queued", "processing"]);
+
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+// Tier 2 (fallback): Use Gemini video understanding to extract frames.
+// Less precise than FFmpeg but works when the transcoder is unavailable.
+// ---------------------------------------------------------------------------
+
+async function extractFramesViaGemini(
+  projectId: string,
+  videoS3Key: string,
+  bucket: string,
+  timestamps: number[],
+): Promise<void> {
   const apiKey = Deno.env.get("GOOGLE_AI_API_KEY");
   if (!apiKey) {
-    console.error("ensureFramesExtracted: GOOGLE_AI_API_KEY not set — cannot extract frames via Gemini");
+    console.error("extractFramesViaGemini: GOOGLE_AI_API_KEY not set — cannot extract frames");
     return;
   }
 
@@ -532,33 +627,31 @@ async function ensureFramesExtracted(
       Key: videoS3Key,
     }));
     if (!videoResponse.Body) {
-      console.error("ensureFramesExtracted: video S3 object has no body");
+      console.error("extractFramesViaGemini: video S3 object has no body");
       return;
     }
     const videoBytes = new Uint8Array(await videoResponse.Body.transformToByteArray());
-    console.log(`Downloaded proxy video: ${videoS3Key} (${videoBytes.length} bytes)`);
-    
-    // If video is too large (>20MB), skip — Gemini inline limit
+    console.log(`Downloaded proxy video for Gemini fallback: ${videoS3Key} (${videoBytes.length} bytes)`);
+
     if (videoBytes.length > 20 * 1024 * 1024) {
-      console.warn(`Proxy video too large for inline Gemini extraction (${videoBytes.length} bytes). Skipping frame extraction.`);
+      console.warn(`Proxy video too large for inline Gemini extraction (${videoBytes.length} bytes). Skipping.`);
       return;
     }
-    
+
     videoBase64 = encodeBase64(videoBytes);
   } catch (err) {
-    console.error(`Failed to download video for frame extraction: ${(err as Error).message}`);
+    console.error(`Failed to download video for Gemini frame extraction: ${(err as Error).message}`);
     return;
   }
 
-  // Use Gemini to extract each missing frame
-  for (const ts of missing) {
+  for (const ts of timestamps) {
     try {
       const minutes = Math.floor(ts / 60);
       const seconds = Math.floor(ts % 60);
       const tsFormatted = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-      
+
       const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`;
-      
+
       const geminiResponse = await fetch(geminiUrl, {
         method: "POST",
         headers: {
@@ -593,8 +686,7 @@ async function ensureFramesExtracted(
       }
 
       const geminiResult = await geminiResponse.json();
-      
-      // Look for image part in the response
+
       let imageData: string | null = null;
       let imageMimeType = "image/png";
       const candidates = geminiResult.candidates ?? [];
@@ -614,7 +706,6 @@ async function ensureFramesExtracted(
         continue;
       }
 
-      // Decode and upload to S3
       const frameBytes = Uint8Array.from(atob(imageData), (c) => c.charCodeAt(0));
       const frameName = `frame_${ts.toFixed(3).replace(".", "_")}.png`;
       const s3Key = `frames/${projectId}/${frameName}`;
@@ -626,10 +717,9 @@ async function ensureFramesExtracted(
         ContentType: imageMimeType,
       }));
 
-      console.log(`Extracted and uploaded frame: ${s3Key} (${frameBytes.length} bytes) via Gemini`);
+      console.log(`Extracted and uploaded frame: ${s3Key} (${frameBytes.length} bytes) via Gemini fallback`);
     } catch (err) {
-      console.error(`Frame extraction via Gemini failed for ts=${ts}: ${(err as Error).message}`);
-      // Continue to next timestamp — partial conditioning is better than none
+      console.error(`Gemini frame extraction failed for ts=${ts}: ${(err as Error).message}`);
     }
   }
 }
