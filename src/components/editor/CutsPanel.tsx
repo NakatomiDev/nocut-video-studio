@@ -743,8 +743,11 @@ const CutsPanel = ({ thumbnailSpriteUrl, videoUrl, duration }: CutsPanelProps) =
                   {/* Main row */}
                   <div className="flex items-center gap-1 px-1.5 py-1.5 cursor-grab active:cursor-grabbing">
                     {/* Drag handle + sequence */}
-                    <div className="flex flex-col items-center gap-0.5 shrink-0 select-none">
-                      <GripVertical className="h-3.5 w-3.5 text-muted-foreground/50" />
+                    <div className="flex flex-col items-center gap-0.5 shrink-0 select-none mr-0.5">
+                      <div className="flex flex-col items-center rounded bg-muted/50 hover:bg-muted px-0.5 py-1 transition-colors">
+                        <GripVertical className="h-4 w-4 text-muted-foreground/70" />
+                        <GripVertical className="h-4 w-4 -mt-2 text-muted-foreground/70" />
+                      </div>
                       <span className="text-[8px] font-mono text-muted-foreground/70">{idx + 1}</span>
                     </div>
                     {/* Thumbnail */}
