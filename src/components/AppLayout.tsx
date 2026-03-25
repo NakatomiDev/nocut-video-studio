@@ -1,9 +1,11 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { LayoutGrid, CreditCard, Settings, LogOut } from "lucide-react";
+import { LayoutGrid, CreditCard, Settings, LogOut, ShieldAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+
+const ADMIN_EMAILS = ["richorman@gmail.com"];
 
 const navItems = [
   { title: "Dashboard", path: "/dashboard", icon: LayoutGrid },
@@ -42,6 +44,20 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
               </Link>
             );
           })}
+          {user && ADMIN_EMAILS.includes(user.email ?? "") && (
+            <Link
+              to="/admin"
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                location.pathname === "/admin"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+              )}
+            >
+              <ShieldAlert className="h-4 w-4" />
+              Admin
+            </Link>
+          )}
         </nav>
 
         <div className="border-t border-border px-4 py-4">

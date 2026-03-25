@@ -21,6 +21,7 @@ const ExportComplete = lazy(() => import("@/pages/ExportComplete"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const CommercialDisclosure = lazy(() => import("@/pages/CommercialDisclosure"));
 const TestTransition = lazy(() => import("@/pages/TestTransition"));
+const Admin = lazy(() => import("@/pages/Admin"));
 
 const queryClient = new QueryClient();
 
@@ -69,6 +70,7 @@ const App = () => (
               <Route path="/editor/:projectId" element={<ProtectedRoute><ProjectEditor /></ProtectedRoute>} />
               <Route path="/commercial-disclosure" element={<CommercialDisclosure />} />
               <Route path="/test-transition" element={<ProtectedRoute><TestTransition /></ProtectedRoute>} />
+              <Route path="/admin" element={<ProtectedWithLayout><Admin /></ProtectedWithLayout>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
