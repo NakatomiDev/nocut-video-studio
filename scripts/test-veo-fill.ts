@@ -82,77 +82,20 @@ Environment:
 }
 
 // ---------------------------------------------------------------------------
-// Vertex AI auth (inline — same logic as supabase/functions/_shared/gcp-auth.ts)
+// Vertex AI auth — reuse shared module
 // ---------------------------------------------------------------------------
 
-const GCP_PROJECT_ID = Deno.env.get("GCP_PROJECT_ID") ?? "nocut-ai-dev";
-const GCP_REGION = Deno.env.get("GCP_REGION") ?? "us-central1";
+import {
+  getVertexAccessToken,
+  getGcpProjectId,
+  getGcpRegion,
+} from "../supabase/functions/_shared/gcp-auth.ts";
 
-function base64UrlEncode(data: Uint8Array): string {
-  let binary = "";
-  for (let i = 0; i < data.length; i++) {
-    binary += String.fromCharCode(data[i]);
-  }
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-async function importPkcs8Key(pem: string): Promise<CryptoKey> {
-  const pemBody = pem
-    .replace(/-----BEGIN PRIVATE KEY-----/, "")
-    .replace(/-----END PRIVATE KEY-----/, "")
-    .replace(/\s/g, "");
-  const binaryStr = atob(pemBody);
-  const bytes = new Uint8Array(binaryStr.length);
-  for (let i = 0; i < binaryStr.length; i++) {
-    bytes[i] = binaryStr.charCodeAt(i);
-  }
-  return crypto.subtle.importKey(
-    "pkcs8",
-    bytes.buffer,
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-}
-
-async function getAccessToken(): Promise<string> {
-  const saKeyJson = Deno.env.get("GCP_SERVICE_ACCOUNT_KEY");
-  if (!saKeyJson) {
-    console.error("ERROR: GCP_SERVICE_ACCOUNT_KEY environment variable is not set.");
-    console.error("Set it with: export GCP_SERVICE_ACCOUNT_KEY='$(cat infra/gcp-sa-key.json)'");
-    Deno.exit(1);
-  }
-  const saKey = JSON.parse(saKeyJson) as { client_email: string; private_key: string; token_uri?: string };
-  const tokenUri = saKey.token_uri ?? "https://oauth2.googleapis.com/token";
-  const now = Math.floor(Date.now() / 1000);
-  const enc = new TextEncoder();
-  const header = base64UrlEncode(enc.encode(JSON.stringify({ alg: "RS256", typ: "JWT" })));
-  const payload = base64UrlEncode(enc.encode(JSON.stringify({
-    iss: saKey.client_email, sub: saKey.client_email, aud: tokenUri,
-    iat: now, exp: now + 3600, scope: "https://www.googleapis.com/auth/cloud-platform",
-  })));
-  const unsignedToken = `${header}.${payload}`;
-  const privateKey = await importPkcs8Key(saKey.private_key);
-  const signature = new Uint8Array(
-    await crypto.subtle.sign("RSASSA-PKCS1-v1_5", privateKey, enc.encode(unsignedToken)),
-  );
-  const signedJwt = `${unsignedToken}.${base64UrlEncode(signature)}`;
-  const res = await fetch(tokenUri, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: `grant_type=${encodeURIComponent("urn:ietf:params:oauth:grant-type:jwt-bearer")}&assertion=${encodeURIComponent(signedJwt)}`,
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    console.error(`Token exchange failed (${res.status}): ${body}`);
-    Deno.exit(1);
-  }
-  const data = await res.json() as { access_token: string };
-  return data.access_token;
-}
+const GCP_PROJECT_ID = getGcpProjectId();
+const GCP_REGION = getGcpRegion();
 
 console.log("Authenticating with GCP service account...");
-const accessToken = await getAccessToken();
+const accessToken = await getVertexAccessToken();
 console.log("Authenticated successfully.\n");
 
 const MODEL_API_IDS: Record<string, string> = {

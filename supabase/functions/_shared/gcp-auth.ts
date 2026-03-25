@@ -14,11 +14,27 @@
 // ---------------------------------------------------------------------------
 
 export function getGcpProjectId(): string {
-  return Deno.env.get("GCP_PROJECT_ID") ?? "nocut-ai-dev";
+  const projectId = Deno.env.get("GCP_PROJECT_ID");
+  if (!projectId) {
+    throw new Error(
+      "GCP_PROJECT_ID environment variable is not set. " +
+      "This is required to construct Vertex AI endpoints and avoid sending " +
+      "traffic to an unintended GCP project.",
+    );
+  }
+  return projectId;
 }
 
 export function getGcpRegion(): string {
-  return Deno.env.get("GCP_REGION") ?? "us-central1";
+  const region = Deno.env.get("GCP_REGION");
+  if (!region) {
+    throw new Error(
+      "GCP_REGION environment variable is not set. " +
+      "This is required to construct Vertex AI endpoints and avoid sending " +
+      "traffic to an unintended GCP region.",
+    );
+  }
+  return region;
 }
 
 // ---------------------------------------------------------------------------
@@ -34,9 +50,15 @@ export function vertexGeminiUrl(region: string, projectId: string, modelId: stri
 }
 
 export function vertexPollUrl(region: string, operationName: string): string {
-  // operationName already includes the full path, but if it starts with
-  // "projects/" we need to prefix the regional endpoint.
-  return `https://${region}-aiplatform.googleapis.com/v1/${operationName}`;
+  // If operationName is already an absolute URL, return it as-is. Otherwise
+  // treat it as a relative resource name (e.g. "projects/...") and prefix
+  // the regional Vertex AI endpoint.
+  if (operationName.startsWith("http://") || operationName.startsWith("https://")) {
+    return operationName;
+  }
+
+  const normalizedOperationName = operationName.replace(/^\/+/, "");
+  return `https://${region}-aiplatform.googleapis.com/v1/${normalizedOperationName}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -109,12 +131,18 @@ export async function getVertexAccessToken(): Promise<string> {
 
   const tokenData = (await tokenResponse.json()) as {
     access_token: string;
-    expires_in: number;
+    expires_in?: number;
   };
 
   _cachedToken = tokenData.access_token;
-  // Refresh 100 s before actual expiry to avoid edge-case failures
-  _tokenExpiresAt = Date.now() + (tokenData.expires_in - 100) * 1000;
+  // Refresh before actual expiry to avoid edge-case failures.
+  // Use a safe default if expires_in is missing/invalid and clamp the refresh skew.
+  const DEFAULT_EXPIRES_IN_SEC = 3600;
+  const rawExpiresIn = typeof tokenData.expires_in === "number" ? tokenData.expires_in : DEFAULT_EXPIRES_IN_SEC;
+  const validExpiresIn = Number.isFinite(rawExpiresIn) && rawExpiresIn > 0 ? rawExpiresIn : DEFAULT_EXPIRES_IN_SEC;
+  const refreshSkewSec = Math.min(100, validExpiresIn);
+  const effectiveTtlSec = Math.max(validExpiresIn - refreshSkewSec, 0);
+  _tokenExpiresAt = Date.now() + effectiveTtlSec * 1000;
 
   return _cachedToken;
 }
