@@ -21,6 +21,7 @@ const ExportComplete = lazy(() => import("@/pages/ExportComplete"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const CommercialDisclosure = lazy(() => import("@/pages/CommercialDisclosure"));
 const TestTransition = lazy(() => import("@/pages/TestTransition"));
+const Admin = lazy(() => import("@/pages/Admin"));
 
 const queryClient = new QueryClient();
 
