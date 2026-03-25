@@ -68,7 +68,6 @@ Options:
   --prompt <text>        Custom prompt (default: auto-generated)
   --audio-prompt <text>  Audio prompt (only for -audio models)
   --duration <seconds>   Fill duration in seconds (default: 4)
-  --format <type>        Image format: "gemini" (default, correct) or "vertex" (for A/B testing)
   --output <path>        Output file path (default: auto-generated)
   --dry-run              Build the request and print it, don't send
 
