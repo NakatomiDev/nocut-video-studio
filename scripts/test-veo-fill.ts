@@ -26,7 +26,9 @@
  *     --model veo3.1-fast --prompt "Person talking at desk" --duration 4
  *
  * Environment:
- *   GOOGLE_AI_API_KEY — required
+ *   GCP_SERVICE_ACCOUNT_KEY — required (JSON string of GCP service account key)
+ *   GCP_PROJECT_ID          — optional (default: nocut-ai-dev)
+ *   GCP_REGION              — optional (default: us-central1)
  *
  * Output:
  *   Saves the generated video to ./test-veo-output-{timestamp}.mp4
@@ -68,26 +70,90 @@ Options:
   --prompt <text>        Custom prompt (default: auto-generated)
   --audio-prompt <text>  Audio prompt (only for -audio models)
   --duration <seconds>   Fill duration in seconds (default: 4)
-  --format <type>        Image format: "gemini" (default, correct) or "vertex" (for A/B testing)
   --output <path>        Output file path (default: auto-generated)
   --dry-run              Build the request and print it, don't send
 
 Environment:
-  GOOGLE_AI_API_KEY      Required. Your Google AI API key.
+  GCP_SERVICE_ACCOUNT_KEY  Required. JSON string of GCP service account key.
+  GCP_PROJECT_ID           Optional. Default: nocut-ai-dev
+  GCP_REGION               Optional. Default: us-central1
   `);
   Deno.exit(0);
 }
 
 // ---------------------------------------------------------------------------
-// Config
+// Vertex AI auth (inline — same logic as supabase/functions/_shared/gcp-auth.ts)
 // ---------------------------------------------------------------------------
 
-const apiKey = Deno.env.get("GOOGLE_AI_API_KEY");
-if (!apiKey) {
-  console.error("ERROR: GOOGLE_AI_API_KEY environment variable is not set.");
-  console.error("Set it with: export GOOGLE_AI_API_KEY=your-key-here");
-  Deno.exit(1);
+const GCP_PROJECT_ID = Deno.env.get("GCP_PROJECT_ID") ?? "nocut-ai-dev";
+const GCP_REGION = Deno.env.get("GCP_REGION") ?? "us-central1";
+
+function base64UrlEncode(data: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < data.length; i++) {
+    binary += String.fromCharCode(data[i]);
+  }
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
+
+async function importPkcs8Key(pem: string): Promise<CryptoKey> {
+  const pemBody = pem
+    .replace(/-----BEGIN PRIVATE KEY-----/, "")
+    .replace(/-----END PRIVATE KEY-----/, "")
+    .replace(/\s/g, "");
+  const binaryStr = atob(pemBody);
+  const bytes = new Uint8Array(binaryStr.length);
+  for (let i = 0; i < binaryStr.length; i++) {
+    bytes[i] = binaryStr.charCodeAt(i);
+  }
+  return crypto.subtle.importKey(
+    "pkcs8",
+    bytes.buffer,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+}
+
+async function getAccessToken(): Promise<string> {
+  const saKeyJson = Deno.env.get("GCP_SERVICE_ACCOUNT_KEY");
+  if (!saKeyJson) {
+    console.error("ERROR: GCP_SERVICE_ACCOUNT_KEY environment variable is not set.");
+    console.error("Set it with: export GCP_SERVICE_ACCOUNT_KEY='$(cat infra/gcp-sa-key.json)'");
+    Deno.exit(1);
+  }
+  const saKey = JSON.parse(saKeyJson) as { client_email: string; private_key: string; token_uri?: string };
+  const tokenUri = saKey.token_uri ?? "https://oauth2.googleapis.com/token";
+  const now = Math.floor(Date.now() / 1000);
+  const enc = new TextEncoder();
+  const header = base64UrlEncode(enc.encode(JSON.stringify({ alg: "RS256", typ: "JWT" })));
+  const payload = base64UrlEncode(enc.encode(JSON.stringify({
+    iss: saKey.client_email, sub: saKey.client_email, aud: tokenUri,
+    iat: now, exp: now + 3600, scope: "https://www.googleapis.com/auth/cloud-platform",
+  })));
+  const unsignedToken = `${header}.${payload}`;
+  const privateKey = await importPkcs8Key(saKey.private_key);
+  const signature = new Uint8Array(
+    await crypto.subtle.sign("RSASSA-PKCS1-v1_5", privateKey, enc.encode(unsignedToken)),
+  );
+  const signedJwt = `${unsignedToken}.${base64UrlEncode(signature)}`;
+  const res = await fetch(tokenUri, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `grant_type=${encodeURIComponent("urn:ietf:params:oauth:grant-type:jwt-bearer")}&assertion=${encodeURIComponent(signedJwt)}`,
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    console.error(`Token exchange failed (${res.status}): ${body}`);
+    Deno.exit(1);
+  }
+  const data = await res.json() as { access_token: string };
+  return data.access_token;
+}
+
+console.log("Authenticating with GCP service account...");
+const accessToken = await getAccessToken();
+console.log("Authenticated successfully.\n");
 
 const MODEL_API_IDS: Record<string, string> = {
   "veo2":                  "veo-2.0-generate-preview",
@@ -108,7 +174,7 @@ console.log("=== Veo API Test ===");
 console.log(`Model:    ${model} → API ID: ${apiModelId}`);
 console.log(`Duration: ${duration}s`);
 console.log(`Audio:    ${includeAudio}`);
-console.log(`Format:   bytesBase64Encoded (predictLongRunning requires Vertex AI-style format)`);
+console.log(`Region:   ${GCP_REGION}`);
 console.log(`Frames:   ${noFrames ? "NONE (text-only)" : "see below"}`);
 console.log();
 
@@ -201,8 +267,10 @@ const requestBody = {
   parameters,
 };
 
+const generateUrl = `https://${GCP_REGION}-aiplatform.googleapis.com/v1/projects/${GCP_PROJECT_ID}/locations/${GCP_REGION}/publishers/google/models/${apiModelId}:predictLongRunning`;
+
 console.log("=== Request ===");
-console.log(`Endpoint: https://generativelanguage.googleapis.com/v1beta/models/${apiModelId}:predictLongRunning`);
+console.log(`Endpoint: ${generateUrl}`);
 console.log(`Prompt:   ${promptText}`);
 console.log(`Body keys: instances[0] has: ${Object.keys(instance).join(", ")}`);
 console.log(`Parameters: ${JSON.stringify(parameters)}`);
@@ -228,14 +296,13 @@ if (dryRun) {
 // Send request
 // ---------------------------------------------------------------------------
 
-const generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/${apiModelId}:predictLongRunning`;
 console.log("Sending generation request...");
 
 const generateResponse = await fetch(generateUrl, {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
-    "x-goog-api-key": apiKey,
+    "Authorization": `Bearer ${accessToken}`,
   },
   body: JSON.stringify(requestBody),
 });
@@ -256,7 +323,7 @@ console.log();
 // Poll for completion
 // ---------------------------------------------------------------------------
 
-const pollBaseUrl = "https://generativelanguage.googleapis.com/v1beta";
+const pollBaseUrl = `https://${GCP_REGION}-aiplatform.googleapis.com/v1`;
 const maxWaitMs = 300_000; // 5 minutes
 const pollIntervalMs = 5_000;
 const startTime = Date.now();
@@ -269,7 +336,7 @@ while (Date.now() - startTime < maxWaitMs) {
 
   const pollResponse = await fetch(
     `${pollBaseUrl}/${operationName}`,
-    { headers: { "x-goog-api-key": apiKey } },
+    { headers: { "Authorization": `Bearer ${accessToken}` } },
   );
 
   if (!pollResponse.ok) {
@@ -305,17 +372,21 @@ while (Date.now() - startTime < maxWaitMs) {
 
     console.log(`Video URI: ${videoUri}`);
 
-    // Download video (same fallback logic as process-ai-fill)
-    let videoResponse = await fetch(`${videoUri}?key=${apiKey}`);
-    if (!videoResponse.ok) {
-      console.log(`Download with query key failed (${videoResponse.status}), trying header auth...`);
-      videoResponse = await fetch(videoUri, {
-        headers: { "x-goog-api-key": apiKey },
-      });
+    // Download video — handle gs:// URIs from Vertex AI
+    let downloadUrl = videoUri;
+    if (videoUri.startsWith("gs://")) {
+      const gcsPath = videoUri.slice(5);
+      const slashIdx = gcsPath.indexOf("/");
+      const gcsBucket = gcsPath.slice(0, slashIdx);
+      const gcsObject = encodeURIComponent(gcsPath.slice(slashIdx + 1));
+      downloadUrl = `https://storage.googleapis.com/storage/v1/b/${gcsBucket}/o/${gcsObject}?alt=media`;
     }
+    let videoResponse = await fetch(downloadUrl, {
+      headers: { "Authorization": `Bearer ${accessToken}` },
+    });
     if (!videoResponse.ok) {
-      console.log(`Download with header failed (${videoResponse.status}), trying alt=media...`);
-      videoResponse = await fetch(`${videoUri}?alt=media&key=${apiKey}`);
+      console.log(`Download with bearer auth failed (${videoResponse.status}), trying without auth...`);
+      videoResponse = await fetch(downloadUrl);
     }
     if (!videoResponse.ok) {
       console.error(`ERROR: All download attempts failed (${videoResponse.status})`);

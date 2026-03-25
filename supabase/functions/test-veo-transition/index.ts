@@ -1,5 +1,12 @@
 import { handleCors } from "../_shared/cors.ts";
 import { successResponse, errorResponse } from "../_shared/response.ts";
+import {
+  getVertexAccessToken,
+  getGcpProjectId,
+  getGcpRegion,
+  vertexVeoUrl,
+  vertexPollUrl,
+} from "../_shared/gcp-auth.ts";
 
 /**
  * Test endpoint: accepts two base64 images (first/last frame) and generates
@@ -29,10 +36,14 @@ Deno.serve(async (req) => {
       return errorResponse("missing_field", "first_image_base64 is required", 400);
     }
 
-    const apiKey = Deno.env.get("GOOGLE_AI_API_KEY");
-    if (!apiKey) {
-      return errorResponse("config_error", "GOOGLE_AI_API_KEY is not set", 500);
+    let accessToken: string;
+    try {
+      accessToken = await getVertexAccessToken();
+    } catch (err) {
+      return errorResponse("config_error", (err as Error).message, 500);
     }
+    const gcpProjectId = getGcpProjectId();
+    const gcpRegion = getGcpRegion();
 
     console.log(`Starting Veo transition: model=${model}, duration=${duration}s, hasLastFrame=${!!last_image_base64}`);
 
@@ -58,14 +69,14 @@ Deno.serve(async (req) => {
       aspectRatio: "16:9",
     };
 
-    const generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:predictLongRunning`;
+    const generateUrl = vertexVeoUrl(gcpRegion, gcpProjectId, model);
     console.log(`Calling: ${generateUrl}`);
 
     const generateResponse = await fetch(generateUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
+        "Authorization": `Bearer ${accessToken}`,
       },
       body: JSON.stringify({ instances: [instance], parameters }),
     });
@@ -89,8 +100,8 @@ Deno.serve(async (req) => {
       await new Promise((r) => setTimeout(r, pollIntervalMs));
 
       const pollResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/${operationName}`,
-        { headers: { "x-goog-api-key": apiKey } },
+        vertexPollUrl(gcpRegion, operationName),
+        { headers: { "Authorization": `Bearer ${accessToken}` } },
       );
 
       if (!pollResponse.ok) {
@@ -129,13 +140,20 @@ Deno.serve(async (req) => {
         return errorResponse("no_video", "Veo completed but returned no video URI. Try a different prompt.", 502);
       }
 
-      // Download the video
-      let videoResponse = await fetch(`${videoUri}?key=${apiKey}`);
-      if (!videoResponse.ok) {
-        videoResponse = await fetch(videoUri, { headers: { "x-goog-api-key": apiKey } });
+      // Download the video — handle gs:// URIs from Vertex AI
+      let downloadUrl = videoUri;
+      if (videoUri.startsWith("gs://")) {
+        const gcsPath = videoUri.slice(5);
+        const slashIdx = gcsPath.indexOf("/");
+        const gcsBucket = gcsPath.slice(0, slashIdx);
+        const gcsObject = encodeURIComponent(gcsPath.slice(slashIdx + 1));
+        downloadUrl = `https://storage.googleapis.com/storage/v1/b/${gcsBucket}/o/${gcsObject}?alt=media`;
       }
+      let videoResponse = await fetch(downloadUrl, {
+        headers: { "Authorization": `Bearer ${accessToken}` },
+      });
       if (!videoResponse.ok) {
-        videoResponse = await fetch(`${videoUri}?alt=media&key=${apiKey}`);
+        videoResponse = await fetch(downloadUrl);
       }
       if (!videoResponse.ok) {
         return errorResponse("download_failed", `Failed to download video: ${videoResponse.status}`, 502);

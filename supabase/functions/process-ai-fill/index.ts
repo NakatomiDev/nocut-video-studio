@@ -12,6 +12,14 @@ import {
   DEFAULT_AI_FILL_MODEL,
   type AiFillModel,
 } from "../_shared/credits.ts";
+import {
+  getVertexAccessToken,
+  getGcpProjectId,
+  getGcpRegion,
+  vertexVeoUrl,
+  vertexGeminiUrl,
+  vertexPollUrl,
+} from "../_shared/gcp-auth.ts";
 
 /**
  * Independently recalculate the credit cost from edl_json entries.
@@ -621,11 +629,15 @@ async function extractFramesViaGemini(
   bucket: string,
   timestamps: number[],
 ): Promise<void> {
-  const apiKey = Deno.env.get("GOOGLE_AI_API_KEY");
-  if (!apiKey) {
-    console.error("extractFramesViaGemini: GOOGLE_AI_API_KEY not set — cannot extract frames");
+  let accessToken: string;
+  try {
+    accessToken = await getVertexAccessToken();
+  } catch (err) {
+    console.error("extractFramesViaGemini: cannot get Vertex AI access token —", (err as Error).message);
     return;
   }
+  const gcpProjectId = getGcpProjectId();
+  const gcpRegion = getGcpRegion();
 
   let videoBase64: string;
   try {
@@ -657,13 +669,13 @@ async function extractFramesViaGemini(
       const seconds = Math.floor(ts % 60);
       const tsFormatted = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`;
+      const geminiUrl = vertexGeminiUrl(gcpRegion, gcpProjectId, "gemini-2.0-flash");
 
       const geminiResponse = await fetch(geminiUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
+          "Authorization": `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
           contents: [{
@@ -762,11 +774,9 @@ async function generateAiFill(request: FillRequest): Promise<FillResponse> {
 }
 
 async function generateVeoFill(request: FillRequest, model: string): Promise<FillResponse> {
-  const apiKey = Deno.env.get("GOOGLE_AI_API_KEY");
-
-  if (!apiKey) {
-    throw new Error("GOOGLE_AI_API_KEY is not set — cannot call Veo API");
-  }
+  const accessToken = await getVertexAccessToken();
+  const gcpProjectId = getGcpProjectId();
+  const gcpRegion = getGcpRegion();
 
   // Map our model names to Gemini API model IDs (use -preview suffix)
   const MODEL_API_IDS: Record<string, string> = {
@@ -827,15 +837,14 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
     parameters.generateAudio = true;
   }
 
-  // Always use Gemini API — it supports API keys and image conditioning
-  const generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/${apiModelId}:predictLongRunning`;
-  console.log(`Using Gemini API endpoint: ${generateUrl}`);
+  const generateUrl = vertexVeoUrl(gcpRegion, gcpProjectId, apiModelId);
+  console.log(`Using Vertex AI endpoint: ${generateUrl}`);
 
   const generateResponse = await fetch(generateUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-goog-api-key": apiKey,
+      "Authorization": `Bearer ${accessToken}`,
     },
     body: JSON.stringify({
       instances: [instance],
@@ -851,8 +860,6 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
   const operation = await generateResponse.json();
   const operationName = operation.name;
 
-  const pollBaseUrl = `https://generativelanguage.googleapis.com/v1beta`;
-
   // Poll for completion (up to 5 minutes)
   const maxWaitMs = 300_000;
   const pollIntervalMs = 5_000;
@@ -861,10 +868,10 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
   while (Date.now() - startTime < maxWaitMs) {
     await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
 
-    const pollResponse = await fetch(
-      `${pollBaseUrl}/${operationName}`,
-      { headers: { "x-goog-api-key": apiKey } },
-    );
+    const pollUrl = vertexPollUrl(gcpRegion, operationName);
+    const pollResponse = await fetch(pollUrl, {
+      headers: { "Authorization": `Bearer ${accessToken}` },
+    });
 
     if (!pollResponse.ok) {
       const body = await pollResponse.text();
@@ -886,18 +893,24 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
 
       // Download the generated video and upload to S3
       const s3Key = `ai-fills/${request.projectId}/${request.editDecisionId}/gap_${request.gapIndex}_${request.duration}s.mp4`;
-      
-      // Try multiple download approaches
-      let videoResponse = await fetch(`${videoUri}?key=${apiKey}`);
-      if (!videoResponse.ok) {
-        console.warn(`Video download with query key failed (${videoResponse.status}), retrying with header auth`);
-        videoResponse = await fetch(videoUri, {
-          headers: { "x-goog-api-key": apiKey },
-        });
+
+      // Convert gs:// URIs to HTTPS for download
+      let downloadUrl = videoUri;
+      if (videoUri.startsWith("gs://")) {
+        const gcsPath = videoUri.slice(5); // strip "gs://"
+        const slashIdx = gcsPath.indexOf("/");
+        const gcsBucket = gcsPath.slice(0, slashIdx);
+        const gcsObject = encodeURIComponent(gcsPath.slice(slashIdx + 1));
+        downloadUrl = `https://storage.googleapis.com/storage/v1/b/${gcsBucket}/o/${gcsObject}?alt=media`;
       }
+
+      let videoResponse = await fetch(downloadUrl, {
+        headers: { "Authorization": `Bearer ${accessToken}` },
+      });
       if (!videoResponse.ok) {
-        console.warn(`Video download with header also failed (${videoResponse.status}), trying alt=media`);
-        videoResponse = await fetch(`${videoUri}?alt=media&key=${apiKey}`);
+        // Retry without auth in case the URI is a signed URL
+        console.warn(`Video download with bearer auth failed (${videoResponse.status}), retrying without auth`);
+        videoResponse = await fetch(downloadUrl);
       }
       if (!videoResponse.ok) {
         const errBody = await videoResponse.text().catch(() => "");
