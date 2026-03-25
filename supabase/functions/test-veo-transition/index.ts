@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
       last_image_base64,
       prompt = "Smooth transition, seamless continuity, natural movement",
       duration = 5,
-      model = "veo-2.0-generate-preview",
+      model = "veo-3.1-generate-preview",
     } = body;
 
     if (!first_image_base64) {
@@ -36,20 +36,24 @@ Deno.serve(async (req) => {
 
     console.log(`Starting Veo transition: model=${model}, duration=${duration}s, hasLastFrame=${!!last_image_base64}`);
 
-    // Build instance using predictLongRunning format (bytesBase64Encoded).
-    // The predictLongRunning endpoint is Vertex AI-style and does NOT support inlineData.
+    // Build instance using predictLongRunning format with inlineData.
+    // See: https://ai.google.dev/gemini-api/docs/video#using-first-and-last-video-frames
     const instance: Record<string, unknown> = {
       prompt: `${prompt}, ${duration} seconds`,
       image: {
-        mimeType: "image/png",
-        bytesBase64Encoded: first_image_base64,
+        inlineData: {
+          mimeType: "image/png",
+          data: first_image_base64,
+        },
       },
     };
 
     if (last_image_base64) {
       instance.lastFrame = {
-        mimeType: "image/png",
-        bytesBase64Encoded: last_image_base64,
+        inlineData: {
+          mimeType: "image/png",
+          data: last_image_base64,
+        },
       };
     }
 

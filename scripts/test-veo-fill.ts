@@ -108,7 +108,7 @@ console.log("=== Veo API Test ===");
 console.log(`Model:    ${model} → API ID: ${apiModelId}`);
 console.log(`Duration: ${duration}s`);
 console.log(`Audio:    ${includeAudio}`);
-console.log(`Format:   bytesBase64Encoded (predictLongRunning requires Vertex AI-style format)`);
+console.log(`Format:   inlineData (per Gemini API docs)`);
 console.log(`Frames:   ${noFrames ? "NONE (text-only)" : "see below"}`);
 console.log();
 
@@ -172,17 +172,21 @@ if (includeAudio && args["audio-prompt"]) {
 const instance: Record<string, unknown> = { prompt: promptText };
 
 if (firstFrame) {
-  // predictLongRunning requires bytesBase64Encoded (Vertex AI-style), not inlineData
+  // Use inlineData format per Gemini API docs
   instance.image = {
-    mimeType: firstFrame.mimeType,
-    bytesBase64Encoded: firstFrame.base64,
+    inlineData: {
+      mimeType: firstFrame.mimeType,
+      data: firstFrame.base64,
+    },
   };
 }
 
 if (lastFrame) {
   instance.lastFrame = {
-    mimeType: lastFrame.mimeType,
-    bytesBase64Encoded: lastFrame.base64,
+    inlineData: {
+      mimeType: lastFrame.mimeType,
+      data: lastFrame.base64,
+    },
   };
 }
 

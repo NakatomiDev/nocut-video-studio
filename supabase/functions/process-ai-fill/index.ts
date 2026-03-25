@@ -777,7 +777,7 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
     "veo3.1-standard-audio": "veo-3.1-generate-preview",
     "veo3-standard-audio":   "veo-3.0-generate-preview",
   };
-  const apiModelId = MODEL_API_IDS[model] ?? "veo-2.0-generate-preview";
+  const apiModelId = MODEL_API_IDS[model] ?? "veo-3.1-generate-preview";
   const includeAudio = model.endsWith("-audio");
 
   // Build the instance with optional first/last frame conditioning
@@ -792,20 +792,24 @@ async function generateVeoFill(request: FillRequest, model: string): Promise<Fil
     prompt: promptText,
   };
 
-  // predictLongRunning is Vertex AI-style and requires bytesBase64Encoded format.
-  // Do NOT use inlineData here — it is rejected with a 400 error.
+  // Use inlineData format per Gemini API docs for frame conditioning.
+  // See: https://ai.google.dev/gemini-api/docs/video#using-first-and-last-video-frames
   if (request.firstFrameBase64) {
     instance.image = {
-      mimeType: "image/png",
-      bytesBase64Encoded: request.firstFrameBase64,
+      inlineData: {
+        mimeType: "image/png",
+        data: request.firstFrameBase64,
+      },
     };
     console.log("Using first frame conditioning for fill generation");
   }
 
   if (request.lastFrameBase64) {
     instance.lastFrame = {
-      mimeType: "image/png",
-      bytesBase64Encoded: request.lastFrameBase64,
+      inlineData: {
+        mimeType: "image/png",
+        data: request.lastFrameBase64,
+      },
     };
     console.log("Using last frame conditioning for fill generation");
   }
