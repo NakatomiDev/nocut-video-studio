@@ -372,6 +372,39 @@ verify_jwt = false
 [functions.process-ai-fill]
 verify_jwt = false
 
+[functions.test-veo-transition]
+verify_jwt = false
+
+[functions.credits-balance]
+verify_jwt = false
+
+[functions.credits-history]
+verify_jwt = false
+
+[functions.credits-topup]
+verify_jwt = false
+
+[functions.project-edl]
+verify_jwt = false
+
+[functions.project-estimate]
+verify_jwt = false
+
+[functions.export-video]
+verify_jwt = false
+
+[functions.preview-fill]
+verify_jwt = false
+
+[functions.subscribe-checkout]
+verify_jwt = false
+
+[functions.webhooks-stripe]
+verify_jwt = false
+
+[functions.webhooks-revenuecat]
+verify_jwt = false
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.
