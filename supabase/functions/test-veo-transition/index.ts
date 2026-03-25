@@ -109,15 +109,24 @@ Deno.serve(async (req) => {
       console.log(`Veo completed after ${elapsedSec}s`);
 
       const response = pollResult.response ?? pollResult.result;
+      const genVideoResp = response?.generateVideoResponse;
+
+      // Check for safety filter rejection
+      const raiReasons = genVideoResp?.raiMediaFilteredReasons;
+      if (raiReasons && raiReasons.length > 0) {
+        console.error("Safety filter triggered:", raiReasons);
+        return errorResponse("safety_filtered", raiReasons[0], 422);
+      }
+
       const generatedSamples =
-        response?.generateVideoResponse?.generatedSamples ??
+        genVideoResp?.generatedSamples ??
         response?.generatedSamples ??
         [];
       const videoUri = generatedSamples[0]?.video?.uri;
 
       if (!videoUri) {
         console.error("No video URI in response:", JSON.stringify(pollResult).slice(0, 1000));
-        return errorResponse("no_video", "Veo completed but returned no video URI", 502);
+        return errorResponse("no_video", "Veo completed but returned no video URI. Try a different prompt.", 502);
       }
 
       // Download the video
