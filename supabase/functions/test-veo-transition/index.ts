@@ -55,7 +55,6 @@ Deno.serve(async (req) => {
 
     const parameters: Record<string, unknown> = {
       sampleCount: 1,
-      durationSeconds: duration,
       aspectRatio: "16:9",
     };
 
