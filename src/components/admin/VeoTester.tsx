@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,10 +15,36 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-const MODELS = [
-  { id: "veo-2.0-generate-preview", label: "Veo 2.0" },
-  { id: "veo-3.1-fast-generate-preview", label: "Veo 3.1 Fast" },
-  { id: "veo-3.1-generate-preview", label: "Veo 3.1 Standard" },
+interface ModelConfig {
+  id: string;
+  label: string;
+  durations: number[];
+  defaultDuration: number;
+  audio: boolean;
+}
+
+const MODELS: ModelConfig[] = [
+  {
+    id: "veo-3.1-generate-preview",
+    label: "Veo 3.1 Standard",
+    durations: [4, 6, 8],
+    defaultDuration: 8,
+    audio: true,
+  },
+  {
+    id: "veo-3.1-fast-generate-preview",
+    label: "Veo 3.1 Fast",
+    durations: [4, 6, 8],
+    defaultDuration: 8,
+    audio: true,
+  },
+  {
+    id: "veo-2.0-generate-001",
+    label: "Veo 2.0 (Silent)",
+    durations: [5, 6, 7, 8],
+    defaultDuration: 5,
+    audio: false,
+  },
 ];
 
 const VeoTester = () => {
@@ -27,8 +53,8 @@ const VeoTester = () => {
   const [firstPreview, setFirstPreview] = useState<string | null>(null);
   const [lastPreview, setLastPreview] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("Smooth transition, seamless continuity, natural head movement, same person speaking");
-  const [duration, setDuration] = useState(5);
-  const [model, setModel] = useState(MODELS[0].id);
+  const [modelIndex, setModelIndex] = useState(0);
+  const [duration, setDuration] = useState(MODELS[0].defaultDuration);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -37,6 +63,17 @@ const VeoTester = () => {
 
   const firstRef = useRef<HTMLInputElement>(null);
   const lastRef = useRef<HTMLInputElement>(null);
+
+  const selectedModel = MODELS[modelIndex];
+
+  const handleModelChange = useCallback((idx: number) => {
+    setModelIndex(idx);
+    const model = MODELS[idx];
+    // Reset duration to default if current duration isn't valid for new model
+    if (!model.durations.includes(duration)) {
+      setDuration(model.defaultDuration);
+    }
+  }, [duration]);
 
   const handleImageSelect = useCallback(
     (which: "first" | "last") => (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -59,10 +96,16 @@ const VeoTester = () => {
     try {
       const first_image_base64 = await fileToBase64(firstImage);
       const last_image_base64 = lastImage ? await fileToBase64(lastImage) : null;
-      setStatus("Sending to Veo API... This may take up to 5 minutes.");
+      setStatus(`Sending to ${selectedModel.label}... This may take up to 5 minutes.`);
 
       const { data, error: fnError } = await supabase.functions.invoke("test-veo-transition", {
-        body: { first_image_base64, last_image_base64, prompt, duration, model },
+        body: {
+          first_image_base64,
+          last_image_base64,
+          prompt,
+          duration,
+          model: selectedModel.id,
+        },
       });
 
       if (fnError) throw new Error(fnError.message || "Edge function error");
@@ -126,11 +169,31 @@ const VeoTester = () => {
         <CardContent className="space-y-4">
           <div><Label htmlFor="veo-prompt">Prompt</Label><Input id="veo-prompt" value={prompt} onChange={(e) => setPrompt(e.target.value)} className="mt-1" /></div>
           <div className="grid grid-cols-2 gap-4">
-            <div><Label htmlFor="veo-duration">Duration (s)</Label><Input id="veo-duration" type="number" min={1} max={8} value={duration} onChange={(e) => setDuration(Number(e.target.value))} className="mt-1" /></div>
             <div>
               <Label htmlFor="veo-model">Model</Label>
-              <select id="veo-model" value={model} onChange={(e) => setModel(e.target.value)} className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                {MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+              <select
+                id="veo-model"
+                value={modelIndex}
+                onChange={(e) => handleModelChange(Number(e.target.value))}
+                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {MODELS.map((m, i) => <option key={m.id} value={i}>{m.label}</option>)}
+              </select>
+              {!selectedModel.audio && (
+                <p className="mt-1 text-xs text-muted-foreground">Silent — no audio generated</p>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="veo-duration">Duration</Label>
+              <select
+                id="veo-duration"
+                value={duration}
+                onChange={(e) => setDuration(Number(e.target.value))}
+                className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {selectedModel.durations.map((d) => (
+                  <option key={d} value={d}>{d} seconds</option>
+                ))}
               </select>
             </div>
           </div>
