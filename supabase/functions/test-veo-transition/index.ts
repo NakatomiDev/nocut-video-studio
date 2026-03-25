@@ -36,23 +36,19 @@ Deno.serve(async (req) => {
 
     console.log(`Starting Veo transition: model=${model}, duration=${duration}s, hasLastFrame=${!!last_image_base64}`);
 
-    // Build instance with image conditioning
+    // Build instance with image conditioning (Vertex AI format, NOT Gemini inlineData)
     const instance: Record<string, unknown> = {
       prompt: `${prompt}, ${duration} seconds`,
       image: {
-        inlineData: {
-          mimeType: "image/png",
-          data: first_image_base64,
-        },
+        bytesBase64Encoded: first_image_base64,
+        mimeType: "image/png",
       },
     };
 
     if (last_image_base64) {
       instance.lastFrame = {
-        inlineData: {
-          mimeType: "image/png",
-          data: last_image_base64,
-        },
+        bytesBase64Encoded: last_image_base64,
+        mimeType: "image/png",
       };
     }
 
