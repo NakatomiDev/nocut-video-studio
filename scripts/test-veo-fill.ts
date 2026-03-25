@@ -104,18 +104,11 @@ const includeAudio = model.endsWith("-audio");
 const duration = parseInt((args["duration"] as string) ?? "4", 10);
 const noFrames = !!args["no-frames"];
 const dryRun = !!args["dry-run"];
-const imageFormat = (args["format"] as string) ?? "gemini"; // "gemini" or "vertex"
-
-if (imageFormat !== "gemini" && imageFormat !== "vertex") {
-  console.error("ERROR: --format must be 'gemini' or 'vertex'");
-  Deno.exit(1);
-}
-
 console.log("=== Veo API Test ===");
 console.log(`Model:    ${model} → API ID: ${apiModelId}`);
 console.log(`Duration: ${duration}s`);
 console.log(`Audio:    ${includeAudio}`);
-console.log(`Format:   ${imageFormat} (${imageFormat === "gemini" ? "inlineData — CORRECT" : "bytesBase64Encoded — Vertex AI format, will likely be ignored by Gemini API"})`);
+console.log(`Format:   bytesBase64Encoded (predictLongRunning requires Vertex AI-style format)`);
 console.log(`Frames:   ${noFrames ? "NONE (text-only)" : "see below"}`);
 console.log();
 
@@ -179,37 +172,18 @@ if (includeAudio && args["audio-prompt"]) {
 const instance: Record<string, unknown> = { prompt: promptText };
 
 if (firstFrame) {
-  if (imageFormat === "gemini") {
-    // Correct format for Gemini API (generativelanguage.googleapis.com)
-    instance.image = {
-      inlineData: {
-        mimeType: firstFrame.mimeType,
-        data: firstFrame.base64,
-      },
-    };
-  } else {
-    // Vertex AI format (aiplatform.googleapis.com) — WRONG for Gemini API endpoint
-    instance.image = {
-      mimeType: firstFrame.mimeType,
-      bytesBase64Encoded: firstFrame.base64,
-    };
-  }
+  // predictLongRunning requires bytesBase64Encoded (Vertex AI-style), not inlineData
+  instance.image = {
+    mimeType: firstFrame.mimeType,
+    bytesBase64Encoded: firstFrame.base64,
+  };
 }
 
 if (lastFrame) {
-  if (imageFormat === "gemini") {
-    instance.lastFrame = {
-      inlineData: {
-        mimeType: lastFrame.mimeType,
-        data: lastFrame.base64,
-      },
-    };
-  } else {
-    instance.lastFrame = {
-      mimeType: lastFrame.mimeType,
-      bytesBase64Encoded: lastFrame.base64,
-    };
-  }
+  instance.lastFrame = {
+    mimeType: lastFrame.mimeType,
+    bytesBase64Encoded: lastFrame.base64,
+  };
 }
 
 const parameters: Record<string, unknown> = {
