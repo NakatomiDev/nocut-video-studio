@@ -70,6 +70,7 @@ const App = () => (
               <Route path="/editor/:projectId" element={<ProtectedRoute><ProjectEditor /></ProtectedRoute>} />
               <Route path="/commercial-disclosure" element={<CommercialDisclosure />} />
               <Route path="/test-transition" element={<ProtectedRoute><TestTransition /></ProtectedRoute>} />
+              <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
