@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
 
     console.log(`Starting Veo transition: model=${model}, duration=${duration}s, hasLastFrame=${!!last_image_base64}`);
 
-    // Build instance with image conditioning (Vertex AI format, NOT Gemini inlineData)
+    // Build instance with image conditioning (Vertex AI format)
     const instance: Record<string, unknown> = {
       prompt: `${prompt}, ${duration} seconds`,
       image: {
@@ -45,11 +45,15 @@ Deno.serve(async (req) => {
       },
     };
 
-    if (last_image_base64) {
+    // lastFrame is only supported by veo-2.0; 3.x models don't support it via Gemini API
+    const supportsLastFrame = model.startsWith("veo-2");
+    if (last_image_base64 && supportsLastFrame) {
       instance.lastFrame = {
         bytesBase64Encoded: last_image_base64,
         mimeType: "image/png",
       };
+    } else if (last_image_base64 && !supportsLastFrame) {
+      console.log(`Skipping lastFrame — not supported by model ${model}`);
     }
 
     const parameters: Record<string, unknown> = {
