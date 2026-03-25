@@ -98,26 +98,42 @@ const VeoTester = () => {
       const last_image_base64 = lastImage ? await fileToBase64(lastImage) : null;
       setStatus(`Sending to ${selectedModel.label}... This may take up to 5 minutes.`);
 
-      const { data, error: fnError } = await supabase.functions.invoke("test-veo-transition", {
-        body: {
+      // Use raw fetch to get binary response
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const resp = await fetch(`${supabaseUrl}/functions/v1/test-veo-transition`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": supabaseKey,
+          "Authorization": `Bearer ${session?.access_token ?? supabaseKey}`,
+        },
+        body: JSON.stringify({
           first_image_base64,
           last_image_base64,
           prompt,
           duration,
           model: selectedModel.id,
-        },
+        }),
       });
 
-      if (fnError) throw new Error(fnError.message || "Edge function error");
-      if (data?.error) throw new Error(data.error.message || JSON.stringify(data.error));
+      const contentType = resp.headers.get("content-type") || "";
 
-      const byteChars = atob(data.video_base64);
-      const byteArray = new Uint8Array(byteChars.length);
-      for (let i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i);
-      const blob = new Blob([byteArray], { type: "video/mp4" });
-      setVideoUrl(URL.createObjectURL(blob));
-      setElapsed(data.elapsed_seconds);
-      setStatus(`✅ Done! Generated in ${data.elapsed_seconds}s (${(data.size_bytes / 1024 / 1024).toFixed(1)} MB)`);
+      if (contentType.includes("video/mp4")) {
+        // Binary video response
+        const blob = await resp.blob();
+        setVideoUrl(URL.createObjectURL(blob));
+        const elapsedSec = Number(resp.headers.get("x-video-elapsed") || "0");
+        const sizeBytes = Number(resp.headers.get("x-video-size") || blob.size);
+        setElapsed(elapsedSec);
+        setStatus(`✅ Done! Generated in ${elapsedSec}s (${(sizeBytes / 1024 / 1024).toFixed(1)} MB)`);
+      } else {
+        // JSON error response
+        const data = await resp.json();
+        throw new Error(data?.error?.message || data?.message || `API returned ${resp.status}`);
+      }
     } catch (err) {
       setError((err as Error).message);
       setStatus("");
