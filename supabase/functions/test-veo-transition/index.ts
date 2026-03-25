@@ -144,17 +144,17 @@ Deno.serve(async (req) => {
       const videoBytes = new Uint8Array(await videoResponse.arrayBuffer());
       console.log(`Downloaded video: ${videoBytes.length} bytes`);
 
-      // Return as base64
-      const { encodeBase64 } = await import("https://deno.land/std@0.224.0/encoding/base64.ts");
-      const videoBase64 = encodeBase64(videoBytes);
-
-      return successResponse({
-        video_base64: videoBase64,
-        size_bytes: videoBytes.length,
-        duration_seconds: duration,
-        model,
-        elapsed_seconds: elapsedSec,
-      });
+      // Return video as binary with metadata in headers
+      const corsHeaders = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+        "Access-Control-Expose-Headers": "x-video-size, x-video-model, x-video-elapsed",
+        "Content-Type": "video/mp4",
+        "x-video-size": String(videoBytes.length),
+        "x-video-model": model,
+        "x-video-elapsed": String(elapsedSec),
+      };
+      return new Response(videoBytes, { status: 200, headers: corsHeaders });
     }
 
     return errorResponse("timeout", "Veo generation timed out after 5 minutes", 504);
